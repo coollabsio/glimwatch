@@ -1,0 +1,10 @@
+target/
+data/
+backups/
+.env
+.env.local
+deploy/.env
+apps/web/node_modules/
+apps/web/dist/
+.DS_Store
+**/.DS_Store

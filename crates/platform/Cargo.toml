@@ -1,0 +1,25 @@
+[package]
+name = "coolstatus-platform"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+argon2.workspace = true
+base64.workspace = true
+chrono.workspace = true
+rand.workspace = true
+serde.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+unicode-segmentation = "1"
+url = "2"
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

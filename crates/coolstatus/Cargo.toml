@@ -1,0 +1,13 @@
+[package]
+name = "coolstatus-domain"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+coolstatus-platform = { path = "../platform" }
+hmac.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true

@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: coolstatus
+          POSTGRES_PASSWORD: coolstatus
+          POSTGRES_DB: coolstatus
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U coolstatus -d coolstatus"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      COOLSTATUS_TEST_POSTGRES_URL: postgres://coolstatus:coolstatus@127.0.0.1:5432/coolstatus_platform
+      COOLSTATUS_APP_POSTGRES_URL: postgres://coolstatus:coolstatus@127.0.0.1:5432/coolstatus_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt
+      - uses: oven-sh/setup-bun@v2
+      - name: Create test databases
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=coolstatus psql -h 127.0.0.1 -U coolstatus -d coolstatus -c "CREATE DATABASE coolstatus_platform"
+          PGPASSWORD=coolstatus psql -h 127.0.0.1 -U coolstatus -d coolstatus -c "CREATE DATABASE coolstatus_app"
+      - name: Backend tests
+        run: cargo test --workspace
+      - name: Frontend build
+        run: cd apps/web && bun install --frozen-lockfile && bun run build

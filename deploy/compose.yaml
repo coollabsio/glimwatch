@@ -1,0 +1,28 @@
+services:
+  coolstatus:
+    build:
+      context: ..
+    image: ${COOLSTATUS_IMAGE:-coolstatus:local}
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    environment:
+      COOLSTATUS_ENV: production
+      COOLSTATUS_BIND: 0.0.0.0
+      COOLSTATUS_PORT: 8080
+      COOLSTATUS_PUBLIC_ORIGIN: ${COOLSTATUS_PUBLIC_ORIGIN:-http://localhost:8080}
+      COOLSTATUS_DATABASE_PATH: /var/lib/coolstatus/coolstatus.sqlite
+      # Switch the same binary to Postgres by setting this and starting the db service.
+      # COOLSTATUS_DATABASE_URL: postgres://coolstatus:coolstatus@db:5432/coolstatus
+    volumes:
+      - coolstatus-data:/var/lib/coolstatus
+  # db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: coolstatus
+  #     POSTGRES_PASSWORD: coolstatus
+  #     POSTGRES_DB: coolstatus
+  #   volumes:
+  #     - coolstatus-pg:/var/lib/postgresql/data
+volumes:
+  coolstatus-data:
+  # coolstatus-pg:
