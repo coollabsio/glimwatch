@@ -38,7 +38,7 @@ async fn tick(state: &AppState, last_pruned: &mut i64) -> Result<(), sqlx::Error
         // Detached so a slow probe does not delay the next tick.
         tokio::spawn(async move {
             match engine::execute(&state, id).await {
-                Ok(()) | Err(AppError::Busy) | Err(AppError::NotFound) => {}
+                Ok(()) | Err(AppError::Busy | AppError::NotFound | AppError::Offline) => {}
                 Err(error) => tracing::error!(%error, %id, "monitor check failed"),
             }
         });

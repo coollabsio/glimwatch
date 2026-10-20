@@ -37,6 +37,9 @@ pub async fn execute(state: &AppState, id: Id) -> Result<(), AppError> {
         )
     } else {
         let probe = checker::probe(&state.http, &monitor).await;
+        if probe.transport_error.is_some() && !state.connectivity.online().await {
+            return Err(AppError::Offline);
+        }
         let judgement = judge(
             &Rules {
                 job_type: monitor.job_type,

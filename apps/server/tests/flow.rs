@@ -9,11 +9,17 @@ use status_server::{DEMO_PASSWORD, boot, router, testing_config};
 use tower::ServiceExt;
 
 async fn app() -> Router {
+    app_with_targets(Vec::new()).await
+}
+
+async fn app_with_targets(connectivity_targets: Vec<String>) -> Router {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("status.sqlite");
     // Leak the temp dir so the sqlite file outlives the router.
     let _keep = Box::leak(Box::new(dir));
-    let state = boot(testing_config(path)).await.unwrap();
+    let mut config = testing_config(path);
+    config.connectivity_targets = connectivity_targets;
+    let state = boot(config).await.unwrap();
     router(state)
 }
 
@@ -338,4 +344,61 @@ async fn sign_up_rejects_the_seeded_demo_password() {
     .await;
     assert!(status.is_client_error(), "{status} {body}");
     assert!(cookie.is_none());
+}
+
+#[tokio::test]
+async fn failed_check_is_not_counted_when_the_host_has_no_network() {
+    let app = app_with_targets(vec!["127.0.0.1:9".to_owned()]).await;
+    let (_, _, cookie) = call(
+        &app,
+        "POST",
+        "/api/auth/register",
+        Some(serde_json::json!({
+            "email": "ada@coollabs.io",
+            "password": "correct-horse-battery",
+        })),
+        None,
+    )
+    .await;
+    let cookie = cookie.expect("session cookie");
+    let (status, monitor, _) = call(
+        &app,
+        "POST",
+        "/api/monitors",
+        Some(serde_json::json!({
+            "name": "Worker",
+            "job_type": "tcp",
+            "url": "127.0.0.1:9",
+            "timeout_ms": 1000,
+            "interval_seconds": 30,
+            "failure_threshold": 1
+        })),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{monitor}");
+    let id = monitor["id"].as_str().unwrap();
+
+    let (status, problem, _) = call(
+        &app,
+        "POST",
+        &format!("/api/monitors/{id}/checks"),
+        None,
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{problem}");
+    assert_eq!(problem["code"], "host_offline");
+
+    let (_, monitor, _) = call(
+        &app,
+        "GET",
+        &format!("/api/monitors/{id}"),
+        None,
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(monitor["state"], "pending", "{monitor}");
+    let (_, incidents, _) = call(&app, "GET", "/api/incidents", None, Some(&cookie)).await;
+    assert_eq!(incidents.as_array().unwrap().len(), 0, "{incidents}");
 }

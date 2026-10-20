@@ -5,6 +5,7 @@
 
 mod checker;
 mod cli;
+mod connectivity;
 mod engine;
 mod error;
 mod migrations;

@@ -19,6 +19,7 @@ const SMTP_USERNAME: &str = "STATUS_SMTP_USERNAME";
 const SMTP_PASSWORD: &str = "STATUS_SMTP_PASSWORD";
 const SMTP_FROM: &str = "STATUS_SMTP_FROM";
 const ARGON_MEMORY: &str = "STATUS_ARGON_MEMORY_KIB";
+const CONNECTIVITY_TARGETS: &str = "STATUS_CONNECTIVITY_TARGETS";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -31,6 +32,9 @@ pub struct Config {
     pub open_signup: bool,
     pub smtp: Option<SmtpConfig>,
     pub argon_memory_kib: u32,
+    /// `host:port` targets that prove the Status host itself has network.
+    /// Empty disables the check.
+    pub connectivity_targets: Vec<String>,
 }
 
 impl Config {
@@ -46,6 +50,9 @@ impl Config {
             open_signup: true,
             smtp: None,
             argon_memory_kib: 19456,
+            connectivity_targets: ["1.1.1.1:443", "8.8.8.8:443", "9.9.9.9:443"]
+                .map(str::to_owned)
+                .to_vec(),
         }
     }
 
@@ -124,6 +131,12 @@ impl Config {
                 value: memory,
             })?;
         }
+        if let Some(targets) = optional(CONNECTIVITY_TARGETS) {
+            config.connectivity_targets = parse_targets(&targets).ok_or(ConfigError::Invalid {
+                name: CONNECTIVITY_TARGETS,
+                value: targets,
+            })?;
+        }
         Ok(config)
     }
 
@@ -196,6 +209,20 @@ fn optional(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn parse_targets(value: &str) -> Option<Vec<String>> {
+    if value == "off" {
+        return Some(Vec::new());
+    }
+    value
+        .split(',')
+        .map(str::trim)
+        .map(|target| {
+            let (host, port) = target.rsplit_once(':')?;
+            (!host.is_empty() && port.parse::<u16>().is_ok()).then(|| target.to_owned())
+        })
+        .collect()
+}
+
 fn parse_bool(value: &str) -> Option<bool> {
     match value {
         "1" | "true" | "yes" | "on" => Some(true),
@@ -250,6 +277,17 @@ impl FromStr for EnvironmentMode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_connectivity_targets() {
+        assert_eq!(
+            parse_targets("1.1.1.1:443, [::1]:53"),
+            Some(vec!["1.1.1.1:443".to_owned(), "[::1]:53".to_owned()])
+        );
+        assert_eq!(parse_targets("off"), Some(Vec::new()));
+        assert_eq!(parse_targets("1.1.1.1"), None);
+        assert_eq!(parse_targets("1.1.1.1:443,"), None);
+    }
 
     #[test]
     fn redacts_passwords() {

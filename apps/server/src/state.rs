@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use thiserror::Error;
 
+use crate::connectivity::Connectivity;
 use crate::migrations;
 
 #[derive(Clone)]
@@ -17,6 +18,7 @@ pub struct AppState {
     pub http: HttpClients,
     pub scheduler_id: String,
     pub inflight: Inflight,
+    pub connectivity: Connectivity,
 }
 
 #[derive(Clone)]
@@ -89,6 +91,7 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
         http: HttpClients::new()?,
         scheduler_id: status_platform::Id::new().to_string(),
         inflight: Inflight::default(),
+        connectivity: Connectivity::new(config.connectivity_targets.clone()),
         passwords,
         config: Arc::new(config),
     })
@@ -127,6 +130,7 @@ pub fn testing_config(path: PathBuf) -> Config {
         open_signup: true,
         smtp: None,
         argon_memory_kib: 32,
+        connectivity_targets: Vec::new(),
     }
 }
 

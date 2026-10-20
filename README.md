@@ -63,6 +63,12 @@ Webhook channels can set a secret. The body is posted as JSON with `X-Status-Sig
 
 In production (`STATUS_ENV=production`) sign-up closes after the first account. Set `STATUS_OPEN_SIGNUP=true` to leave it open.
 
+When a check cannot connect (DNS, connect, or timeout error), Status first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Status host's own network. Status then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
+
+```bash
+export STATUS_CONNECTIVITY_TARGETS=10.0.0.1:53,10.0.0.2:53   # or "off"
+```
+
 ## Development
 
 ```bash
