@@ -1,0 +1,17 @@
+{
+  "scripts": {
+    "setup": "just setup",
+    "teardown": null,
+    "run": "just dev"
+  },
+  "ports": [
+    {
+      "port": 43123,
+      "label": "CoolStatus web (Vite)"
+    },
+    {
+      "port": 43124,
+      "label": "CoolStatus API"
+    }
+  ]
+}
