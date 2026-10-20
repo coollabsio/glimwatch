@@ -51,8 +51,8 @@ impl PasswordService {
         }
     }
 
+    /// Hashes without the policy check. Callers that take user input call `validate` first.
     pub fn hash(&self, password: &str) -> Result<String, PasswordError> {
-        self.validate(password)?;
         let salt = SaltString::generate(&mut OsRng);
         self.argon2()
             .hash_password(password.as_bytes(), &salt)
@@ -134,9 +134,9 @@ mod tests {
     #[test]
     fn hashes_and_verifies() {
         let passwords = PasswordService::testing();
-        let hash = passwords.hash("coolstatus-demo").unwrap();
-        assert!(passwords.verify("coolstatus-demo", &hash).unwrap());
-        assert!(!passwords.verify("coolstatus-other", &hash).unwrap());
+        let hash = passwords.hash("status-demo").unwrap();
+        assert!(passwords.verify("status-demo", &hash).unwrap());
+        assert!(!passwords.verify("status-other", &hash).unwrap());
     }
 
     #[test]

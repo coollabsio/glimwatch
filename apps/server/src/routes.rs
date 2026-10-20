@@ -6,16 +6,16 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use coolstatus_domain::{
+use serde::Deserialize;
+use serde_json::{Value, json};
+use status_domain::{
     Assertion, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput, MonitorState,
     NotificationEvent, NotificationPayload, OpenIncident, page_banner, resolved_at_after_update,
     validate_monitor, validate_slug,
 };
-use coolstatus_platform::{
+use status_platform::{
     Id, PasswordError, TimestampMillis, generate_token, hash_token, normalize_email,
 };
-use serde::Deserialize;
-use serde_json::{Value, json};
 use tower_http::trace::TraceLayer;
 
 use crate::engine;
@@ -26,7 +26,7 @@ use crate::repo::{self, Channel, Incident, IncidentUpdate, Maintenance, Monitor,
 use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
 use crate::state::{self, AppState};
 
-const COOKIE: &str = "coolstatus_session";
+const COOKIE: &str = "status_session";
 const DAY_MS: i64 = 86_400_000;
 
 pub fn router(state: AppState) -> Router {
@@ -890,7 +890,7 @@ async fn test_channel(
         monitor: None,
         check: None,
         incident: None,
-        message: Some("This is a test notification from CoolStatus.".to_owned()),
+        message: Some("This is a test notification from Status.".to_owned()),
     };
     notify::deliver(&state, &channel, &payload, None, None).await;
     Ok(Json(channel_view(&state, channel).await?))
@@ -1029,14 +1029,14 @@ async fn notify_incident(state: &AppState, incident: &Incident, message: &str) {
     let payload = NotificationPayload {
         event: NotificationEvent::IncidentUpdated.as_str().to_owned(),
         sent_at: TimestampMillis::now().to_string(),
-        monitor: monitor.map(|monitor| coolstatus_domain::PayloadMonitor {
+        monitor: monitor.map(|monitor| status_domain::PayloadMonitor {
             id: monitor.id.to_string(),
             name: monitor.name,
             url: monitor.url,
             state: monitor.state,
         }),
         check: None,
-        incident: Some(coolstatus_domain::PayloadIncident {
+        incident: Some(status_domain::PayloadIncident {
             id: incident.id.to_string(),
             title: incident.title.clone(),
             status: incident.status,

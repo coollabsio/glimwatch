@@ -3,13 +3,13 @@
 
 use std::ops::DerefMut;
 
-use coolstatus_domain::{
+use serde::de::DeserializeOwned;
+use sqlx::{Any, Row, Transaction};
+use status_domain::{
     Assertion, CheckStatus, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
     MonitorState,
 };
-use coolstatus_platform::{Database, Id, ParseIdError, TimestampMillis};
-use serde::de::DeserializeOwned;
-use sqlx::{Any, Row, Transaction};
+use status_platform::{Database, Id, ParseIdError, TimestampMillis};
 
 const MONITOR_COLUMNS: &str = "\
 id, name, description, job_type, url, method, headers_json, body, timeout_ms, interval_seconds, \

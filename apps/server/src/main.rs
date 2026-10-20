@@ -1,9 +1,9 @@
 use std::process::ExitCode;
 
-use coolstatus_platform::{TracingFormat, init_tracing};
+use status_platform::{TracingFormat, init_tracing};
 
 fn main() -> ExitCode {
-    let format = match std::env::var("COOLSTATUS_ENV").as_deref() {
+    let format = match std::env::var("STATUS_ENV").as_deref() {
         Ok("production") => TracingFormat::Json,
         _ => TracingFormat::Compact,
     };
@@ -12,10 +12,10 @@ fn main() -> ExitCode {
         .enable_all()
         .build()
         .expect("tokio runtime");
-    match runtime.block_on(coolstatus_server::run()) {
+    match runtime.block_on(status_server::run()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("coolstatus: {error}");
+            eprintln!("status: {error}");
             ExitCode::FAILURE
         }
     }

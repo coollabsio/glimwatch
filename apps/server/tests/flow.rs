@@ -3,14 +3,14 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use coolstatus_server::{boot, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::Value;
+use status_server::{DEMO_PASSWORD, boot, router, testing_config};
 use tower::ServiceExt;
 
 async fn app() -> Router {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("coolstatus.sqlite");
+    let path = dir.path().join("status.sqlite");
     // Leak the temp dir so the sqlite file outlives the router.
     let _keep = Box::leak(Box::new(dir));
     let state = boot(testing_config(path)).await.unwrap();
@@ -202,8 +202,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
     assert_eq!(public["components"].as_array().unwrap().len(), 2);
     assert!(!public["incidents"].as_array().unwrap().is_empty());
 
-    let starts = coolstatus_platform::TimestampMillis::now();
-    let ends = coolstatus_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
+    let starts = status_platform::TimestampMillis::now();
+    let ends = status_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
     let (status, maintenance, _) = call(
         &app,
         "POST",
@@ -293,7 +293,7 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
 
 #[tokio::test]
 async fn postgres_accepts_the_same_api() {
-    let Some(url) = std::env::var("COOLSTATUS_APP_POSTGRES_URL")
+    let Some(url) = std::env::var("STATUS_APP_POSTGRES_URL")
         .ok()
         .filter(|url| !url.is_empty())
     else {
@@ -303,7 +303,7 @@ async fn postgres_accepts_the_same_api() {
     config.database_url = Some(url);
     let state = boot(config).await.expect("postgres boot");
     let app = router(state);
-    let email = format!("pg-{}@coollabs.io", coolstatus_platform::Id::new());
+    let email = format!("pg-{}@coollabs.io", status_platform::Id::new());
     let (status, user, _) = call(
         &app,
         "POST",
@@ -320,4 +320,22 @@ async fn postgres_accepts_the_same_api() {
     let (status, ready, _) = call(&app, "GET", "/api/health/ready", None, None).await;
     assert_eq!(status, StatusCode::OK, "{ready}");
     assert_eq!(ready["database"], "postgres");
+}
+
+#[tokio::test]
+async fn sign_up_rejects_the_seeded_demo_password() {
+    let app = app().await;
+    let (status, body, cookie) = call(
+        &app,
+        "POST",
+        "/api/auth/register",
+        Some(serde_json::json!({
+            "email": "ada@coollabs.io",
+            "password": DEMO_PASSWORD,
+        })),
+        None,
+    )
+    .await;
+    assert!(status.is_client_error(), "{status} {body}");
+    assert!(cookie.is_none());
 }

@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use coolstatus_domain::{NotificationPayload, sign_body};
-use coolstatus_platform::{Id, TimestampMillis};
 use serde_json::Value;
+use status_domain::{NotificationPayload, sign_body};
+use status_platform::{Id, TimestampMillis};
 
 use crate::repo::{self, Channel};
 use crate::state::AppState;
@@ -70,8 +70,7 @@ async fn send(
         "email" => {
             let Some(smtp) = &state.config.smtp else {
                 return Ok(SendOutcome::Skipped(
-                    "SMTP is not configured. Set COOLSTATUS_SMTP_HOST and COOLSTATUS_SMTP_FROM."
-                        .to_owned(),
+                    "SMTP is not configured. Set STATUS_SMTP_HOST and STATUS_SMTP_FROM.".to_owned(),
                 ));
             };
             let to = config
@@ -94,8 +93,7 @@ async fn send(
             if let Some(secret) = config.get("secret").and_then(Value::as_str) {
                 if !secret.is_empty() {
                     let signature = sign_body(secret, &body);
-                    request =
-                        request.header("x-coolstatus-signature", format!("sha256={signature}"));
+                    request = request.header("x-status-signature", format!("sha256={signature}"));
                 }
             }
             let response = request
@@ -140,7 +138,7 @@ async fn post_json(state: &AppState, url: &str, body: serde_json::Value) -> Resu
 }
 
 async fn send_email(
-    smtp: &coolstatus_platform::SmtpConfig,
+    smtp: &status_platform::SmtpConfig,
     to: &str,
     subject: &str,
     text: &str,
@@ -190,13 +188,13 @@ pub fn plain(payload: &NotificationPayload) -> (String, String) {
         .monitor
         .as_ref()
         .map(|monitor| monitor.name.as_str())
-        .unwrap_or("CoolStatus");
+        .unwrap_or("Status");
     let subject = match payload.event.as_str() {
-        "monitor.down" => format!("[CoolStatus] {name} is down"),
-        "monitor.recovered" => format!("[CoolStatus] {name} recovered"),
-        "incident.updated" => format!("[CoolStatus] Incident update: {name}"),
-        "notification.test" => format!("[CoolStatus] Test notification for {name}"),
-        _ => format!("[CoolStatus] {name}"),
+        "monitor.down" => format!("[Status] {name} is down"),
+        "monitor.recovered" => format!("[Status] {name} recovered"),
+        "incident.updated" => format!("[Status] Incident update: {name}"),
+        "notification.test" => format!("[Status] Test notification for {name}"),
+        _ => format!("[Status] {name}"),
     };
     let mut lines = vec![subject.clone(), String::new()];
     if let Some(monitor) = &payload.monitor {

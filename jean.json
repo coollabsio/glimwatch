@@ -7,11 +7,11 @@
   "ports": [
     {
       "port": 43123,
-      "label": "CoolStatus web (Vite)"
+      "label": "Status web (Vite)"
     },
     {
       "port": 43124,
-      "label": "CoolStatus API"
+      "label": "Status API"
     }
   ]
 }

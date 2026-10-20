@@ -1,12 +1,12 @@
-use coolstatus_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
-use coolstatus_platform::{Id, TimestampMillis};
+use status_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
+use status_platform::{Id, TimestampMillis};
 
 use crate::error::AppError;
 use crate::repo::{self, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page};
 use crate::state::{self, AppState};
 
-pub const DEMO_EMAIL: &str = "andras@coollabs.io";
-pub const DEMO_PASSWORD: &str = "coolstatus-demo";
+pub const DEMO_EMAIL: &str = "test@example.com";
+pub const DEMO_PASSWORD: &str = "password";
 
 pub async fn seed(state: &AppState) -> Result<bool, AppError> {
     if repo::count_users(&state.db).await? > 0 {
@@ -22,7 +22,7 @@ pub async fn seed(state: &AppState) -> Result<bool, AppError> {
         user_id,
         DEMO_EMAIL,
         DEMO_EMAIL,
-        "Andras Bacsai",
+        "Test User",
         &hash,
         "owner",
         now,

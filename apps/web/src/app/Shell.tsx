@@ -83,7 +83,7 @@ export function Shell() {
 
   function toggleTheme() {
     const next = document.documentElement.classList.toggle("dark");
-    localStorage.setItem("coolstatus-theme", next ? "dark" : "light");
+    localStorage.setItem("status-theme", next ? "dark" : "light");
     setDark(next);
   }
 
@@ -92,14 +92,14 @@ export function Shell() {
       <header className="fixed inset-x-0 top-0 z-40 hidden h-12 items-center border-b border-neutral-200 bg-white/95 backdrop-blur lg:flex dark:border-white/[0.06] dark:bg-[var(--color-panel)]/95">
         <div className="flex h-full w-56 shrink-0 items-center gap-2 border-r border-neutral-200 px-4 dark:border-white/[0.06]">
           <NavLink to="/" className="text-[15px] font-semibold tracking-tight text-black dark:text-white">
-            CoolStatus
+            Status
           </NavLink>
           <span className="truncate text-[10.5px] font-medium text-neutral-400 dark:text-[var(--color-fg-faint)]">
             v{meta.data?.version ?? "0.1.0"}
           </span>
         </div>
         <div className="flex h-full min-w-0 flex-1 items-center justify-between px-4">
-          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "CoolStatus"}</div>
+          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Status"}</div>
           <div className="flex items-center gap-1">
             <button type="button" className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -116,7 +116,7 @@ export function Shell() {
 
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden dark:border-white/[0.06] dark:bg-[var(--color-panel)]/95">
         <NavLink to="/" className="text-[15px] font-semibold tracking-tight">
-          CoolStatus
+          Status
         </NavLink>
         <button type="button" className="icon-button" onClick={() => setOpen(true)} aria-label="Open menu">
           <Menu className="size-5" />
@@ -128,7 +128,7 @@ export function Shell() {
           <button className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-[var(--color-panel)]">
             <div className="flex h-12 items-center justify-between border-b border-neutral-200 px-4 dark:border-white/[0.06]">
-              <span className="text-[15px] font-semibold">CoolStatus</span>
+              <span className="text-[15px] font-semibold">Status</span>
               <button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="Close menu">
                 <X className="size-4" />
               </button>
@@ -173,7 +173,7 @@ export function Mark({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="size-2.5 rounded-full bg-[var(--color-coollabs)] shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-coollabs)_25%,transparent)]" />
+      <span className="size-2.5 rounded-full bg-[var(--color-brand)] shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-brand)_25%,transparent)]" />
     </span>
   );
 }

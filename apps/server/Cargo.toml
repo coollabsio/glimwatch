@@ -1,15 +1,15 @@
 [package]
-name = "coolstatus-server"
+name = "status-server"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [lib]
-name = "coolstatus_server"
+name = "status_server"
 path = "src/lib.rs"
 
 [[bin]]
-name = "coolstatus"
+name = "status"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,8 +17,8 @@ axum = "0.8"
 axum-extra = { version = "0.10", features = ["cookie"] }
 chrono.workspace = true
 clap = { version = "4", features = ["derive"] }
-coolstatus-domain = { path = "../../crates/coolstatus" }
-coolstatus-platform = { path = "../../crates/platform" }
+status-domain = { path = "../../crates/status" }
+status-platform = { path = "../../crates/platform" }
 include_dir = "0.7"
 lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
 mime_guess = "2"
@@ -32,7 +32,7 @@ tower-http = { version = "0.6", features = ["trace"] }
 tracing.workspace = true
 
 [dev-dependencies]
-coolstatus-platform = { path = "../../crates/platform" }
+status-platform = { path = "../../crates/platform" }
 http-body-util = "0.1"
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }

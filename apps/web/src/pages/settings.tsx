@@ -10,7 +10,7 @@ export function SettingsPage() {
 
   function toggleTheme() {
     const next = document.documentElement.classList.toggle("dark");
-    localStorage.setItem("coolstatus-theme", next ? "dark" : "light");
+    localStorage.setItem("status-theme", next ? "dark" : "light");
     setDark(next);
   }
 
@@ -18,7 +18,7 @@ export function SettingsPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="This CoolStatus install, the signed-in operator, and the interface theme."
+        description="This Status install, the signed-in operator, and the interface theme."
       />
       <LayerCard title="Account">
         <dl className="grid gap-3 text-[13px] sm:grid-cols-3">
@@ -48,7 +48,7 @@ export function SettingsPage() {
           </div>
         </dl>
       </LayerCard>
-      <LayerCard title="Appearance" description="Coolify is dark first. Light mode keeps the purple accent.">
+      <LayerCard title="Appearance" description="Coolify is dark first. Both modes use the blue accent.">
         <Button type="button" onClick={toggleTheme}>
           {dark ? "Switch to light" : "Switch to dark"}
         </Button>

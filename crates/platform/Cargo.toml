@@ -1,5 +1,5 @@
 [package]
-name = "coolstatus-platform"
+name = "status-platform"
 edition.workspace = true
 version.workspace = true
 license.workspace = true

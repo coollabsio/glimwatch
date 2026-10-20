@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use coolstatus_platform::Config;
+use status_platform::Config;
 
 use crate::scheduler;
 use crate::seed;
@@ -11,7 +11,7 @@ use crate::state::{self, BootError};
 
 #[derive(Parser)]
 #[command(
-    name = "coolstatus",
+    name = "status",
     version,
     about = "Status pages, incidents, and uptime monitoring"
 )]
@@ -58,7 +58,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             scheduler::spawn(state.clone());
             let listener = tokio::net::TcpListener::bind(addr).await?;
             let bound = listener.local_addr()?;
-            tracing::info!("CoolStatus listening on http://{bound}");
+            tracing::info!("Status listening on http://{bound}");
             axum::serve(listener, crate::routes::router(state))
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;

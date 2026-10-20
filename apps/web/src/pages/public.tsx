@@ -44,7 +44,7 @@ export function PublicStatusPage() {
           <div className="flex items-center gap-3">
             <Mark />
             <div>
-              <div className="text-[11px] font-medium text-[var(--coollabs-subtle)]">CoolStatus</div>
+              <div className="text-[11px] font-medium text-[var(--coollabs-subtle)]">Status</div>
               <h1>{page.title}</h1>
               <p className="mt-1 text-[13px] text-[var(--coollabs-subtle)]">{page.description}</p>
             </div>
@@ -112,7 +112,7 @@ export function PublicStatusPage() {
             ))}
           </div>
         </section>
-        <footer className="mt-16 text-center text-[11px] text-[var(--coollabs-subtle)]">Powered by CoolStatus</footer>
+        <footer className="mt-16 text-center text-[11px] text-[var(--coollabs-subtle)]">Powered by Status</footer>
       </div>
     </div>
   );

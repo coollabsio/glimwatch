@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use coolstatus_platform::Problem;
+use status_platform::Problem;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -54,7 +54,7 @@ impl IntoResponse for AppError {
         let problem = match self {
             Self::Unauthorized => Problem::unauthorized(),
             Self::InvalidLogin => Problem {
-                type_uri: "https://coolstatus.dev/problems/invalid-login".to_owned(),
+                type_uri: "https://status.dev/problems/invalid-login".to_owned(),
                 title: "Sign-in failed".to_owned(),
                 status: 401,
                 code: "invalid_login".to_owned(),
@@ -62,7 +62,7 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::Forbidden(detail) => Problem {
-                type_uri: "https://coolstatus.dev/problems/forbidden".to_owned(),
+                type_uri: "https://status.dev/problems/forbidden".to_owned(),
                 title: "Forbidden".to_owned(),
                 status: 403,
                 code: "forbidden".to_owned(),

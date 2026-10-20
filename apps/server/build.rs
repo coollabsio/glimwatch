@@ -9,7 +9,7 @@ fn main() {
         fs::create_dir_all(&dist).expect("create web dist");
         fs::write(
             &index,
-            "<!doctype html><title>CoolStatus</title><p>The UI has not been built yet. From apps/web, run <code>bun install && bun run build</code>, then rebuild the server.</p>",
+            "<!doctype html><title>Status</title><p>The UI has not been built yet. From apps/web, run <code>bun install && bun run build</code>, then rebuild the server.</p>",
         )
         .expect("write placeholder index");
     }

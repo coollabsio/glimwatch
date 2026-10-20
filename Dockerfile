@@ -15,24 +15,24 @@ COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY apps/server/ apps/server/
 COPY --from=web /src/apps/web/dist/ apps/web/dist/
-RUN cargo build --locked --release -p coolstatus-server
+RUN cargo build --locked --release -p status-server
 
 FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --uid 65532 --user-group --create-home --home-dir /var/lib/coolstatus coolstatus \
-    && mkdir -p /var/lib/coolstatus \
-    && chown -R 65532:65532 /var/lib/coolstatus
-COPY --from=server /src/target/release/coolstatus /coolstatus
-ENV COOLSTATUS_ENV=production \
-    COOLSTATUS_BIND=0.0.0.0 \
-    COOLSTATUS_PORT=8080 \
-    COOLSTATUS_DATABASE_PATH=/var/lib/coolstatus/coolstatus.sqlite \
-    COOLSTATUS_PUBLIC_ORIGIN=http://127.0.0.1:8080
+    && useradd --uid 65532 --user-group --create-home --home-dir /var/lib/status status \
+    && mkdir -p /var/lib/status \
+    && chown -R 65532:65532 /var/lib/status
+COPY --from=server /src/target/release/status /status
+ENV STATUS_ENV=production \
+    STATUS_BIND=0.0.0.0 \
+    STATUS_PORT=8080 \
+    STATUS_DATABASE_PATH=/var/lib/status/status.sqlite \
+    STATUS_PUBLIC_ORIGIN=http://127.0.0.1:8080
 USER 65532:65532
-VOLUME ["/var/lib/coolstatus"]
+VOLUME ["/var/lib/status"]
 EXPOSE 8080
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD ["/coolstatus", "healthcheck"]
-ENTRYPOINT ["/coolstatus"]
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD ["/status", "healthcheck"]
+ENTRYPOINT ["/status"]
 CMD ["serve"]

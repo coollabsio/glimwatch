@@ -1,6 +1,6 @@
-# CoolStatus
+# Status
 
-CoolStatus is a self-hosted status page, incident desk, and uptime monitor from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
+Status is a self-hosted status page, incident desk, and uptime monitor from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -21,28 +21,30 @@ You need Rust 1.99 (see `rust-toolchain.toml`) and [Bun](https://bun.sh) 1.2 or 
 
 ```bash
 cd apps/web && bun install && bun run build
-cargo run -p coolstatus-server -- seed
-cargo run -p coolstatus-server -- serve --listen 127.0.0.1:43123
+cargo run -p status-server -- seed
+cargo run -p status-server -- serve --listen 127.0.0.1:43123
 ```
 
 Open http://127.0.0.1:43123.
 
 `seed` creates a local demo and does nothing if an account already exists:
 
-- email `andras@coollabs.io`
-- password `coolstatus-demo`
+- email `test@example.com`
+- password `password`
 
-The database file is `data/coolstatus.sqlite`. Migrations run on startup.
+`just dev` runs `seed` before it starts the server.
+
+The database file is `data/status.sqlite`. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
 ### Postgres
 
-Leave the SQLite path in place (it is unused for data) and set a URL. `DATABASE_URL` is accepted as an alias of `COOLSTATUS_DATABASE_URL`.
+Leave the SQLite path in place (it is unused for data) and set a URL. `DATABASE_URL` is accepted as an alias of `STATUS_DATABASE_URL`.
 
 ```bash
-export COOLSTATUS_DATABASE_URL=postgres://coolstatus:coolstatus@127.0.0.1:5432/coolstatus
-cargo run -p coolstatus-server -- serve --listen 127.0.0.1:43123
+export STATUS_DATABASE_URL=postgres://status:status@127.0.0.1:5432/status
+cargo run -p status-server -- serve --listen 127.0.0.1:43123
 ```
 
 The URL must start with `postgres://` or `postgresql://`. Integer columns are `BIGINT` so one SQL file decodes as `i64` on both engines. A migration is applied once, inside a transaction, and its SHA-256 is stored in `schema_migrations`. A later binary with different SQL for that version refuses to start.
@@ -52,14 +54,14 @@ Copy `.env.example` to `.env.local` if you want the variables written down. The 
 Email delivery needs SMTP. Without it, an email channel is saved and each send is recorded as skipped:
 
 ```bash
-export COOLSTATUS_SMTP_HOST=smtp.example.com
-export COOLSTATUS_SMTP_PORT=587
-export COOLSTATUS_SMTP_FROM=status@example.com
+export STATUS_SMTP_HOST=smtp.example.com
+export STATUS_SMTP_PORT=587
+export STATUS_SMTP_FROM=status@example.com
 ```
 
-Webhook channels can set a secret. The body is posted as JSON with `X-CoolStatus-Signature: sha256=<hmac-sha256>`.
+Webhook channels can set a secret. The body is posted as JSON with `X-Status-Signature: sha256=<hmac-sha256>`.
 
-In production (`COOLSTATUS_ENV=production`) sign-up closes after the first account. Set `COOLSTATUS_OPEN_SIGNUP=true` to leave it open.
+In production (`STATUS_ENV=production`) sign-up closes after the first account. Set `STATUS_OPEN_SIGNUP=true` to leave it open.
 
 ## Development
 
@@ -70,7 +72,7 @@ just test
 just build    # release binary with the UI embedded
 ```
 
-`just` is optional. The same commands are `bun install`, `cargo test --workspace`, and `cargo build --release -p coolstatus-server` after `bun run build`.
+`just` is optional. The same commands are `bun install`, `cargo test --workspace`, and `cargo build --release -p status-server` after `bun run build`.
 
 Frontend dev proxies `/api` to the Rust process. Production does not proxy: the binary serves both.
 
@@ -85,8 +87,8 @@ Domain tests cover assertions, the failure threshold, uptime math (maintenance i
 Postgres runs the same migration and API test when these are set:
 
 ```bash
-export COOLSTATUS_TEST_POSTGRES_URL=postgres://coolstatus:coolstatus@127.0.0.1:5432/coolstatus_platform
-export COOLSTATUS_APP_POSTGRES_URL=postgres://coolstatus:coolstatus@127.0.0.1:5432/coolstatus_app
+export STATUS_TEST_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_platform
+export STATUS_APP_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_app
 ```
 
 Use two empty databases. The platform test resets its own schema.
@@ -94,29 +96,29 @@ Use two empty databases. The platform test resets its own schema.
 ## Docker
 
 ```bash
-docker build -t coolstatus:local .
-docker run --rm -p 8080:8080 -v coolstatus-data:/var/lib/coolstatus coolstatus:local
+docker build -t status:local .
+docker run --rm -p 8080:8080 -v status-data:/var/lib/status status:local
 ```
 
-The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/coolstatus`, and uses `coolstatus healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service.
+The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/status`, and uses `status healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service.
 
 ## How this maps to Orbit
 
-CoolStatus follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves out its realtime stack (websockets, live sync, collaborative editing).
+Status follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves out its realtime stack (websockets, live sync, collaborative editing).
 
-| Orbit | CoolStatus |
+| Orbit | Status |
 | --- | --- |
-| `apps/server` binary embeds the web app | `apps/server`, binary name `coolstatus` |
+| `apps/server` binary embeds the web app | `apps/server`, binary name `status` |
 | `crates/platform` (config, db, auth, migrations) | `crates/platform` |
-| `crates/orbit` domain rules | `crates/coolstatus` |
+| `crates/orbit` domain rules | `crates/status` |
 | `apps/web` Vite, React, Tailwind | `apps/web` |
-| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `COOLSTATUS_DATABASE_URL` / `DATABASE_URL` |
+| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `STATUS_DATABASE_URL` / `DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
 | `platform::jobs` worker | `scheduler`: a lease row plus the check loop |
 | `justfile`, multi-stage Dockerfile, `deploy/compose.yaml` | same roles |
 
-The domain follows [OpenStatus](https://github.com/openstatusHQ/openstatus): monitors, check history, status pages and components, incident timelines, maintenance, and a notification provider list. Regions, private locations, and the hosted billing pieces are not in this MVP. Checks run from the CoolStatus process itself (`region = local`).
+The domain follows [OpenStatus](https://github.com/openstatusHQ/openstatus): monitors, check history, status pages and components, incident timelines, maintenance, and a notification provider list. Regions, private locations, and the hosted billing pieces are not in this MVP. Checks run from the Status process itself (`region = local`).
 
 The interface takes Coolify's dark shell and pink primary action, which Orbit already uses, and the public page takes the OpenStatus layout: one banner, a component list, and uptime bars.
 
@@ -126,7 +128,7 @@ The interface takes Coolify's dark shell and pink primary action, which Orbit al
 apps/server     API, scheduler, checker, repositories, migrations
 apps/web        React dashboard and public status page
 crates/platform Config, SQLite/Postgres pool, migrations, passwords, ids
-crates/coolstatus  Assertions, state machine, uptime, slugs, notification signing
+crates/status  Assertions, state machine, uptime, slugs, notification signing
 deploy          Docker Compose
 ```
 

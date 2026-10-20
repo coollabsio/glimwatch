@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use coolstatus_domain::{Probe, parse_tcp_target};
+use status_domain::{Probe, parse_tcp_target};
 use tokio::net::TcpStream;
 
 use crate::repo::Monitor;
@@ -12,8 +12,8 @@ pub async fn probe(http: &HttpClients, monitor: &Monitor) -> Probe {
     let started = Instant::now();
     let timeout = Duration::from_millis(monitor.timeout_ms.max(1) as u64);
     match monitor.job_type {
-        coolstatus_domain::JobType::Http => http_probe(http, monitor, timeout, started).await,
-        coolstatus_domain::JobType::Tcp => tcp_probe(monitor, timeout, started).await,
+        status_domain::JobType::Http => http_probe(http, monitor, timeout, started).await,
+        status_domain::JobType::Tcp => tcp_probe(monitor, timeout, started).await,
     }
 }
 

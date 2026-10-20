@@ -19,7 +19,7 @@ function RequireAuth() {
     queryFn: () => api<User>("/api/auth/me"),
   });
   if (me.isLoading) {
-    return <div className="grid min-h-svh place-items-center text-sm text-muted-foreground">Opening CoolStatus…</div>;
+    return <div className="grid min-h-svh place-items-center text-sm text-muted-foreground">Opening Status…</div>;
   }
   if (me.error instanceof ApiError && me.error.status === 401) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

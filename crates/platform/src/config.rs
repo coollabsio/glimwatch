@@ -5,20 +5,20 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-const ENV: &str = "COOLSTATUS_ENV";
-const BIND: &str = "COOLSTATUS_BIND";
-const PORT: &str = "COOLSTATUS_PORT";
-const ORIGIN: &str = "COOLSTATUS_PUBLIC_ORIGIN";
-const DATABASE_PATH: &str = "COOLSTATUS_DATABASE_PATH";
-const DATABASE_URL: &str = "COOLSTATUS_DATABASE_URL";
+const ENV: &str = "STATUS_ENV";
+const BIND: &str = "STATUS_BIND";
+const PORT: &str = "STATUS_PORT";
+const ORIGIN: &str = "STATUS_PUBLIC_ORIGIN";
+const DATABASE_PATH: &str = "STATUS_DATABASE_PATH";
+const DATABASE_URL: &str = "STATUS_DATABASE_URL";
 const DATABASE_URL_ALIAS: &str = "DATABASE_URL";
-const OPEN_SIGNUP: &str = "COOLSTATUS_OPEN_SIGNUP";
-const SMTP_HOST: &str = "COOLSTATUS_SMTP_HOST";
-const SMTP_PORT: &str = "COOLSTATUS_SMTP_PORT";
-const SMTP_USERNAME: &str = "COOLSTATUS_SMTP_USERNAME";
-const SMTP_PASSWORD: &str = "COOLSTATUS_SMTP_PASSWORD";
-const SMTP_FROM: &str = "COOLSTATUS_SMTP_FROM";
-const ARGON_MEMORY: &str = "COOLSTATUS_ARGON_MEMORY_KIB";
+const OPEN_SIGNUP: &str = "STATUS_OPEN_SIGNUP";
+const SMTP_HOST: &str = "STATUS_SMTP_HOST";
+const SMTP_PORT: &str = "STATUS_SMTP_PORT";
+const SMTP_USERNAME: &str = "STATUS_SMTP_USERNAME";
+const SMTP_PASSWORD: &str = "STATUS_SMTP_PASSWORD";
+const SMTP_FROM: &str = "STATUS_SMTP_FROM";
+const ARGON_MEMORY: &str = "STATUS_ARGON_MEMORY_KIB";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -41,7 +41,7 @@ impl Config {
             bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 43123,
             public_origin: "http://127.0.0.1:43123".to_owned(),
-            database_path: PathBuf::from("data/coolstatus.sqlite"),
+            database_path: PathBuf::from("data/status.sqlite"),
             database_url: None,
             open_signup: true,
             smtp: None,
@@ -184,7 +184,7 @@ pub enum ConfigError {
     #[error("missing {0}")]
     Missing(&'static str),
     #[error(
-        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set COOLSTATUS_DATABASE_PATH to move the file"
+        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set STATUS_DATABASE_PATH to move the file"
     )]
     DatabaseUrl,
 }
@@ -254,8 +254,8 @@ mod tests {
     #[test]
     fn redacts_passwords() {
         assert_eq!(
-            redact_database_url("postgres://coolstatus:secret@localhost/coolstatus"),
-            "postgres://coolstatus:REDACTED@localhost/coolstatus"
+            redact_database_url("postgres://status:secret@localhost/status"),
+            "postgres://status:REDACTED@localhost/status"
         );
     }
 
@@ -265,7 +265,7 @@ mod tests {
         // because the process is the test binary. Other tests do not read DATABASE_URL.
         unsafe {
             std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
-            std::env::remove_var("COOLSTATUS_DATABASE_URL");
+            std::env::remove_var("STATUS_DATABASE_URL");
         }
         let error = Config::from_env().unwrap_err();
         assert!(matches!(error, ConfigError::DatabaseUrl));

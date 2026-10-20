@@ -1,4 +1,4 @@
-use coolstatus_platform::{Migration, MigrationRunner};
+use status_platform::{Migration, MigrationRunner};
 
 pub fn runner() -> MigrationRunner {
     MigrationRunner::new(

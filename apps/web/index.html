@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CoolStatus</title>
+    <title>Status</title>
     <meta
       name="description"
       content="Status pages, incidents, and uptime monitoring from coolLabs."
@@ -11,7 +11,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script>
       (function () {
-        var theme = localStorage.getItem("coolstatus-theme");
+        var theme = localStorage.getItem("status-theme");
         if (theme !== "light") document.documentElement.classList.add("dark");
         var meta = document.querySelector('meta[name="theme-color"]');
         if (!meta) {

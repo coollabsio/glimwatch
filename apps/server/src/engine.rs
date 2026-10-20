@@ -1,11 +1,11 @@
 use std::ops::DerefMut;
 
-use coolstatus_domain::{
+use sqlx::Row;
+use status_domain::{
     CheckStatus, IncidentImpact, IncidentStatus, NotificationEvent, NotificationPayload,
     PayloadCheck, PayloadIncident, PayloadMonitor, Rules, apply_outcome, judge,
 };
-use coolstatus_platform::{Id, TimestampMillis};
-use sqlx::Row;
+use status_platform::{Id, TimestampMillis};
 
 use crate::checker;
 use crate::error::AppError;
@@ -94,7 +94,7 @@ pub async fn execute(state: &AppState, id: Id) -> Result<(), AppError> {
             let incident_id = Id::new();
             let detail = error.unwrap_or_else(|| "The check failed.".to_owned());
             let message = format!(
-                "CoolStatus recorded {} consecutive failed checks for {}. {detail}",
+                "Status recorded {} consecutive failed checks for {}. {detail}",
                 transition.consecutive_failures, monitor.url
             );
             let incident = Incident {

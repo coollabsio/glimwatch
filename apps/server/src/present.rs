@@ -1,11 +1,11 @@
 use chrono::{DateTime, Utc};
-use coolstatus_domain::{
+use serde::Serialize;
+use serde_json::Value;
+use status_domain::{
     Assertion, CheckStatus, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
     MonitorState, PageBanner, summarize,
 };
-use coolstatus_platform::{Id, TimestampMillis};
-use serde::Serialize;
-use serde_json::Value;
+use status_platform::{Id, TimestampMillis};
 
 use crate::repo::{
     Audit, Channel, CheckRow, Component, DailyRow, Delivery, Incident, IncidentUpdate, Maintenance,
@@ -168,7 +168,7 @@ fn average(sum: i64, count: i64) -> Option<i64> {
     if count <= 0 { None } else { Some(sum / count) }
 }
 
-fn bar(bucket: coolstatus_domain::DayBucket) -> BarResponse {
+fn bar(bucket: status_domain::DayBucket) -> BarResponse {
     BarResponse {
         day: day_label(bucket.day),
         status: bucket.status.as_str().to_owned(),

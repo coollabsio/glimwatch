@@ -1,12 +1,12 @@
 [workspace]
-members = ["apps/server", "crates/coolstatus", "crates/platform"]
+members = ["apps/server", "crates/status", "crates/platform"]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
 version = "0.1.0"
 license = "Apache-2.0"
-repository = "https://github.com/coollabsio/coolstatus"
+repository = "https://github.com/coollabsio/status"
 
 [workspace.dependencies]
 argon2 = "0.5"

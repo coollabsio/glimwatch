@@ -1,4 +1,4 @@
-//! Domain rules for CoolStatus.
+//! Domain rules for Status.
 //!
 //! This crate plays the role of Orbit's `orbit-domain`: pure decisions about
 //! monitors, assertions, uptime, incidents, and notification payloads. The

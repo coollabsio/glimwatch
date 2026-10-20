@@ -17,7 +17,7 @@ export function IncidentsPage() {
       />
       {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading incidents…</p> : null}
       {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
-        <Empty title="No incidents" body="When a monitor crosses its failure threshold, CoolStatus files one. You can also write one by hand." />
+        <Empty title="No incidents" body="When a monitor crosses its failure threshold, Status files one. You can also write one by hand." />
       ) : (
         <div className="flex flex-col gap-4">
           {query.data?.map((incident) => (
@@ -83,7 +83,7 @@ export function IncidentDetailPage() {
         <ol className="space-y-4 border-l border-[var(--coollabs-fill)] pl-5">
           {incident.updates.map((item) => (
             <li key={item.id} className="relative">
-              <span className="absolute -left-[1.4rem] top-1.5 size-2.5 rounded-full bg-[var(--color-coollabs)]" />
+              <span className="absolute -left-[1.4rem] top-1.5 size-2.5 rounded-full bg-[var(--color-brand)]" />
               <div className="text-[11px] text-[var(--coollabs-subtle)]">{formatTime(item.created_at)} · {stateLabel[item.status]}</div>
               <p className="mt-1 text-[13px] text-[var(--color-fg-dim)]">{item.message}</p>
             </li>
