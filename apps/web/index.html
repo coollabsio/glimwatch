@@ -13,6 +13,13 @@
       (function () {
         var theme = localStorage.getItem("coolstatus-theme");
         if (theme !== "light") document.documentElement.classList.add("dark");
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+          meta = document.createElement("meta");
+          meta.setAttribute("name", "theme-color");
+          document.head.appendChild(meta);
+        }
+        meta.setAttribute("content", theme === "light" ? "#ffffff" : "#101010");
       })();
     </script>
   </head>

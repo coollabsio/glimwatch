@@ -38,18 +38,19 @@ export function PublicStatusPage() {
   const active = page.incidents.filter((incident) => incident.status !== "resolved");
   const history = page.incidents.filter((incident) => incident.status === "resolved");
   return (
-    <div className="min-h-svh bg-background">
+    <div className="min-h-svh bg-[var(--coollabs-canvas)] text-[var(--color-fg)]">
       <div className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
-        <header className="mb-8 flex items-center justify-between">
+        <header className="mb-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Mark />
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{page.title}</h1>
-              <p className="text-sm text-muted-foreground">{page.description}</p>
+              <div className="text-[11px] font-medium text-[var(--coollabs-subtle)]">CoolStatus</div>
+              <h1>{page.title}</h1>
+              <p className="mt-1 text-[13px] text-[var(--coollabs-subtle)]">{page.description}</p>
             </div>
           </div>
           {page.homepage_url ? (
-            <a className="text-sm text-primary" href={page.homepage_url}>Homepage</a>
+            <a className="auth-text-link shrink-0" href={page.homepage_url}>Homepage</a>
           ) : null}
         </header>
         <div className={`rounded-2xl border px-5 py-6 text-lg font-semibold ${banner.className}`}>{banner.title}</div>
@@ -67,19 +68,19 @@ export function PublicStatusPage() {
         ) : null}
         <section className="mt-8 space-y-3">
           {page.components.map((component) => (
-            <div key={component.id} className="rounded-xl border bg-card p-4">
+            <div key={component.id} className="rounded-lg bg-[var(--coollabs-base)] p-4 shadow-[0_0_0_1px_var(--coollabs-hairline),0_1px_2px_rgb(0_0_0/0.05)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-medium">{component.name}</div>
-                  {component.description ? <p className="text-sm text-muted-foreground">{component.description}</p> : null}
+                  {component.description ? <p className="text-[13px] text-[var(--coollabs-subtle)]">{component.description}</p> : null}
                 </div>
                 <div className="text-right">
                   <Badge className={stateTone(component.state)}>{stateLabel[component.state]}</Badge>
-                  <div className="mt-1 text-xs text-muted-foreground">{percent(component.uptime_90d)} uptime</div>
+                  <div className="mt-1 text-[11px] text-[var(--coollabs-subtle)]">{percent(component.uptime_90d)} uptime</div>
                 </div>
               </div>
               <UptimeBars bars={component.bars} className="mt-3" />
-              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+              <div className="mt-1 flex justify-between text-[11px] text-[var(--coollabs-subtle)]">
                 <span>90 days ago</span>
                 <span>Today</span>
               </div>
@@ -89,7 +90,7 @@ export function PublicStatusPage() {
         <section className="mt-10">
           <h2 className="text-lg font-semibold">Incidents</h2>
           {active.length === 0 && history.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">No incidents reported.</p>
+            <p className="mt-2 text-[13px] text-[var(--coollabs-subtle)]">No incidents reported.</p>
           ) : null}
           <div className="mt-4 space-y-8">
             {[...active, ...history].map((incident) => (
@@ -102,7 +103,7 @@ export function PublicStatusPage() {
                 <ol className="mt-3 space-y-3 border-l pl-4">
                   {[...incident.updates].reverse().map((update) => (
                     <li key={update.id}>
-                      <div className="text-xs text-muted-foreground">{stateLabel[update.status]} · {formatTime(update.created_at)}</div>
+                      <div className="text-[11px] text-[var(--coollabs-subtle)]">{stateLabel[update.status]} · {formatTime(update.created_at)}</div>
                       <p className="text-sm">{update.message}</p>
                     </li>
                   ))}
@@ -111,7 +112,7 @@ export function PublicStatusPage() {
             ))}
           </div>
         </section>
-        <footer className="mt-16 text-center text-xs text-muted-foreground">Powered by CoolStatus</footer>
+        <footer className="mt-16 text-center text-[11px] text-[var(--coollabs-subtle)]">Powered by CoolStatus</footer>
       </div>
     </div>
   );

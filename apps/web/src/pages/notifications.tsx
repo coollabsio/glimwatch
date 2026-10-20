@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { Badge, Button, Card, Empty, ErrorText, Field, Input, Select } from "@/components/ui";
+import { Button, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge } from "@/components/ui";
 import { ApiError, api, type Channel, type Monitor } from "@/lib/api";
 import { formatTime } from "@/lib/utils";
 
@@ -53,44 +53,36 @@ export function NotificationsPage() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-          <p className="text-sm text-muted-foreground">Email and webhooks ship today. Slack and Discord use the same incoming-webhook shape, so another provider is a new formatter.</p>
-        </div>
-        {query.isLoading ? <p className="text-sm text-muted-foreground">Loading channels…</p> : null}
+      <div className="flex flex-col gap-4">
+        <PageHeader title="Notifications" description="Email and webhooks ship today. Slack and Discord use the same incoming-webhook shape." />
+        {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading channels…</p> : null}
         {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
           <Empty title="No channels" body="A channel with no monitors attached hears every transition. Link one to narrow it." />
         ) : (
           query.data?.map((channel) => (
-            <Card key={channel.id} className="space-y-3 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-medium">{channel.name}</div>
-                  <div className="text-xs text-muted-foreground">{channel.provider} · {channel.monitor_ids.length === 0 ? "all monitors" : `${channel.monitor_ids.length} monitors`}</div>
-                </div>
-                <Badge className={channel.enabled ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" : "bg-muted text-muted-foreground"}>
-                  {channel.enabled ? "Enabled" : "Off"}
-                </Badge>
-              </div>
-              <div className="text-sm text-muted-foreground break-all">{channel.config.to || channel.config.url}</div>
+            <LayerCard
+              key={channel.id}
+              title={channel.name}
+              description={`${channel.provider} · ${channel.monitor_ids.length === 0 ? "all monitors" : `${channel.monitor_ids.length} monitors`}`}
+              actions={<StatusBadge tone={channel.enabled ? "success" : "neutral"}>{channel.enabled ? "Enabled" : "Off"}</StatusBadge>}
+            >
+              <div className="break-all text-[13px] text-[var(--color-fg-dim)]">{channel.config.to || channel.config.url}</div>
               {channel.deliveries[0] ? (
-                <div className="text-xs text-muted-foreground">
+                <div className="mt-2 text-[11px] text-[var(--coollabs-subtle)]">
                   Last delivery {channel.deliveries[0].status} · {channel.deliveries[0].event} · {formatTime(channel.deliveries[0].created_at)}
                   {channel.deliveries[0].error ? ` · ${channel.deliveries[0].error}` : ""}
                 </div>
               ) : null}
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => test.mutate(channel.id)}>Send test</Button>
-                <Button size="sm" variant="destructive" onClick={() => remove.mutate(channel.id)}>Delete</Button>
+              <div className="mt-3 flex gap-2">
+                <Button onClick={() => test.mutate(channel.id)}>Send test</Button>
+                <Button variant="danger" onClick={() => remove.mutate(channel.id)}>Delete</Button>
               </div>
-            </Card>
+            </LayerCard>
           ))
         )}
       </div>
-      <Card className="h-fit p-4">
-        <h2 className="font-medium">Add a channel</h2>
-        <form className="mt-3 space-y-3" onSubmit={submit}>
+      <LayerCard title="Add a channel" className="h-fit">
+        <form className="space-y-3" onSubmit={submit}>
           <Field label="Name" error={fields.name}><Input value={name} onChange={(event) => setName(event.target.value)} required /></Field>
           <Field label="Provider" error={fields.provider}>
             <Select value={provider} onChange={(event) => setProvider(event.target.value as (typeof providers)[number])}>
@@ -112,9 +104,9 @@ export function NotificationsPage() {
             </Select>
           </Field>
           <ErrorText error={save.error || test.error} />
-          <Button className="w-full" type="submit" disabled={save.isPending}>{save.isPending ? "Saving…" : "Add channel"}</Button>
+          <Button className="w-full" type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Add channel"}</Button>
         </form>
-      </Card>
+      </LayerCard>
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Mark } from "@/app/Shell";
-import { Button, Card, ErrorText, Field, Input } from "@/components/ui";
+import { Button, ErrorText, Field, Input } from "@/components/ui";
 import { ApiError, api, type Meta, type User } from "@/lib/api";
 
 export function LoginPage() {
@@ -12,7 +11,7 @@ export function LoginPage() {
       subtitle="Status pages and uptime for the coolLabs stack."
       footer={
         <>
-          Need an account? <Link className="text-primary" to="/register">Create one</Link>
+          Need an account? <Link className="auth-text-link" to="/register">Create one</Link>
         </>
       }
     >
@@ -28,7 +27,7 @@ export function RegisterPage() {
       subtitle="The first account becomes the owner of this CoolStatus install."
       footer={
         <>
-          Already registered? <Link className="text-primary" to="/login">Sign in</Link>
+          Already registered? <Link className="auth-text-link" to="/login">Sign in</Link>
         </>
       }
     >
@@ -50,28 +49,29 @@ function AuthShell({
 }) {
   const meta = useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/api/meta") });
   return (
-    <div className="grid min-h-svh place-items-center px-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-3">
-          <Mark />
-          <div>
-            <div className="font-semibold">CoolStatus</div>
-            <div className="text-xs text-muted-foreground">by coolLabs</div>
+    <section className="auth-shell">
+      <div className="auth-shell-content">
+        <div className="w-full max-w-[27rem]">
+          <div className="mb-5 text-center">
+            <div className="text-[15px] font-semibold tracking-tight text-black dark:text-white">CoolStatus</div>
+            <div className="text-[11px] text-[var(--coollabs-subtle)]">coolLabs</div>
           </div>
+          <div className="auth-card">
+            <div className="auth-card-heading">
+              <h1>{title}</h1>
+              <p>{subtitle}</p>
+            </div>
+            <div className="auth-card-body">{children}</div>
+            <footer className="auth-card-footer">{footer}</footer>
+          </div>
+          {meta.data?.demo ? (
+            <p className="mt-4 text-center text-xs text-[var(--coollabs-subtle)]">
+              Seeded demo: {meta.data.demo.email} / {meta.data.demo.password}
+            </p>
+          ) : null}
         </div>
-        <Card className="p-6">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          <div className="mt-6">{children}</div>
-        </Card>
-        {meta.data?.demo ? (
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Seeded demo: {meta.data.demo.email} / {meta.data.demo.password}
-          </p>
-        ) : null}
-        <p className="mt-3 text-center text-sm text-muted-foreground">{footer}</p>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -97,7 +97,7 @@ function AuthForm({ mode }: { mode: "login" | "register" }) {
       navigate("/");
     },
     onError: (error) => {
-      setFields(error instanceof ApiError ? error.fields ?? {} : {});
+      setFields(error instanceof ApiError ? (error.fields ?? {}) : {});
     },
   });
 
@@ -121,7 +121,7 @@ function AuthForm({ mode }: { mode: "login" | "register" }) {
         <Input type="password" required value={password} onChange={(event) => setPassword(event.target.value)} />
       </Field>
       <ErrorText error={mutation.error} />
-      <Button className="w-full" type="submit" disabled={mutation.isPending}>
+      <Button className="w-full" variant="primary" type="submit" disabled={mutation.isPending}>
         {mutation.isPending ? "Working…" : mode === "login" ? "Sign in" : "Create account"}
       </Button>
     </form>

@@ -10,6 +10,7 @@ import { MonitorDetailPage, MonitorsPage } from "@/pages/monitors";
 import { NotificationsPage } from "@/pages/notifications";
 import { PageEditor, PagesPage } from "@/pages/pages";
 import { PublicStatusPage } from "@/pages/public";
+import { SettingsPage } from "@/pages/settings";
 
 function RequireAuth() {
   const location = useLocation();
@@ -46,6 +47,7 @@ export function App() {
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           <Route path="maintenance" element={<MaintenancePage />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

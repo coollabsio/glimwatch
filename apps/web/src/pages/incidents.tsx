@@ -1,40 +1,39 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { Badge, Button, Card, Dialog, Empty, ErrorText, Field, Input, Select, Textarea } from "@/components/ui";
+import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
 import { ApiError, api, type Incident, type Monitor, type StatusPage } from "@/lib/api";
-import { formatTime, stateLabel, stateTone } from "@/lib/utils";
+import { formatTime, stateLabel } from "@/lib/utils";
 
 export function IncidentsPage() {
   const query = useQuery({ queryKey: ["incidents"], queryFn: () => api<Incident[]>("/api/incidents") });
   const [open, setOpen] = useState(false);
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Incidents</h1>
-          <p className="text-sm text-muted-foreground">A timeline customers read on the status page. Automatic incidents open after repeated failures.</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>Report incident</Button>
-      </div>
-      {query.isLoading ? <p className="text-sm text-muted-foreground">Loading incidents…</p> : null}
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Incidents"
+        description="A timeline customers read on the status page. Automatic incidents open after repeated failures."
+        actions={<Button variant="primary" onClick={() => setOpen(true)}>Report incident</Button>}
+      />
+      {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading incidents…</p> : null}
       {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
         <Empty title="No incidents" body="When a monitor crosses its failure threshold, CoolStatus files one. You can also write one by hand." />
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-4">
           {query.data?.map((incident) => (
             <Link key={incident.id} to={`/incidents/${incident.id}`}>
-              <Card className="p-4 transition hover:-translate-y-0.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-medium">{incident.title}</div>
-                  <div className="flex gap-2">
-                    <Badge className={stateTone(incident.impact)}>{stateLabel[incident.impact]}</Badge>
-                    <Badge className={stateTone(incident.status)}>{stateLabel[incident.status]}</Badge>
-                  </div>
-                </div>
-                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{incident.updates.at(-1)?.message}</p>
-                <div className="mt-2 text-xs text-muted-foreground">{formatTime(incident.started_at)}{incident.auto ? " · automatic" : ""}</div>
-              </Card>
+              <LayerCard
+                title={incident.title}
+                actions={
+                  <>
+                    <StatusBadge tone={incident.impact === "critical" || incident.impact === "major" ? "error" : incident.impact === "minor" ? "warning" : "neutral"}>{stateLabel[incident.impact]}</StatusBadge>
+                    <StatusBadge tone={incident.status === "resolved" ? "success" : incident.status === "investigating" ? "warning" : "info"}>{stateLabel[incident.status]}</StatusBadge>
+                  </>
+                }
+              >
+                <p className="line-clamp-2 text-[13px] text-[var(--color-fg-dim)]">{incident.updates.at(-1)?.message}</p>
+                <div className="mt-2 text-[11px] text-[var(--coollabs-subtle)]">{formatTime(incident.started_at)}{incident.auto ? " · automatic" : ""}</div>
+              </LayerCard>
             </Link>
           ))}
         </div>
@@ -74,25 +73,25 @@ export function IncidentDetailPage() {
   if (query.isLoading) return <p className="text-sm text-muted-foreground">Loading incident…</p>;
   if (!incident) return <p className="text-sm text-destructive">{(query.error as Error | null)?.message ?? "Not found."}</p>;
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{incident.title}</h1>
-          <p className="text-sm text-muted-foreground">Opened {formatTime(incident.started_at)}{incident.auto ? " by the scheduler" : ""}</p>
-        </div>
-        <Button variant="destructive" onClick={() => remove.mutate()}>Delete</Button>
-      </div>
-      <ol className="space-y-4 border-l pl-5">
-        {incident.updates.map((item) => (
-          <li key={item.id} className="relative">
-            <span className="absolute -left-[1.4rem] top-1.5 size-2.5 rounded-full bg-primary" />
-            <div className="text-xs text-muted-foreground">{formatTime(item.created_at)} · {stateLabel[item.status]}</div>
-            <p className="mt-1 text-sm">{item.message}</p>
-          </li>
-        ))}
-      </ol>
-      <Card className="space-y-3 p-4">
-        <h2 className="font-medium">Post an update</h2>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <PageHeader
+        title={incident.title}
+        description={`Opened ${formatTime(incident.started_at)}${incident.auto ? " by the scheduler" : ""}`}
+        actions={<Button variant="danger" onClick={() => remove.mutate()}>Delete</Button>}
+      />
+      <LayerCard title="Timeline">
+        <ol className="space-y-4 border-l border-[var(--coollabs-fill)] pl-5">
+          {incident.updates.map((item) => (
+            <li key={item.id} className="relative">
+              <span className="absolute -left-[1.4rem] top-1.5 size-2.5 rounded-full bg-[var(--color-coollabs)]" />
+              <div className="text-[11px] text-[var(--coollabs-subtle)]">{formatTime(item.created_at)} · {stateLabel[item.status]}</div>
+              <p className="mt-1 text-[13px] text-[var(--color-fg-dim)]">{item.message}</p>
+            </li>
+          ))}
+        </ol>
+      </LayerCard>
+      <LayerCard title="Post an update">
+        <div className="space-y-3">
         <Field label="Status">
           <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             {["investigating", "identified", "monitoring", "resolved"].map((item) => (
@@ -104,10 +103,11 @@ export function IncidentDetailPage() {
           <Textarea value={message} onChange={(event) => setMessage(event.target.value)} />
         </Field>
         <ErrorText error={update.error} />
-        <Button onClick={() => update.mutate()} disabled={update.isPending || message.trim().length === 0}>
+        <Button variant="primary" onClick={() => update.mutate()} disabled={update.isPending || message.trim().length === 0}>
           {update.isPending ? "Posting…" : "Post update"}
         </Button>
-      </Card>
+        </div>
+      </LayerCard>
     </div>
   );
 }
@@ -180,7 +180,7 @@ function IncidentDialog({ open, onClose }: { open: boolean; onClose: () => void 
         </Field>
         <Field label="Message" error={fields.message}><Textarea value={message} onChange={(event) => setMessage(event.target.value)} required /></Field>
         <ErrorText error={save.error} />
-        <div className="flex justify-end"><Button type="submit" disabled={save.isPending}>{save.isPending ? "Saving…" : "Create incident"}</Button></div>
+        <div className="flex justify-end"><Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Create incident"}</Button></div>
       </form>
     </Dialog>
   );

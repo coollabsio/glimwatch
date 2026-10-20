@@ -1,86 +1,43 @@
-import { cva, type VariantProps } from "class-variance-authority";
 import { X } from "lucide-react";
-import { type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent text-sm font-medium whitespace-nowrap transition duration-150 outline-none select-none focus-visible:ring-3 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4",
-  {
-    variants: {
-      variant: {
-        default:
-          "bg-primary text-primary-foreground shadow-[0_2px_0_color-mix(in_oklch,var(--primary),black_28%)] hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_3px_0_color-mix(in_oklch,var(--primary),black_28%)] active:translate-y-0.5 active:shadow-none",
-        outline:
-          "border-border bg-background text-foreground shadow-[0_2px_0_rgb(0_0_0/0.18)] hover:-translate-y-px hover:bg-muted active:translate-y-0.5 active:shadow-none dark:shadow-[0_2px_0_rgb(255_255_255/0.06)]",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-[0_2px_0_rgb(0_0_0/0.16)] hover:-translate-y-px hover:bg-secondary/80 active:translate-y-0.5 active:shadow-none",
-        ghost: "hover:bg-muted",
-        destructive:
-          "bg-destructive/10 text-destructive shadow-[0_2px_0_color-mix(in_oklch,var(--destructive),transparent_55%)] hover:-translate-y-px hover:bg-destructive/20 active:translate-y-0.5 active:shadow-none",
-      },
-      size: {
-        default: "h-9 px-3",
-        sm: "h-8 px-2.5 text-[0.8rem]",
-        lg: "h-10 px-4",
-        icon: "size-9",
-      },
-    },
-    defaultVariants: { variant: "default", size: "default" },
-  },
-);
+type ButtonVariant = "default" | "primary" | "danger" | "ghost";
 
 export function Button({
   className,
-  variant,
-  size,
+  variant = "default",
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & VariantProps<typeof buttonVariants>) {
-  return <button className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
+  return (
+    <button
+      className={cn(
+        variant === "ghost" ? "icon-button" : "button",
+        variant === "primary" && "button-highlighted",
+        variant === "danger" && "button-error",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={cn(
-        "h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30",
-        props.className,
-      )}
-    />
-  );
+  return <input {...props} className={cn("input", props.className)} />;
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={cn(
-        "min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30",
-        props.className,
-      )}
-    />
-  );
+  return <textarea {...props} className={cn("input", props.className)} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <select
-      {...props}
-      className={cn(
-        "h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30",
-        props.className,
-      )}
-    />
-  );
-}
-
-export function Label({ children, hint }: { children: ReactNode; hint?: string }) {
-  return (
-    <div className="mb-1.5 flex items-baseline justify-between gap-3">
-      <span className="text-sm font-medium">{children}</span>
-      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
-    </div>
-  );
+  return <select {...props} className={cn("select", props.className)} />;
 }
 
 export function Field({
@@ -96,15 +53,80 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <Label hint={hint}>{label}</Label>
+      <span className="field-label">
+        <span>{label}</span>
+        {hint ? <span className="ml-auto text-[11px] font-normal">{hint}</span> : null}
+      </span>
       {children}
-      {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="field-error">{error}</p> : null}
     </label>
   );
 }
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn("rounded-xl border bg-card text-card-foreground shadow-sm", className)}>{children}</div>;
+export function PageHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string;
+  description?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="page-header">
+      <div>
+        <h1>{title}</h1>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+export function LayerCard({
+  title,
+  description,
+  actions,
+  flush,
+  children,
+  className,
+}: {
+  title?: string;
+  description?: string;
+  actions?: ReactNode;
+  flush?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={cn("layer-card", className)}>
+      {title ? (
+        <header>
+          <div className="min-w-0 py-0.5">
+            <h2>{title}</h2>
+            {description ? <p>{description}</p> : null}
+          </div>
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        </header>
+      ) : null}
+      <div className={cn("layer-card-body", flush && "is-flush", !title && "rounded-lg")}>{children}</div>
+    </section>
+  );
+}
+
+export function StatusBadge({
+  tone = "neutral",
+  children,
+}: {
+  tone?: "neutral" | "success" | "warning" | "error" | "info";
+  children: ReactNode;
+}) {
+  return (
+    <span className={cn("status-badge", tone)}>
+      <i />
+      <span className="truncate">{children}</span>
+    </span>
+  );
 }
 
 export function Badge({ className, children }: { className?: string; children: ReactNode }) {
@@ -130,19 +152,19 @@ export function Dialog({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
-      <button className="absolute inset-0 bg-black/60" aria-label="Close dialog" onClick={onClose} />
-      <div className="relative z-10 max-h-[92svh] w-full overflow-auto rounded-t-2xl border bg-popover p-5 shadow-2xl sm:max-w-lg sm:rounded-2xl">
-        <div className="mb-4 flex items-start justify-between gap-4">
+    <div className="modal-backdrop">
+      <button className="absolute inset-0" aria-label="Close dialog" onClick={onClose} />
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+        <div className="modal-heading">
           <div>
-            <h2 className="text-lg font-semibold">{title}</h2>
-            {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+            <h2 id="dialog-title">{title}</h2>
+            {description ? <p>{description}</p> : null}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-            <X />
-          </Button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </button>
         </div>
-        {children}
+        <div className="modal-body">{children}</div>
       </div>
     </div>
   );
@@ -150,15 +172,17 @@ export function Dialog({
 
 export function Empty({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
-    <Card className="px-6 py-12 text-center">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">{body}</p>
-      {action ? <div className="mt-5">{action}</div> : null}
-    </Card>
+    <LayerCard>
+      <div className="px-2 py-8 text-center">
+        <h2 className="text-sm font-medium text-[var(--color-fg)]">{title}</h2>
+        <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--coollabs-subtle)]">{body}</p>
+        {action ? <div className="mt-4">{action}</div> : null}
+      </div>
+    </LayerCard>
   );
 }
 
 export function ErrorText({ error }: { error: unknown }) {
   if (!error) return null;
-  return <p className="text-sm text-destructive">{error instanceof Error ? error.message : "Something went wrong."}</p>;
+  return <p className="field-error">{error instanceof Error ? error.message : "Something went wrong."}</p>;
 }

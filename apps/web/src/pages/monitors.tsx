@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { LatencyChart, UptimeBars } from "@/components/charts";
-import { Badge, Button, Card, Dialog, Empty, ErrorText, Field, Input, Select, Textarea } from "@/components/ui";
+import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
 import { ApiError, api, type Assertion, type Monitor } from "@/lib/api";
-import { formatTime, percent, stateLabel, stateTone, timeAgo } from "@/lib/utils";
+import { formatTime, percent, stateLabel, timeAgo } from "@/lib/utils";
 
 type Draft = {
   name: string;
@@ -82,45 +82,43 @@ export function MonitorsPage() {
   const query = useQuery({ queryKey: ["monitors"], queryFn: () => api<Monitor[]>("/api/monitors"), refetchInterval: 10_000 });
   const [open, setOpen] = useState(false);
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Monitors</h1>
-          <p className="text-sm text-muted-foreground">HTTP and TCP checks from this server.</p>
-        </div>
-        <Button onClick={() => setOpen(true)}>New monitor</Button>
-      </div>
-      {query.isLoading ? <p className="text-sm text-muted-foreground">Loading monitors…</p> : null}
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Monitors"
+        description="HTTP and TCP checks from this server."
+        actions={<Button variant="primary" onClick={() => setOpen(true)}>New monitor</Button>}
+      />
+      {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading monitors…</p> : null}
       {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
-        <Empty title="No monitors" body="Point one at an HTTP URL or a host:port. Checks start on the next scheduler tick." action={<Button onClick={() => setOpen(true)}>New monitor</Button>} />
+        <Empty title="No monitors" body="Point one at an HTTP URL or a host:port. Checks start on the next scheduler tick." action={<Button variant="primary" onClick={() => setOpen(true)}>New monitor</Button>} />
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+        <LayerCard title="All monitors" flush>
+          <table className="cool-table">
+            <thead>
               <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">State</th>
-                <th className="hidden px-4 py-2 font-medium md:table-cell">Today</th>
-                <th className="hidden px-4 py-2 font-medium sm:table-cell">30 days</th>
-                <th className="px-4 py-2 font-medium">Last</th>
+                <th>Name</th>
+                <th>State</th>
+                <th className="hidden md:table-cell">Today</th>
+                <th className="hidden sm:table-cell">30 days</th>
+                <th>Last</th>
               </tr>
             </thead>
             <tbody>
               {query.data?.map((monitor) => (
-                <tr key={monitor.id} className="border-t">
-                  <td className="px-4 py-3">
-                    <Link className="font-medium hover:text-primary" to={`/monitors/${monitor.id}`}>{monitor.name}</Link>
-                    <div className="text-xs text-muted-foreground">{monitor.job_type.toUpperCase()} · {monitor.url}</div>
+                <tr key={monitor.id}>
+                  <td>
+                    <Link className="font-medium text-[var(--color-fg)]" to={`/monitors/${monitor.id}`}>{monitor.name}</Link>
+                    <div className="text-[11px] text-[var(--coollabs-subtle)]">{monitor.job_type.toUpperCase()} · {monitor.url}</div>
                   </td>
-                  <td className="px-4 py-3"><Badge className={stateTone(monitor.state)}>{stateLabel[monitor.state]}</Badge></td>
-                  <td className="hidden px-4 py-3 md:table-cell">{percent(monitor.uptime_24h)}</td>
-                  <td className="hidden px-4 py-3 sm:table-cell">{percent(monitor.uptime_30d)}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{timeAgo(monitor.last_checked_at)}</td>
+                  <td><StatusBadge tone={monitor.state === "up" ? "success" : monitor.state === "down" ? "error" : monitor.state === "degraded" ? "warning" : "neutral"}>{stateLabel[monitor.state]}</StatusBadge></td>
+                  <td className="hidden md:table-cell">{percent(monitor.uptime_24h)}</td>
+                  <td className="hidden sm:table-cell">{percent(monitor.uptime_30d)}</td>
+                  <td>{timeAgo(monitor.last_checked_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </LayerCard>
       )}
       <MonitorDialog open={open} onClose={() => setOpen(false)} />
     </div>
@@ -151,61 +149,66 @@ export function MonitorDetailPage() {
     onSuccess: () => navigate("/monitors"),
   });
   const monitor = query.data;
-  if (query.isLoading) return <p className="text-sm text-muted-foreground">Loading monitor…</p>;
-  if (!monitor) return <p className="text-sm text-destructive">{(query.error as Error | null)?.message ?? "Monitor not found."}</p>;
+  if (query.isLoading) return <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading monitor…</p>;
+  if (!monitor) return <p className="field-error">{(query.error as Error | null)?.message ?? "Monitor not found."}</p>;
+  const stateToneName = monitor.state === "up" ? "success" : monitor.state === "down" ? "error" : monitor.state === "degraded" ? "warning" : "neutral";
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{monitor.name}</h1>
-            <Badge className={stateTone(monitor.state)}>{monitor.active ? stateLabel[monitor.state] : "Paused"}</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">{monitor.job_type.toUpperCase()} {monitor.url}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending}>{run.isPending ? "Checking…" : "Run check"}</Button>
-          <Button variant="outline" onClick={() => pause.mutate(!monitor.active)}>{monitor.active ? "Pause" : "Resume"}</Button>
-          <Button variant="outline" onClick={() => setEditing(true)}>Edit</Button>
-          <Button variant="destructive" onClick={() => remove.mutate()}>Delete</Button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title={monitor.name}
+        description={`${monitor.job_type.toUpperCase()} ${monitor.url}`}
+        actions={
+          <>
+            <StatusBadge tone={monitor.active ? stateToneName : "neutral"}>{monitor.active ? stateLabel[monitor.state] : "Paused"}</StatusBadge>
+            <Button variant="primary" onClick={() => run.mutate()} disabled={run.isPending}>{run.isPending ? "Checking…" : "Run check"}</Button>
+            <Button onClick={() => pause.mutate(!monitor.active)}>{monitor.active ? "Pause" : "Resume"}</Button>
+            <Button onClick={() => setEditing(true)}>Edit</Button>
+            <Button variant="danger" onClick={() => remove.mutate()}>Delete</Button>
+          </>
+        }
+      />
       <ErrorText error={run.error || pause.error || remove.error} />
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Today" value={percent(monitor.uptime_24h)} />
         <Stat label="30 days" value={percent(monitor.uptime_30d)} />
         <Stat label="90 days" value={percent(monitor.uptime_90d)} />
-        <Stat label="Avg latency today" value={monitor.avg_latency_ms == null ? "—" : `${monitor.avg_latency_ms} ms`} />
+        <Stat label="Avg latency today" value={monitor.avg_latency_ms == null ? "-" : `${monitor.avg_latency_ms} ms`} />
       </div>
-      <Card className="p-4">
-        <div className="mb-2 flex justify-between text-xs text-muted-foreground">
-          <span>90 days</span>
+      <LayerCard title="Uptime" description="90 days">
+        <div className="mb-2 flex justify-end text-[11px] text-[var(--coollabs-subtle)]">
           <span>{percent(monitor.uptime_90d)} uptime</span>
         </div>
         <UptimeBars bars={monitor.bars} />
-      </Card>
-      <Card className="p-4">
-        <h2 className="mb-2 font-medium">Latency</h2>
+      </LayerCard>
+      <LayerCard title="Latency">
         <LatencyChart checks={monitor.recent ?? []} />
-      </Card>
-      <Card className="overflow-hidden">
-        <h2 className="px-4 py-3 font-medium">Recent checks</h2>
+      </LayerCard>
+      <LayerCard title="Recent checks" flush>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="cool-table">
+            <thead>
+              <tr>
+                <th>Result</th>
+                <th>Status</th>
+                <th>Latency</th>
+                <th>Error</th>
+                <th>When</th>
+              </tr>
+            </thead>
             <tbody>
               {(monitor.recent ?? []).map((check) => (
-                <tr key={check.id} className="border-t">
-                  <td className="px-4 py-2"><Badge className={stateTone(check.status)}>{stateLabel[check.status] ?? check.status}</Badge></td>
-                  <td className="px-4 py-2">{check.status_code ?? "—"}</td>
-                  <td className="px-4 py-2">{check.latency_ms} ms</td>
-                  <td className="px-4 py-2 text-muted-foreground">{check.error ?? ""}</td>
-                  <td className="px-4 py-2 text-right text-muted-foreground">{formatTime(check.checked_at)}</td>
+                <tr key={check.id}>
+                  <td><StatusBadge tone={check.status === "success" ? "success" : check.status === "failure" ? "error" : check.status === "degraded" ? "warning" : "info"}>{stateLabel[check.status] ?? check.status}</StatusBadge></td>
+                  <td>{check.status_code ?? "-"}</td>
+                  <td>{check.latency_ms} ms</td>
+                  <td>{check.error ?? ""}</td>
+                  <td>{formatTime(check.checked_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </Card>
+      </LayerCard>
       <MonitorDialog open={editing} onClose={() => setEditing(false)} monitor={monitor} />
     </div>
   );
@@ -213,10 +216,10 @@ export function MonitorDetailPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Card className="p-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
-    </Card>
+    <LayerCard>
+      <div className="text-[11px] uppercase tracking-wide text-[var(--coollabs-subtle)]">{label}</div>
+      <div className="mt-1 text-xl font-semibold text-[var(--color-fg)]">{value}</div>
+    </LayerCard>
   );
 }
 
@@ -310,8 +313,8 @@ function MonitorDialog({ open, onClose, monitor }: { open: boolean; onClose: () 
         ) : null}
         <ErrorText error={fields.name ? null : save.error} />
         <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save monitor"}</Button>
+          <Button type="button" onClick={onClose}>Cancel</Button>
+          <Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save monitor"}</Button>
         </div>
       </form>
     </Dialog>
