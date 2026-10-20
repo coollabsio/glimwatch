@@ -53,10 +53,10 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
               to={link.to}
               end={link.end}
               onClick={onNavigate}
-              className={({ isActive }) => cn("menu-item", isActive && "active")}
+              className={({ isActive }) => cn("menu-item", isActive && "menu-item-active")}
             >
-              <link.icon />
-              <span className="truncate">{link.label}</span>
+              <link.icon className="menu-item-icon" />
+              <span className="menu-item-label">{link.label}</span>
             </NavLink>
           ))}
         </div>
@@ -138,8 +138,8 @@ export function Shell() {
             </div>
             <div className="border-t border-neutral-200 p-3 dark:border-white/[0.06]">
               <button type="button" className="menu-item" onClick={() => void logout()}>
-                <LogOut />
-                Sign out
+                <LogOut className="menu-item-icon" />
+                <span className="menu-item-label">Sign out</span>
               </button>
             </div>
           </div>
