@@ -4,17 +4,15 @@ import {
   Bell,
   CalendarClock,
   LayoutDashboard,
-  LogOut,
   Menu,
-  Moon,
   Radio,
   Settings,
   Siren,
-  Sun,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { ProfileMenu } from "@/components/profile-menu";
 import { api, type Meta, type User } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +69,6 @@ export function Shell() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => api<User>("/api/auth/me") });
   const meta = useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/api/meta") });
   const [open, setOpen] = useState(false);
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const section = groups.flatMap((group) => group.links).find((link) =>
     link.end ? location.pathname === "/" : location.pathname.startsWith(link.to),
   );
@@ -79,12 +76,6 @@ export function Shell() {
   async function logout() {
     await api("/api/auth/logout", { method: "POST" });
     navigate("/login");
-  }
-
-  function toggleTheme() {
-    const next = document.documentElement.classList.toggle("dark");
-    localStorage.setItem("status-theme", next ? "dark" : "light");
-    setDark(next);
   }
 
   return (
@@ -98,19 +89,8 @@ export function Shell() {
             v{meta.data?.version ?? "0.1.0"}
           </span>
         </div>
-        <div className="flex h-full min-w-0 flex-1 items-center justify-between px-4">
+        <div className="flex h-full min-w-0 flex-1 items-center px-4">
           <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Status"}</div>
-          <div className="flex items-center gap-1">
-            <button type="button" className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
-              {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </button>
-            <span className="hidden max-w-48 truncate px-2 text-[13px] text-[var(--color-fg-dim)] sm:inline">
-              {me.data?.display_name}
-            </span>
-            <button type="button" className="icon-button" onClick={() => void logout()} aria-label="Sign out">
-              <LogOut className="size-4" />
-            </button>
-          </div>
         </div>
       </header>
 
@@ -137,10 +117,7 @@ export function Shell() {
               <NavItems onNavigate={() => setOpen(false)} />
             </div>
             <div className="border-t border-neutral-200 p-3 dark:border-white/[0.06]">
-              <button type="button" className="menu-item" onClick={() => void logout()}>
-                <LogOut className="menu-item-icon" />
-                <span className="menu-item-label">Sign out</span>
-              </button>
+              <ProfileMenu user={me.data} onLogout={() => void logout()} onNavigate={() => setOpen(false)} />
             </div>
           </div>
         </div>
@@ -150,9 +127,8 @@ export function Shell() {
         <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-2">
           <NavItems />
         </nav>
-        <div className="border-t border-neutral-200 px-4 py-3 dark:border-white/[0.06]">
-          <div className="truncate text-[13px] font-medium text-[var(--color-nav-active)]">{me.data?.display_name ?? "…"}</div>
-          <div className="truncate text-[11px] text-[var(--color-nav-muted)]">{me.data?.email}</div>
+        <div className="sidebar-footer shrink-0 border-t border-neutral-200 bg-white px-3 py-2 dark:border-white/[0.06] dark:bg-[var(--color-panel)]">
+          <ProfileMenu user={me.data} onLogout={() => void logout()} />
         </div>
       </aside>
 

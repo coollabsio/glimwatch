@@ -78,6 +78,39 @@ function payload(draft: Draft) {
   };
 }
 
+function rowCover(to: string) {
+  return <Link className="cell-link-anchor" to={to} tabIndex={-1} aria-hidden="true" />;
+}
+
+function MonitorRow({ monitor }: { monitor: Monitor }) {
+  const to = `/monitors/${monitor.id}`;
+  return (
+    <tr className="clickable-row">
+      <td className="cell-link">
+        <Link className="row-link" to={to}>{monitor.name}</Link>
+        {rowCover(to)}
+        <div className="text-[11px] text-[var(--coollabs-subtle)]">{monitor.job_type.toUpperCase()} · {monitor.url}</div>
+      </td>
+      <td className="cell-link">
+        {rowCover(to)}
+        <StatusBadge tone={monitor.state === "up" ? "success" : monitor.state === "down" ? "error" : monitor.state === "degraded" ? "warning" : "neutral"}>{stateLabel[monitor.state]}</StatusBadge>
+      </td>
+      <td className="cell-link hidden md:table-cell">
+        {rowCover(to)}
+        {percent(monitor.uptime_24h)}
+      </td>
+      <td className="cell-link hidden sm:table-cell">
+        {rowCover(to)}
+        {percent(monitor.uptime_30d)}
+      </td>
+      <td className="cell-link">
+        {rowCover(to)}
+        {timeAgo(monitor.last_checked_at)}
+      </td>
+    </tr>
+  );
+}
+
 export function MonitorsPage() {
   const query = useQuery({ queryKey: ["monitors"], queryFn: () => api<Monitor[]>("/api/monitors"), refetchInterval: 10_000 });
   const [open, setOpen] = useState(false);
@@ -105,16 +138,7 @@ export function MonitorsPage() {
             </thead>
             <tbody>
               {query.data?.map((monitor) => (
-                <tr key={monitor.id}>
-                  <td>
-                    <Link className="font-medium text-[var(--color-fg)]" to={`/monitors/${monitor.id}`}>{monitor.name}</Link>
-                    <div className="text-[11px] text-[var(--coollabs-subtle)]">{monitor.job_type.toUpperCase()} · {monitor.url}</div>
-                  </td>
-                  <td><StatusBadge tone={monitor.state === "up" ? "success" : monitor.state === "down" ? "error" : monitor.state === "degraded" ? "warning" : "neutral"}>{stateLabel[monitor.state]}</StatusBadge></td>
-                  <td className="hidden md:table-cell">{percent(monitor.uptime_24h)}</td>
-                  <td className="hidden sm:table-cell">{percent(monitor.uptime_30d)}</td>
-                  <td>{timeAgo(monitor.last_checked_at)}</td>
-                </tr>
+                <MonitorRow key={monitor.id} monitor={monitor} />
               ))}
             </tbody>
           </table>
