@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Logo } from "@/app/Shell";
 import { Button, ErrorText, Field, Input } from "@/components/ui";
 import { ApiError, api, type Meta, type User } from "@/lib/api";
 
@@ -53,6 +54,7 @@ function AuthShell({
       <div className="auth-shell-content">
         <div className="w-full max-w-[27rem]">
           <div className="mb-5 text-center">
+            <Logo className="mx-auto mb-3 size-10" />
             <div className="text-[15px] font-semibold tracking-tight text-black dark:text-white">Haruvo</div>
             <div className="text-[11px] text-[var(--coollabs-subtle)]">coolLabs</div>
           </div>

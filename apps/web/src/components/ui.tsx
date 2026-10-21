@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X } from "reicon-react";
 import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,

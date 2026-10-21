@@ -2,22 +2,22 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
   Bell,
-  Boxes,
   Bug,
-  CalendarClock,
+  CalendarDays,
+  ChartLine,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard,
-  LineChart,
-  Link2,
-  type LucideIcon,
+  Element3,
+  Global,
+  Home,
+  type IconComponent,
+  Link,
   Menu,
-  Network,
-  Radio,
-  Settings,
+  Setting2,
   Siren,
+  Sitemap,
   X,
-} from "lucide-react";
+} from "reicon-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { ProfileMenu } from "@/components/profile-menu";
@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 type NavLinkItem = {
   to: string;
   label: string;
-  icon: LucideIcon;
+  icon: IconComponent;
   end?: boolean;
 };
 
@@ -39,29 +39,32 @@ type NavGroup = {
 type Product = {
   id: string;
   label: string;
-  icon: LucideIcon;
+  description: string;
+  icon: IconComponent;
   groups: NavGroup[];
 };
 
-const products: Product[] = [
+export const products: Product[] = [
   {
     id: "status",
     label: "Status",
+    description: "Uptime monitors, agents, status pages, and incidents.",
     icon: Activity,
     groups: [
       {
         label: "Workspace",
         links: [
-          { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
+          { to: "/status", label: "Overview", icon: Home, end: true },
           { to: "/monitors", label: "Monitors", icon: Activity },
-          { to: "/pages", label: "Status pages", icon: Radio },
+          { to: "/agents", label: "Agents", icon: Sitemap },
+          { to: "/pages", label: "Status pages", icon: Global },
         ],
       },
       {
         label: "Operations",
         links: [
           { to: "/incidents", label: "Incidents", icon: Siren },
-          { to: "/maintenance", label: "Maintenance", icon: CalendarClock },
+          { to: "/maintenance", label: "Maintenance", icon: CalendarDays },
           { to: "/notifications", label: "Notifications", icon: Bell },
         ],
       },
@@ -70,12 +73,13 @@ const products: Product[] = [
   {
     id: "errors",
     label: "Errors",
+    description: "Exceptions from your apps, grouped into issues.",
     icon: Bug,
     groups: [
       {
         links: [
           { to: "/errors", label: "Issues", icon: Bug },
-          { to: "/error-projects", label: "Projects", icon: Boxes },
+          { to: "/error-projects", label: "Projects", icon: Element3 },
         ],
       },
     ],
@@ -83,12 +87,13 @@ const products: Product[] = [
   {
     id: "analytics",
     label: "Analytics",
-    icon: LineChart,
+    description: "Cookieless site analytics and short links.",
+    icon: ChartLine,
     groups: [
       {
         links: [
-          { to: "/analytics", label: "Sites", icon: LineChart },
-          { to: "/links", label: "Links", icon: Link2 },
+          { to: "/analytics", label: "Sites", icon: ChartLine },
+          { to: "/links", label: "Links", icon: Link },
         ],
       },
     ],
@@ -96,8 +101,7 @@ const products: Product[] = [
 ];
 
 const manage: NavLinkItem[] = [
-  { to: "/agents", label: "Agents", icon: Network },
-  { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/settings", label: "Settings", icon: Setting2 },
 ];
 
 function linkActive(pathname: string, link: NavLinkItem) {
@@ -228,6 +232,7 @@ export function Shell() {
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState<string | "root" | null>(null);
   const [swap, setSwap] = useState<"" | "forward" | "back">("");
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "true");
   const routeProduct = products.find((product) =>
     productLinks(product).some((link) => linkActive(location.pathname, link)),
   );
@@ -249,6 +254,13 @@ export function Shell() {
     setPinned("root");
   }
 
+  function toggleSidebar() {
+    setCollapsed((value) => {
+      localStorage.setItem("sidebarCollapsed", String(!value));
+      return !value;
+    });
+  }
+
   async function logout() {
     await api("/api/auth/logout", { method: "POST" });
     navigate("/login");
@@ -267,22 +279,35 @@ export function Shell() {
 
   return (
     <div className="min-h-svh text-[var(--color-fg)]">
-      <header className="fixed inset-x-0 top-0 z-40 hidden h-12 items-center border-b border-neutral-200 bg-white/95 backdrop-blur lg:flex dark:border-white/[0.06] dark:bg-[var(--color-panel)]/95">
-        <div className="flex h-full w-56 shrink-0 items-center gap-2 border-r border-neutral-200 px-4 dark:border-white/[0.06]">
-          <NavLink to="/" className="text-[15px] font-semibold tracking-tight text-black dark:text-white">
-            Haruvo
+      <header className="fixed inset-x-0 top-0 z-40 hidden h-12 items-center border-b border-neutral-200 bg-neutral-50/95 backdrop-blur lg:flex dark:border-white/[0.06] dark:bg-[var(--color-app)]/95">
+        <div
+          className={cn(
+            "flex h-full shrink-0 items-center gap-2 border-r border-neutral-200 transition-[width] duration-200 dark:border-white/[0.06]",
+            collapsed ? "w-16 justify-center" : "w-56 px-4",
+          )}
+        >
+          <NavLink
+            to="/"
+            title="Haruvo"
+            className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-black dark:text-white"
+          >
+            <Logo className="size-5" />
+            {collapsed ? null : "Haruvo"}
           </NavLink>
-          <span className="truncate text-[10.5px] font-medium text-neutral-400 dark:text-[var(--color-fg-faint)]">
-            v{meta.data?.version ?? "0.1.0"}
-          </span>
+          {collapsed ? null : (
+            <span className="truncate text-[10.5px] font-medium text-neutral-400 dark:text-[var(--color-fg-faint)]">
+              v{meta.data?.version ?? "0.1.0"}
+            </span>
+          )}
         </div>
         <div className="flex h-full min-w-0 flex-1 items-center px-4">
-          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Haruvo"}</div>
+          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Home"}</div>
         </div>
       </header>
 
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden dark:border-white/[0.06] dark:bg-[var(--color-panel)]/95">
-        <NavLink to="/" className="text-[15px] font-semibold tracking-tight">
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-200 bg-neutral-50/95 px-4 py-3 backdrop-blur lg:hidden dark:border-white/[0.06] dark:bg-[var(--color-app)]/95">
+        <NavLink to="/" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+          <Logo className="size-5" />
           Haruvo
         </NavLink>
         <button type="button" className="icon-button" onClick={() => setOpen(true)} aria-label="Open menu">
@@ -295,7 +320,10 @@ export function Shell() {
           <button className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-[var(--color-panel)]">
             <div className="flex h-12 items-center justify-between border-b border-neutral-200 px-4 dark:border-white/[0.06]">
-              <span className="text-[15px] font-semibold">Haruvo</span>
+              <span className="flex items-center gap-2 text-[15px] font-semibold">
+                <Logo className="size-5" />
+                Haruvo
+              </span>
               <button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="Close menu">
                 <X className="size-4" />
               </button>
@@ -308,14 +336,42 @@ export function Shell() {
         </div>
       ) : null}
 
-      <aside className="fixed top-12 bottom-0 left-0 z-30 hidden w-56 flex-col border-r border-neutral-200 bg-white lg:flex dark:border-white/[0.06] dark:bg-[var(--color-panel)]">
+      <aside
+        className={cn(
+          "fixed top-12 bottom-0 left-0 z-30 hidden flex-col border-r border-neutral-200 bg-neutral-50 transition-[width] duration-200 lg:flex dark:border-white/[0.06] dark:bg-[var(--color-app)]",
+          collapsed ? "sidebar-collapsed w-16" : "w-56",
+        )}
+      >
         <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-2">{nav()}</nav>
-        <div className="sidebar-footer shrink-0 border-t border-neutral-200 bg-white px-3 py-2 dark:border-white/[0.06] dark:bg-[var(--color-panel)]">
+        <div
+          className={cn(
+            "sidebar-footer flex shrink-0 items-center gap-1 border-t border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-white/[0.06] dark:bg-[var(--color-app)]",
+            collapsed && "flex-col",
+          )}
+        >
           <ProfileMenu user={me.data} onLogout={() => void logout()} />
+          <button
+            type="button"
+            className="menu-item sidebar-toggle"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={toggleSidebar}
+          >
+            <svg className="sidebar-toggle-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="4" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M16 9v6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
       </aside>
 
-      <main className="min-h-svh bg-neutral-50 px-5 py-6 sm:px-8 lg:ml-56 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10 dark:bg-[var(--color-app)]">
+      <main
+        className={cn(
+          "min-h-svh bg-neutral-50 px-5 py-6 transition-[margin] duration-200 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10 dark:bg-[var(--color-app)]",
+          collapsed ? "lg:ml-16" : "lg:ml-56",
+        )}
+      >
         <div className="mx-auto w-full max-w-[1400px]">
           <Outlet />
         </div>
@@ -324,15 +380,11 @@ export function Shell() {
   );
 }
 
-export function Mark({ className }: { className?: string }) {
+export function Logo({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "grid size-8 place-items-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]",
-        className,
-      )}
-    >
-      <span className="size-2.5 rounded-full bg-[var(--color-brand)] shadow-[0_0_0_4px_color-mix(in_oklab,var(--color-brand)_25%,transparent)]" />
-    </span>
+    <svg viewBox="0 0 352 352" className={cn("size-6 shrink-0", className)} role="img" aria-label="Haruvo">
+      <path d="M0 0h64v128h192V0h64v320h-64V192H64v128H0Z" transform="translate(32 32)" fill="#1e3a8a" />
+      <path d="M0 0h64v128h192V0h64v320h-64V192H64v128H0Z" fill="#2b7fff" />
+    </svg>
   );
 }

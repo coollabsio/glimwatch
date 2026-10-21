@@ -1,4 +1,4 @@
-import { Check, ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
+import { Check, ChevronDown, Logout, Profile, Setting2 } from "reicon-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import type { User } from "@/lib/api";
@@ -98,7 +98,7 @@ export function ProfileMenu({
             }}
           >
             <span className="flex items-center gap-2">
-              <UserRound className="size-4 opacity-80" />
+              <Profile className="size-4 opacity-80" />
               Profile
             </span>
           </Link>
@@ -109,7 +109,7 @@ export function ProfileMenu({
             onClick={() => setAppearanceOpen((value) => !value)}
           >
             <span className="flex items-center gap-2">
-              <Settings className="size-4 opacity-80" />
+              <Setting2 className="size-4 opacity-80" />
               Appearance
             </span>
             <ChevronDown className={cn("profile-chevron", appearanceOpen && "is-open")} aria-hidden="true" />
@@ -135,7 +135,7 @@ export function ProfileMenu({
             }}
           >
             <span className="flex items-center gap-2">
-              <LogOut className="size-4 opacity-90" />
+              <Logout className="size-4 opacity-90" />
               Log out
             </span>
           </button>

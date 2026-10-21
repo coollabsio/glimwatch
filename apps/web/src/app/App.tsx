@@ -6,6 +6,7 @@ import { LoginPage, RegisterPage } from "@/pages/auth";
 import { AgentsPage } from "@/pages/agents";
 import { AnalyticsPage, VisitorPage } from "@/pages/analytics";
 import { DashboardPage } from "@/pages/dashboard";
+import { HomePage } from "@/pages/home";
 import { LinkDetailPage, LinksPage } from "@/pages/links";
 import { ErrorProjectsPage, ProjectDetailPage } from "@/pages/error-projects";
 import { IncidentDetailPage, IncidentsPage } from "@/pages/incidents";
@@ -46,7 +47,8 @@ export function App() {
       <Route path="/share/:kind/:slug" element={<SharePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Shell />}>
-          <Route index element={<DashboardPage />} />
+          <Route index element={<HomePage />} />
+          <Route path="status" element={<DashboardPage />} />
           <Route path="monitors" element={<MonitorsPage />} />
           <Route path="monitors/:id" element={<MonitorDetailPage />} />
           <Route path="pages" element={<PagesPage />} />

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
-import { Mark } from "@/app/Shell";
+import { Logo } from "@/app/Shell";
 import { UptimeBars } from "@/components/charts";
 import { Badge } from "@/components/ui";
 import { api, type PublicPage } from "@/lib/api";
@@ -42,7 +42,7 @@ export function PublicStatusPage() {
       <div className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
         <header className="mb-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Mark />
+            <Logo className="size-8" />
             <div>
               <div className="text-[11px] font-medium text-[var(--coollabs-subtle)]">Haruvo</div>
               <h1>{page.title}</h1>
