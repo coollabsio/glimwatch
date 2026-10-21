@@ -1,18 +1,20 @@
 [workspace]
-members = ["apps/server", "crates/status", "crates/platform"]
+members = ["apps/server", "crates/status", "crates/platform", "crates/insights", "crates/errors"]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
 version = "0.1.0"
 license = "Apache-2.0"
-repository = "https://github.com/coollabsio/status"
+repository = "https://github.com/coollabsio/haruvo"
 
 [workspace.dependencies]
 argon2 = "0.5"
 axum = "0.8"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+flate2 = "1"
+hex = "0.4"
 hmac = "0.12"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
@@ -22,4 +24,4 @@ sqlx = { version = "0.8", default-features = false, features = ["any", "postgres
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
 tracing = "0.1"
-uuid = { version = "1", features = ["serde", "v7"] }
+uuid = { version = "1", features = ["serde", "v4", "v7"] }

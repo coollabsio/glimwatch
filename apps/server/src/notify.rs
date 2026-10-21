@@ -1,8 +1,8 @@
 use std::time::Duration;
 
+use haruvo_domain::{NotificationPayload, sign_body};
+use haruvo_platform::{Id, TimestampMillis};
 use serde_json::Value;
-use status_domain::{NotificationPayload, sign_body};
-use status_platform::{Id, TimestampMillis};
 
 use crate::repo::{self, Channel};
 use crate::state::AppState;
@@ -70,7 +70,7 @@ async fn send(
         "email" => {
             let Some(smtp) = &state.config.smtp else {
                 return Ok(SendOutcome::Skipped(
-                    "SMTP is not configured. Set STATUS_SMTP_HOST and STATUS_SMTP_FROM.".to_owned(),
+                    "SMTP is not configured. Set HARUVO_SMTP_HOST and HARUVO_SMTP_FROM.".to_owned(),
                 ));
             };
             let to = config
@@ -93,7 +93,10 @@ async fn send(
             if let Some(secret) = config.get("secret").and_then(Value::as_str) {
                 if !secret.is_empty() {
                     let signature = sign_body(secret, &body);
-                    request = request.header("x-status-signature", format!("sha256={signature}"));
+                    let header = format!("sha256={signature}");
+                    request = request
+                        .header("x-haruvo-signature", header.clone())
+                        .header("x-status-signature", header);
                 }
             }
             let response = request
@@ -138,7 +141,7 @@ async fn post_json(state: &AppState, url: &str, body: serde_json::Value) -> Resu
 }
 
 async fn send_email(
-    smtp: &status_platform::SmtpConfig,
+    smtp: &haruvo_platform::SmtpConfig,
     to: &str,
     subject: &str,
     text: &str,
@@ -188,13 +191,13 @@ pub fn plain(payload: &NotificationPayload) -> (String, String) {
         .monitor
         .as_ref()
         .map(|monitor| monitor.name.as_str())
-        .unwrap_or("Status");
+        .unwrap_or("Haruvo");
     let subject = match payload.event.as_str() {
-        "monitor.down" => format!("[Status] {name} is down"),
-        "monitor.recovered" => format!("[Status] {name} recovered"),
-        "incident.updated" => format!("[Status] Incident update: {name}"),
-        "notification.test" => format!("[Status] Test notification for {name}"),
-        _ => format!("[Status] {name}"),
+        "monitor.down" => format!("[Haruvo] {name} is down"),
+        "monitor.recovered" => format!("[Haruvo] {name} recovered"),
+        "incident.updated" => format!("[Haruvo] Incident update: {name}"),
+        "notification.test" => format!("[Haruvo] Test notification for {name}"),
+        _ => format!("[Haruvo] {name}"),
     };
     let mut lines = vec![subject.clone(), String::new()];
     if let Some(monitor) = &payload.monitor {

@@ -3,18 +3,18 @@
 
 use std::ops::DerefMut;
 
+use haruvo_domain::{
+    Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
+    JobType, MonitorState,
+};
+use haruvo_platform::{Database, Id, ParseIdError, TimestampMillis};
 use serde::de::DeserializeOwned;
 use sqlx::{Any, Row, Transaction};
-use status_domain::{
-    Assertion, CheckStatus, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
-    MonitorState,
-};
-use status_platform::{Database, Id, ParseIdError, TimestampMillis};
 
 const MONITOR_COLUMNS: &str = "\
 id, name, description, job_type, url, method, headers_json, body, timeout_ms, interval_seconds, \
 degraded_after_ms, expected_status, assertions_json, follow_redirects, failure_threshold, active, \
-state, consecutive_failures, last_checked_at, next_check_at, created_at, updated_at";
+state, consecutive_failures, last_checked_at, next_check_at, created_at, updated_at, agent_id, check_type";
 
 #[derive(Clone, Debug)]
 pub struct User {
@@ -51,6 +51,19 @@ pub struct Monitor {
     pub next_check_at: TimestampMillis,
     pub created_at: TimestampMillis,
     pub updated_at: TimestampMillis,
+    /// The agent that runs this check. `None` means this server runs it.
+    pub agent_id: Option<Id>,
+    /// Set only for agent checks. `None` means `job_type` says it all.
+    pub check_type: Option<CheckType>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Agent {
+    pub id: Id,
+    pub name: String,
+    pub last_seen_at: Option<TimestampMillis>,
+    pub created_at: TimestampMillis,
+    pub monitor_count: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -61,6 +74,7 @@ pub struct NewCheck {
     pub status_code: Option<i64>,
     pub latency_ms: i64,
     pub error: Option<String>,
+    pub region: String,
     pub checked_at: TimestampMillis,
 }
 
@@ -71,6 +85,7 @@ pub struct CheckRow {
     pub status_code: Option<i64>,
     pub latency_ms: i64,
     pub error: Option<String>,
+    pub region: String,
     pub checked_at: TimestampMillis,
 }
 
@@ -326,9 +341,9 @@ pub async fn insert_monitor(db: &Database, monitor: &Monitor) -> Result<(), sqlx
         "INSERT INTO monitors (\
             id, name, description, job_type, url, method, headers_json, body, timeout_ms, interval_seconds, \
             degraded_after_ms, expected_status, assertions_json, follow_redirects, failure_threshold, active, \
-            state, consecutive_failures, last_checked_at, next_check_at, created_at, updated_at\
+            state, consecutive_failures, last_checked_at, next_check_at, created_at, updated_at, agent_id, check_type\
          ) VALUES (\
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22\
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24\
          )",
     )
     .bind(monitor.id.to_string())
@@ -353,6 +368,8 @@ pub async fn insert_monitor(db: &Database, monitor: &Monitor) -> Result<(), sqlx
     .bind(monitor.next_check_at.as_millis())
     .bind(monitor.created_at.as_millis())
     .bind(monitor.updated_at.as_millis())
+    .bind(monitor.agent_id.map(|id| id.to_string()))
+    .bind(monitor.check_type.map(CheckType::as_str))
     .execute(db.pool())
     .await?;
     Ok(())
@@ -421,7 +438,8 @@ pub async fn due_monitors(
     limit: i64,
 ) -> Result<Vec<Monitor>, sqlx::Error> {
     let rows = sqlx::query(&format!(
-        "SELECT {MONITOR_COLUMNS} FROM monitors WHERE active = 1 AND next_check_at <= $1 \
+        "SELECT {MONITOR_COLUMNS} FROM monitors \
+         WHERE active = 1 AND agent_id IS NULL AND next_check_at <= $1 \
          ORDER BY next_check_at LIMIT $2"
     ))
     .bind(now)
@@ -447,6 +465,183 @@ pub async fn claim_monitor(
     .execute(db.pool())
     .await?;
     Ok(result.rows_affected() > 0)
+}
+
+const AGENT_COLUMNS: &str = "\
+a.id, a.name, a.last_seen_at, a.created_at, \
+(SELECT COUNT(*) FROM monitors m WHERE m.agent_id = a.id) AS monitor_count";
+
+pub async fn list_agents(db: &Database) -> Result<Vec<Agent>, sqlx::Error> {
+    let rows = sqlx::query(&format!(
+        "SELECT {AGENT_COLUMNS} FROM agents a ORDER BY lower(a.name), a.id"
+    ))
+    .fetch_all(db.pool())
+    .await?;
+    rows.iter().map(map_agent).collect()
+}
+
+pub async fn get_agent(db: &Database, id: Id) -> Result<Option<Agent>, sqlx::Error> {
+    let row = sqlx::query(&format!(
+        "SELECT {AGENT_COLUMNS} FROM agents a WHERE a.id = $1"
+    ))
+    .bind(id.to_string())
+    .fetch_optional(db.pool())
+    .await?;
+    row.as_ref().map(map_agent).transpose()
+}
+
+pub async fn agent_by_name(db: &Database, name: &str) -> Result<Option<Agent>, sqlx::Error> {
+    let row = sqlx::query(&format!(
+        "SELECT {AGENT_COLUMNS} FROM agents a WHERE lower(a.name) = lower($1)"
+    ))
+    .bind(name)
+    .fetch_optional(db.pool())
+    .await?;
+    row.as_ref().map(map_agent).transpose()
+}
+
+pub async fn insert_agent(
+    db: &Database,
+    id: Id,
+    name: &str,
+    token_hash: &str,
+    now: TimestampMillis,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO agents (id, name, token_hash, created_at) VALUES ($1, $2, $3, $4)")
+        .bind(id.to_string())
+        .bind(name)
+        .bind(token_hash)
+        .bind(now.as_millis())
+        .execute(db.pool())
+        .await?;
+    Ok(())
+}
+
+/// What an agent reports about one check in its config. Secrets never reach the server.
+#[derive(Clone, Debug)]
+pub struct AgentCheck {
+    pub name: String,
+    pub check_type: CheckType,
+    pub target: String,
+    pub interval_seconds: i64,
+    pub timeout_ms: i64,
+    pub failure_threshold: i32,
+}
+
+/// Makes the agent's monitors match its config: listed checks are created or updated and
+/// active, and the agent's other monitors are paused so their history stays.
+pub async fn sync_agent_checks(
+    db: &Database,
+    agent_id: Id,
+    checks: &[AgentCheck],
+    now: TimestampMillis,
+) -> Result<Vec<(String, Id)>, sqlx::Error> {
+    let existing = sqlx::query(&format!(
+        "SELECT {MONITOR_COLUMNS} FROM monitors WHERE agent_id = $1"
+    ))
+    .bind(agent_id.to_string())
+    .fetch_all(db.pool())
+    .await?
+    .iter()
+    .map(map_monitor)
+    .collect::<Result<Vec<_>, _>>()?;
+    let mut ids = Vec::new();
+    for check in checks {
+        let previous = existing.iter().find(|monitor| monitor.name == check.name);
+        let monitor = Monitor {
+            id: previous.map_or_else(Id::new, |monitor| monitor.id),
+            name: check.name.clone(),
+            description: String::new(),
+            job_type: check.check_type.job_type(),
+            url: check.target.clone(),
+            method: "GET".to_owned(),
+            headers: Vec::new(),
+            body: String::new(),
+            timeout_ms: check.timeout_ms,
+            interval_seconds: check.interval_seconds,
+            degraded_after_ms: None,
+            expected_status: None,
+            assertions: Vec::new(),
+            follow_redirects: true,
+            failure_threshold: check.failure_threshold,
+            active: true,
+            state: previous.map_or(MonitorState::Pending, |monitor| monitor.state),
+            consecutive_failures: previous.map_or(0, |monitor| monitor.consecutive_failures),
+            last_checked_at: previous.and_then(|monitor| monitor.last_checked_at),
+            next_check_at: now,
+            created_at: previous.map_or(now, |monitor| monitor.created_at),
+            updated_at: now,
+            agent_id: Some(agent_id),
+            check_type: Some(check.check_type),
+        };
+        if previous.is_some() {
+            sqlx::query(
+                "UPDATE monitors SET job_type = $1, check_type = $2, url = $3, timeout_ms = $4, \
+                 interval_seconds = $5, failure_threshold = $6, active = 1, updated_at = $7 WHERE id = $8",
+            )
+            .bind(monitor.job_type.as_str())
+            .bind(check.check_type.as_str())
+            .bind(&monitor.url)
+            .bind(monitor.timeout_ms)
+            .bind(monitor.interval_seconds)
+            .bind(i64::from(monitor.failure_threshold))
+            .bind(now.as_millis())
+            .bind(monitor.id.to_string())
+            .execute(db.pool())
+            .await?;
+        } else {
+            insert_monitor(db, &monitor).await?;
+        }
+        ids.push((monitor.name, monitor.id));
+    }
+    for monitor in &existing {
+        if monitor.active && !checks.iter().any(|check| check.name == monitor.name) {
+            set_active(
+                db,
+                monitor.id,
+                false,
+                monitor.next_check_at.as_millis(),
+                now.as_millis(),
+            )
+            .await?;
+        }
+    }
+    Ok(ids)
+}
+
+/// Deletes an agent that no monitor uses. Returns false when it is missing or in use.
+pub async fn delete_agent(db: &Database, id: Id) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query(
+        "DELETE FROM agents WHERE id = $1 \
+         AND NOT EXISTS (SELECT 1 FROM monitors WHERE agent_id = $1)",
+    )
+    .bind(id.to_string())
+    .execute(db.pool())
+    .await?;
+    Ok(result.rows_affected() > 0)
+}
+
+/// Finds the agent for a token and records that it was seen.
+pub async fn authenticate_agent(
+    db: &Database,
+    token_hash: &str,
+    now: TimestampMillis,
+) -> Result<Option<Agent>, sqlx::Error> {
+    let row = sqlx::query(&format!(
+        "SELECT {AGENT_COLUMNS} FROM agents a WHERE a.token_hash = $1"
+    ))
+    .bind(token_hash)
+    .fetch_optional(db.pool())
+    .await?;
+    let Some(agent) = row.as_ref().map(map_agent).transpose()? else {
+        return Ok(None);
+    };
+    sqlx::query("UPDATE agents SET last_seen_at = $1 WHERE id = $2")
+        .bind(now.as_millis())
+        .bind(agent.id.to_string())
+        .execute(db.pool())
+        .await?;
+    Ok(Some(agent))
 }
 
 pub async fn save_outcome(
@@ -477,7 +672,7 @@ pub async fn insert_check(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO check_results (id, monitor_id, status, status_code, latency_ms, error, region, checked_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, 'local', $7)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(check.id.to_string())
     .bind(check.monitor_id.to_string())
@@ -485,6 +680,7 @@ pub async fn insert_check(
     .bind(check.status_code)
     .bind(check.latency_ms)
     .bind(&check.error)
+    .bind(&check.region)
     .bind(check.checked_at.as_millis())
     .execute(tx.deref_mut())
     .await?;
@@ -535,7 +731,7 @@ pub async fn recent_checks(
     limit: i64,
 ) -> Result<Vec<CheckRow>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT id, status, status_code, latency_ms, error, checked_at FROM check_results \
+        "SELECT id, status, status_code, latency_ms, error, region, checked_at FROM check_results \
          WHERE monitor_id = $1 ORDER BY checked_at DESC LIMIT $2",
     )
     .bind(monitor_id.to_string())
@@ -550,6 +746,7 @@ pub async fn recent_checks(
                 status_code: row.try_get("status_code")?,
                 latency_ms: row.try_get("latency_ms")?,
                 error: row.try_get("error")?,
+                region: row.try_get("region")?,
                 checked_at: millis(row, "checked_at")?,
             })
         })
@@ -1271,6 +1468,23 @@ fn map_monitor(row: &sqlx::any::AnyRow) -> Result<Monitor, sqlx::Error> {
         next_check_at: millis(row, "next_check_at")?,
         created_at: millis(row, "created_at")?,
         updated_at: millis(row, "updated_at")?,
+        agent_id: optional_id(row, "agent_id")?,
+        check_type: row
+            .try_get::<Option<String>, _>("check_type")?
+            .map(|value| {
+                CheckType::parse(&value).ok_or_else(|| corrupt(format!("check type {value}")))
+            })
+            .transpose()?,
+    })
+}
+
+fn map_agent(row: &sqlx::any::AnyRow) -> Result<Agent, sqlx::Error> {
+    Ok(Agent {
+        id: parse_id(row, "id")?,
+        name: row.try_get("name")?,
+        last_seen_at: optional_millis(row, "last_seen_at")?,
+        created_at: millis(row, "created_at")?,
+        monitor_count: row.try_get("monitor_count")?,
     })
 }
 

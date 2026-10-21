@@ -1,28 +1,28 @@
 services:
-  status:
+  haruvo:
     build:
       context: ..
-    image: ${STATUS_IMAGE:-status:local}
+    image: ${HARUVO_IMAGE:-haruvo:local}
     restart: unless-stopped
     ports: ["8080:8080"]
     environment:
-      STATUS_ENV: production
-      STATUS_BIND: 0.0.0.0
-      STATUS_PORT: 8080
-      STATUS_PUBLIC_ORIGIN: ${STATUS_PUBLIC_ORIGIN:-http://localhost:8080}
-      STATUS_DATABASE_PATH: /var/lib/status/status.sqlite
+      HARUVO_ENV: production
+      HARUVO_BIND: 0.0.0.0
+      HARUVO_PORT: 8080
+      HARUVO_PUBLIC_ORIGIN: ${HARUVO_PUBLIC_ORIGIN:-http://localhost:8080}
+      HARUVO_DATABASE_PATH: /var/lib/haruvo/haruvo.sqlite
       # Switch the same binary to Postgres by setting this and starting the db service.
-      # STATUS_DATABASE_URL: postgres://status:status@db:5432/status
+      # HARUVO_DATABASE_URL: postgres://haruvo:haruvo@db:5432/haruvo
     volumes:
-      - status-data:/var/lib/status
+      - haruvo-data:/var/lib/haruvo
   # db:
   #   image: postgres:16-alpine
   #   environment:
-  #     POSTGRES_USER: status
-  #     POSTGRES_PASSWORD: status
-  #     POSTGRES_DB: status
+  #     POSTGRES_USER: haruvo
+  #     POSTGRES_PASSWORD: haruvo
+  #     POSTGRES_DB: haruvo
   #   volumes:
-  #     - status-pg:/var/lib/postgresql/data
+  #     - haruvo-pg:/var/lib/postgresql/data
 volumes:
-  status-data:
-  # status-pg:
+  haruvo-data:
+  # haruvo-pg:

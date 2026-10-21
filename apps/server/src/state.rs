@@ -1,4 +1,4 @@
-use status_platform::{
+use haruvo_platform::{
     Config, Database, DatabaseConfig, EnvironmentMode, PasswordError, PasswordService,
 };
 use std::collections::HashSet;
@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use thiserror::Error;
 
+use crate::connectivity::Connectivity;
 use crate::migrations;
 
 #[derive(Clone)]
@@ -17,6 +18,11 @@ pub struct AppState {
     pub http: HttpClients,
     pub scheduler_id: String,
     pub inflight: Inflight,
+    pub connectivity: Connectivity,
+    pub insights_secret: String,
+    pub collector_limit: Arc<crate::insights::RateLimiter>,
+    pub public_limit: Arc<crate::insights::RateLimiter>,
+    pub geo: Option<Arc<maxminddb::Reader<Vec<u8>>>>,
 }
 
 #[derive(Clone)]
@@ -37,7 +43,7 @@ impl HttpClients {
 fn client(policy: reqwest::redirect::Policy) -> Result<reqwest::Client, reqwest::Error> {
     reqwest::Client::builder()
         .redirect(policy)
-        .user_agent(concat!("Status/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Haruvo/", env!("CARGO_PKG_VERSION")))
         .build()
 }
 
@@ -84,12 +90,20 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
     let applied = migrations::runner().run(&database).await?;
     tracing::info!(applied, backend = config.backend_name(), "database ready");
     let passwords = PasswordService::new(config.argon_memory_kib)?;
+    let insights = crate::insights::prepare(&database, &config)
+        .await
+        .map_err(|error| BootError::Config(error.to_string()))?;
     Ok(AppState {
         db: database,
         http: HttpClients::new()?,
-        scheduler_id: status_platform::Id::new().to_string(),
+        scheduler_id: haruvo_platform::Id::new().to_string(),
         inflight: Inflight::default(),
+        connectivity: Connectivity::new(config.connectivity_targets.clone()),
         passwords,
+        insights_secret: insights.secret,
+        collector_limit: insights.collector_limit,
+        public_limit: insights.public_limit,
+        geo: insights.geo,
         config: Arc::new(config),
     })
 }
@@ -127,15 +141,18 @@ pub fn testing_config(path: PathBuf) -> Config {
         open_signup: true,
         smtp: None,
         argon_memory_kib: 32,
+        connectivity_targets: Vec::new(),
+        proxy_hops: 0,
+        geoip_path: None,
     }
 }
 
 #[derive(Debug, Error)]
 pub enum BootError {
     #[error(transparent)]
-    Database(#[from] status_platform::DatabaseError),
+    Database(#[from] haruvo_platform::DatabaseError),
     #[error(transparent)]
-    Migration(#[from] status_platform::MigrationError),
+    Migration(#[from] haruvo_platform::MigrationError),
     #[error(transparent)]
     Password(#[from] PasswordError),
     #[error("http client: {0}")]

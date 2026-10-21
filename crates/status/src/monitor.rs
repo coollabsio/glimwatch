@@ -4,6 +4,51 @@ use serde::{Deserialize, Serialize};
 
 use crate::assertion::{Assertion, CheckStatus};
 
+/// What a check tests. Server monitors use only `Http` and `Tcp`. Agents also run database
+/// checks, which are stored as `Tcp` jobs with this type beside them.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckType {
+    Http,
+    Tcp,
+    Postgres,
+    Mysql,
+    Redis,
+}
+
+impl CheckType {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Http => "http",
+            Self::Tcp => "tcp",
+            Self::Postgres => "postgres",
+            Self::Mysql => "mysql",
+            Self::Redis => "redis",
+        }
+    }
+
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "http" => Self::Http,
+            "tcp" => Self::Tcp,
+            "postgres" => Self::Postgres,
+            "mysql" => Self::Mysql,
+            "redis" => Self::Redis,
+            _ => return None,
+        })
+    }
+
+    #[must_use]
+    pub const fn job_type(self) -> JobType {
+        match self {
+            Self::Http => JobType::Http,
+            Self::Tcp | Self::Postgres | Self::Mysql | Self::Redis => JobType::Tcp,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum JobType {

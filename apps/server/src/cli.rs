@@ -3,17 +3,19 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use status_platform::Config;
+use haruvo_platform::Config;
 
+use crate::agent;
+use crate::connectivity::Connectivity;
 use crate::scheduler;
 use crate::seed;
 use crate::state::{self, BootError};
 
 #[derive(Parser)]
 #[command(
-    name = "status",
+    name = "haruvo",
     version,
-    about = "Status pages, incidents, and uptime monitoring"
+    about = "Haruvo status pages, incidents, and uptime monitoring"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -43,9 +45,22 @@ enum Command {
     },
     /// Exit successfully when /api/health answers on the configured port.
     Healthcheck,
+    /// Run the checks in a config file from this network and report them to a Haruvo server.
+    Agent {
+        /// Haruvo server URL, for example https://status.example.com.
+        #[arg(long, env = "HARUVO_AGENT_SERVER")]
+        server: String,
+        /// Token shown once when the agent was created.
+        #[arg(long, env = "HARUVO_AGENT_TOKEN", hide_env_values = true)]
+        token: String,
+        /// TOML file with [[check]] entries.
+        #[arg(long, env = "HARUVO_AGENT_CONFIG")]
+        config: PathBuf,
+    },
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    promote_legacy_agent_env();
     let cli = Cli::parse();
     match cli.command.unwrap_or(Command::Serve {
         listen: None,
@@ -58,7 +73,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             scheduler::spawn(state.clone());
             let listener = tokio::net::TcpListener::bind(addr).await?;
             let bound = listener.local_addr()?;
-            tracing::info!("Status listening on http://{bound}");
+            tracing::info!("Haruvo listening on http://{bound}");
             axum::serve(listener, crate::routes::router(state))
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
@@ -81,6 +96,14 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 println!("database already has an account; left it unchanged");
             }
         }
+        Command::Agent {
+            server,
+            token,
+            config,
+        } => {
+            let targets = Config::from_env()?.connectivity_targets;
+            agent::run(&server, token, &config, Connectivity::new(targets)).await?;
+        }
         Command::Healthcheck => {
             let config = Config::from_env()?;
             let url = format!("http://127.0.0.1:{}/api/health", config.port);
@@ -96,6 +119,21 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+fn promote_legacy_agent_env() {
+    for (primary, legacy) in [
+        ("HARUVO_AGENT_SERVER", "STATUS_AGENT_SERVER"),
+        ("HARUVO_AGENT_TOKEN", "STATUS_AGENT_TOKEN"),
+        ("HARUVO_AGENT_CONFIG", "STATUS_AGENT_CONFIG"),
+    ] {
+        if std::env::var_os(primary).is_none()
+            && let Some(value) = std::env::var_os(legacy)
+        {
+            // SAFETY: process startup, before other threads read these variables.
+            unsafe { std::env::set_var(primary, value) }
+        }
+    }
 }
 
 fn load(listen: Option<SocketAddr>, database: Option<PathBuf>) -> Result<Config, BootError> {

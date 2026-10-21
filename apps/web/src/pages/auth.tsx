@@ -24,7 +24,7 @@ export function RegisterPage() {
   return (
     <AuthShell
       title="Create the operator account"
-      subtitle="The first account becomes the owner of this Status install."
+      subtitle="The first account becomes the owner of this Haruvo install."
       footer={
         <>
           Already registered? <Link className="auth-text-link" to="/login">Sign in</Link>
@@ -53,7 +53,7 @@ function AuthShell({
       <div className="auth-shell-content">
         <div className="w-full max-w-[27rem]">
           <div className="mb-5 text-center">
-            <div className="text-[15px] font-semibold tracking-tight text-black dark:text-white">Status</div>
+            <div className="text-[15px] font-semibold tracking-tight text-black dark:text-white">Haruvo</div>
             <div className="text-[11px] text-[var(--coollabs-subtle)]">coolLabs</div>
           </div>
           <div className="auth-card">

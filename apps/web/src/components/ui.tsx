@@ -8,19 +8,21 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "default" | "primary" | "danger" | "ghost";
+type ButtonVariant = "default" | "primary" | "highlighted" | "danger" | "error" | "ghost";
 
 export function Button({
   className,
   variant = "default",
+  size,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant; size?: "default" | "sm" }) {
   return (
     <button
       className={cn(
         variant === "ghost" ? "icon-button" : "button",
-        variant === "primary" && "button-highlighted",
-        variant === "danger" && "button-error",
+        (variant === "primary" || variant === "highlighted") && "button-highlighted",
+        (variant === "danger" || variant === "error") && "button-error",
+        size === "sm" && "h-7 px-2 text-xs",
         className,
       )}
       {...props}
@@ -68,7 +70,7 @@ export function PageHeader({
   description,
   actions,
 }: {
-  title: string;
+  title: ReactNode;
   description?: string;
   actions?: ReactNode;
 }) {

@@ -12,7 +12,7 @@ export function SettingsPage() {
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="This Status install, the signed-in operator, and the interface theme."
+        description="This Haruvo install, the signed-in operator, and the interface theme."
       />
       <LayerCard title="Account">
         <dl className="grid gap-3 text-[13px] sm:grid-cols-3">

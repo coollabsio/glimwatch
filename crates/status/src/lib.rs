@@ -1,4 +1,4 @@
-//! Domain rules for Status.
+//! Domain rules for Haruvo status pages and uptime.
 //!
 //! This crate plays the role of Orbit's `orbit-domain`: pure decisions about
 //! monitors, assertions, uptime, incidents, and notification payloads. The
@@ -18,8 +18,8 @@ pub use assertion::{
 pub use banner::{OpenIncident, PageBanner, page_banner};
 pub use incident::{IncidentImpact, IncidentStatus, resolved_at_after_update};
 pub use monitor::{
-    HeaderPair, JobType, MonitorInput, MonitorState, Transition, apply_outcome, parse_tcp_target,
-    validate_monitor,
+    CheckType, HeaderPair, JobType, MonitorInput, MonitorState, Transition, apply_outcome,
+    parse_tcp_target, validate_monitor,
 };
 pub use notification::{
     NotificationEvent, NotificationPayload, PayloadCheck, PayloadIncident, PayloadMonitor,

@@ -7,10 +7,10 @@ import { api, type PublicPage } from "@/lib/api";
 import { formatTime, percent, stateLabel, stateTone } from "@/lib/utils";
 
 const bannerCopy: Record<PublicPage["banner"], { title: string; className: string }> = {
-  operational: { title: "All systems operational", className: "bg-emerald-500/15 text-emerald-950 dark:text-emerald-50" },
-  degraded: { title: "Degraded performance", className: "bg-amber-400/20 text-amber-950 dark:text-amber-50" },
-  partial_outage: { title: "Partial system outage", className: "bg-amber-500/20 text-amber-950 dark:text-amber-50" },
-  major_outage: { title: "Major outage", className: "bg-rose-500/20 text-rose-950 dark:text-rose-50" },
+  operational: { title: "All systems operational", className: "border-emerald-500/30 bg-emerald-500/15 text-emerald-950 dark:text-emerald-50" },
+  degraded: { title: "Degraded performance", className: "border-amber-400/30 bg-amber-400/20 text-amber-950 dark:text-amber-50" },
+  partial_outage: { title: "Partial system outage", className: "border-amber-500/30 bg-amber-500/20 text-amber-950 dark:text-amber-50" },
+  major_outage: { title: "Major outage", className: "border-rose-500/30 bg-rose-500/20 text-rose-950 dark:text-rose-50" },
 };
 
 export function PublicStatusPage() {
@@ -44,7 +44,7 @@ export function PublicStatusPage() {
           <div className="flex items-center gap-3">
             <Mark />
             <div>
-              <div className="text-[11px] font-medium text-[var(--coollabs-subtle)]">Status</div>
+              <div className="text-[11px] font-medium text-[var(--coollabs-subtle)]">Haruvo</div>
               <h1>{page.title}</h1>
               <p className="mt-1 text-[13px] text-[var(--coollabs-subtle)]">{page.description}</p>
             </div>
@@ -112,7 +112,7 @@ export function PublicStatusPage() {
             ))}
           </div>
         </section>
-        <footer className="mt-16 text-center text-[11px] text-[var(--coollabs-subtle)]">Powered by Status</footer>
+        <footer className="mt-16 text-center text-[11px] text-[var(--coollabs-subtle)]">Powered by Haruvo</footer>
       </div>
     </div>
   );

@@ -17,7 +17,7 @@ export function IncidentsPage() {
       />
       {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading incidents…</p> : null}
       {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
-        <Empty title="No incidents" body="When a monitor crosses its failure threshold, Status files one. You can also write one by hand." />
+        <Empty title="No incidents" body="When a monitor crosses its failure threshold, Haruvo files one. You can also write one by hand." />
       ) : (
         <div className="flex flex-col gap-4">
           {query.data?.map((incident) => (

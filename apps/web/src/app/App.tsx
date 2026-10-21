@@ -3,13 +3,20 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { Shell } from "@/app/Shell";
 import { ApiError, api, type User } from "@/lib/api";
 import { LoginPage, RegisterPage } from "@/pages/auth";
+import { AgentsPage } from "@/pages/agents";
+import { AnalyticsPage, VisitorPage } from "@/pages/analytics";
 import { DashboardPage } from "@/pages/dashboard";
+import { LinkDetailPage, LinksPage } from "@/pages/links";
+import { ErrorProjectsPage, ProjectDetailPage } from "@/pages/error-projects";
 import { IncidentDetailPage, IncidentsPage } from "@/pages/incidents";
+import { IssueDetailPage } from "@/pages/issue-detail";
+import { IssuesPage } from "@/pages/issues";
 import { MaintenancePage } from "@/pages/maintenance";
 import { MonitorDetailPage, MonitorsPage } from "@/pages/monitors";
 import { NotificationsPage } from "@/pages/notifications";
 import { PageEditor, PagesPage } from "@/pages/pages";
 import { PublicStatusPage } from "@/pages/public";
+import { SharePage } from "@/pages/share";
 import { SettingsPage } from "@/pages/settings";
 
 function RequireAuth() {
@@ -19,7 +26,7 @@ function RequireAuth() {
     queryFn: () => api<User>("/api/auth/me"),
   });
   if (me.isLoading) {
-    return <div className="grid min-h-svh place-items-center text-sm text-muted-foreground">Opening Status…</div>;
+    return <div className="grid min-h-svh place-items-center text-sm text-muted-foreground">Opening Haruvo…</div>;
   }
   if (me.error instanceof ApiError && me.error.status === 401) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
@@ -36,6 +43,7 @@ export function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/status/:slug" element={<PublicStatusPage />} />
+      <Route path="/share/:kind/:slug" element={<SharePage />} />
       <Route element={<RequireAuth />}>
         <Route element={<Shell />}>
           <Route index element={<DashboardPage />} />
@@ -47,6 +55,17 @@ export function App() {
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           <Route path="maintenance" element={<MaintenancePage />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="agents" element={<AgentsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="analytics/:siteId" element={<AnalyticsPage />} />
+          <Route path="analytics/:siteId/visitors/:visitorId" element={<VisitorPage />} />
+          <Route path="links" element={<LinksPage />} />
+          <Route path="links/:linkId" element={<LinkDetailPage />} />
+          <Route path="errors" element={<IssuesPage />} />
+          <Route path="errors/:id" element={<IssueDetailPage />} />
+          <Route path="errors/:id/events/:eventId" element={<IssueDetailPage />} />
+          <Route path="error-projects" element={<ErrorProjectsPage />} />
+          <Route path="error-projects/:id" element={<ProjectDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>

@@ -42,6 +42,7 @@ export type Check = {
   status_code: number | null;
   latency_ms: number;
   error: string | null;
+  region: string;
   checked_at: string;
 };
 
@@ -53,6 +54,7 @@ export type Monitor = {
   name: string;
   description: string;
   job_type: "http" | "tcp";
+  check_type: "http" | "tcp" | "postgres" | "mysql" | "redis";
   url: string;
   method: string;
   headers: HeaderPair[];
@@ -65,6 +67,7 @@ export type Monitor = {
   follow_redirects: boolean;
   failure_threshold: number;
   active: boolean;
+  agent_id: string | null;
   state: "pending" | "up" | "degraded" | "down";
   consecutive_failures: number;
   last_checked_at: string | null;
@@ -77,6 +80,24 @@ export type Monitor = {
   bars: Bar[];
   recent?: Check[];
 };
+
+export type Agent = {
+  id: string;
+  name: string;
+  last_seen_at: string | null;
+  online: boolean;
+  monitor_count: number;
+  created_at: string;
+};
+
+export type CreatedAgent = Agent & { token: string };
+
+export const listAgents = () => api<Agent[]>("/api/agents");
+
+export const createAgent = (name: string) =>
+  api<CreatedAgent>("/api/agents", { method: "POST", body: JSON.stringify({ name }) });
+
+export const deleteAgent = (id: string) => api<void>(`/api/agents/${id}`, { method: "DELETE" });
 
 export type Component = {
   id: string;
@@ -182,5 +203,203 @@ export type Meta = {
   version: string;
   signup_open: boolean;
   database: string;
+  public_origin: string;
   demo: { email: string; password: string } | null;
+};
+
+export type InsightSite = {
+  id: string;
+  public_id: string;
+  name: string;
+  domain: string;
+  color: string;
+  public_slug: string;
+  public_enabled: boolean;
+  public_threshold: number;
+  public_sections: string[];
+  created_at: number;
+};
+
+export type InsightPoint = {
+  day: number;
+  views?: number;
+  visitors?: number;
+  events?: number;
+  visits?: number;
+  bounces?: number;
+  time?: number;
+  clicks?: number;
+};
+
+export type InsightOverview = {
+  pageviews: number;
+  visitors: number;
+  events: number;
+  visits: number;
+  bounces: number;
+  total_time: number;
+  from: number;
+  to: number;
+  series: InsightPoint[];
+};
+
+export type InsightRow = { label: string; count: number; visitors?: number };
+
+export type InsightDomain = {
+  id: string;
+  site_id: string | null;
+  hostname: string;
+  note: string;
+  enabled: boolean;
+  created_at: number;
+};
+
+export type InsightLink = {
+  id: string;
+  domain_id: string;
+  hostname: string;
+  slug: string;
+  destination: string;
+  redirect_type: "temporary" | "permanent";
+  enabled: boolean;
+  public_slug: string;
+  public_enabled: boolean;
+  public_threshold: number;
+  public_sections: string[];
+  created_at: number;
+  total_clicks: number;
+};
+
+export type LinkOverview = {
+  clicks: number;
+  visitors: number;
+  from: number;
+  to: number;
+  series: InsightPoint[];
+};
+
+export type PublicInsight = {
+  name: string;
+  subtitle: string;
+  sections: string[];
+  pageviews?: number | null;
+  clicks?: number | null;
+  visitors: number | null;
+  from: number;
+  to: number;
+  series: InsightPoint[];
+};
+
+export type Project = {
+  id: string;
+  name: string;
+  slug: string;
+  platform: string;
+  publicKey: string;
+  dsn: string;
+  createdAt: string;
+};
+
+export type Issue = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  shortId: string;
+  title: string;
+  culprit?: string | null;
+  status: "unresolved" | "resolved" | "ignored";
+  level: string;
+  platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
+  firstSeen: string;
+  lastSeen: string;
+  eventCount: number;
+  unhandled: boolean;
+  priority: string;
+  userCount: number;
+  periodEventCount: number;
+  trend24h: number[];
+  trend14d: number[];
+};
+
+export type IssueFeed = {
+  issues: Issue[];
+  environments: string[];
+};
+
+export type TagCount = { key: string; value: string; count: number };
+
+export type EventSummary = {
+  id: string;
+  timestamp: string;
+  level: string;
+  title: string;
+  environment?: string | null;
+  release?: string | null;
+};
+
+export type Frame = {
+  filename?: string | null;
+  absPath?: string | null;
+  function?: string | null;
+  module?: string | null;
+  lineno?: number | null;
+  colno?: number | null;
+  contextLine?: string | null;
+  preContext: string[];
+  postContext: string[];
+  inApp: boolean;
+};
+
+export type ExceptionInfo = {
+  type?: string | null;
+  value?: string | null;
+  mechanism?: string | null;
+  handled?: boolean | null;
+  frames: Frame[];
+};
+
+export type Breadcrumb = {
+  timestamp?: string | null;
+  type?: string | null;
+  category?: string | null;
+  level?: string | null;
+  message?: string | null;
+  data: Record<string, unknown>;
+};
+
+export type NormalizedEvent = {
+  eventId: string;
+  timestamp: string;
+  level: string;
+  title: string;
+  message?: string | null;
+  culprit?: string | null;
+  platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
+  serverName?: string | null;
+  transaction?: string | null;
+  logger?: string | null;
+  fingerprint: string;
+  sdk?: { name: string; version: string } | null;
+  exceptions: ExceptionInfo[];
+  breadcrumbs: Breadcrumb[];
+  tags: { key: string; value: string }[];
+  contexts: Record<string, unknown>;
+  user: Record<string, unknown>;
+  request: Record<string, unknown>;
+  extra: Record<string, unknown>;
+  raw: unknown;
+};
+
+export type IssueDetail = Issue & {
+  events: EventSummary[];
+  latest: NormalizedEvent | null;
+  histogram: number[];
+  periodEvents: number;
+  users: number;
+  tags: TagCount[];
 };
