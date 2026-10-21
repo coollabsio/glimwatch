@@ -119,7 +119,7 @@ export function ProfileMenu({
               {(["light", "dark"] as const).map((mode) => (
                 <button key={mode} type="button" className="profile-choice" onClick={() => applyTheme(mode)}>
                   <span>{mode === "light" ? "Light" : "Dark"}</span>
-                  {theme === mode ? <Check className="size-3.5 text-black dark:text-[var(--color-fg)]" /> : null}
+                  {theme === mode ? <Check className="size-3.5 text-[var(--ui-fg)]" /> : null}
                 </button>
               ))}
             </div>

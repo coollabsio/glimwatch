@@ -55,8 +55,8 @@ function AuthShell({
         <div className="w-full max-w-[27rem]">
           <div className="mb-5 text-center">
             <Logo className="mx-auto mb-3 size-10" />
-            <div className="text-[15px] font-semibold tracking-tight text-black dark:text-white">Haruvo</div>
-            <div className="text-[11px] text-[var(--coollabs-subtle)]">coolLabs</div>
+            <div className="text-[15px] font-semibold tracking-tight text-[var(--ui-fg)]">Haruvo</div>
+            <div className="text-[11px] text-[var(--ui-fg-faint)]">coolLabs</div>
           </div>
           <div className="auth-card">
             <div className="auth-card-heading">
@@ -67,7 +67,7 @@ function AuthShell({
             <footer className="auth-card-footer">{footer}</footer>
           </div>
           {meta.data?.demo ? (
-            <p className="mt-4 text-center text-xs text-[var(--coollabs-subtle)]">
+            <p className="mt-4 text-center text-xs text-[var(--ui-fg-faint)]">
               Seeded demo: {meta.data.demo.email} / {meta.data.demo.password}
             </p>
           ) : null}

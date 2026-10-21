@@ -1,39 +1,65 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { Button, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Textarea } from "@/components/ui";
+import { Button, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
 import { ApiError, api, type Monitor, type StatusPage } from "@/lib/api";
 
 export function PagesPage() {
   const query = useQuery({ queryKey: ["pages"], queryFn: () => api<StatusPage[]>("/api/pages") });
+  const [search, setSearch] = useState("");
+  const needle = search.trim().toLowerCase();
+  const pages = (query.data ?? []).filter((page) => page.title.toLowerCase().includes(needle) || page.slug.toLowerCase().includes(needle));
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Status pages"
         description="Public pages at /status/your-slug."
-        actions={<Link to="/pages/new"><Button variant="primary">New page</Button></Link>}
+        actions={<Link to="/pages/new"><Button variant="highlighted">New page</Button></Link>}
       />
-      {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading pages…</p> : null}
-      {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
-        <Empty title="No status pages" body="Group monitors onto a page your customers can open without signing in." action={<Link to="/pages/new"><Button variant="primary">New page</Button></Link>} />
+      {query.isLoading ? (
+        <p className="text-[13px] text-[var(--ui-fg-faint)]">Loading pages…</p>
+      ) : (query.data?.length ?? 0) === 0 ? (
+        <Empty title="No status pages" body="Group monitors onto a page your customers can open without signing in." action={<Link to="/pages/new"><Button variant="highlighted">New page</Button></Link>} />
       ) : (
-        <div className="flex flex-col gap-4">
-          {query.data?.map((page) => (
-            <LayerCard
-              key={page.id}
-              title={page.title}
-              description={`/${page.slug} · ${page.components.length} components · ${page.published ? "published" : "draft"}`}
-              actions={
-                <>
-                  <Link to={`/pages/${page.id}`}><Button>Edit</Button></Link>
-                  {page.published ? <Link to={`/status/${page.slug}`}><Button variant="primary">View</Button></Link> : null}
-                </>
-              }
-            >
-              <p className="text-[13px] text-[var(--coollabs-subtle)]">Customers open this page without signing in.</p>
-            </LayerCard>
-          ))}
-        </div>
+        <LayerCard title="All pages" description="Customers open these pages without signing in." flush>
+          <div className="flex items-center gap-2 border-b border-[var(--ui-divider)] p-2">
+            <Input className="max-w-64" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search pages" aria-label="Search pages" />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="cool-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th className="hidden sm:table-cell">Slug</th>
+                  <th className="hidden md:table-cell">Components</th>
+                  <th>Status</th>
+                  <th className="w-0" />
+                </tr>
+              </thead>
+              <tbody>
+                {pages.map((page) => (
+                  <tr key={page.id}>
+                    <td><Link className="row-link" to={`/pages/${page.id}`}>{page.title}</Link></td>
+                    <td className="hidden font-mono text-[12px] sm:table-cell">/{page.slug}</td>
+                    <td className="hidden md:table-cell">{page.components.length}</td>
+                    <td><StatusBadge tone={page.published ? "success" : "neutral"}>{page.published ? "Published" : "Draft"}</StatusBadge></td>
+                    <td>
+                      <div className="flex justify-end gap-2">
+                        <Link to={`/pages/${page.id}`}><Button>Edit</Button></Link>
+                        {page.published ? <Link to={`/status/${page.slug}`}><Button>View</Button></Link> : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {pages.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center text-[var(--ui-fg-faint)]">No pages match your search.</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </LayerCard>
       )}
     </div>
   );
@@ -99,48 +125,63 @@ export function PageEditor() {
     save.mutate();
   }
 
-  if (!creating && existing.isLoading) return <p className="text-sm text-muted-foreground">Loading page…</p>;
+  if (!creating && existing.isLoading) return <p className="text-[13px] text-[var(--ui-fg-faint)]">Loading page…</p>;
 
   return (
-    <form className="mx-auto flex max-w-2xl flex-col gap-4" onSubmit={submit}>
-      <PageHeader title={creating ? "New status page" : "Edit status page"} description="Choose a slug and the monitors that appear on it." />
-      <Field label="Title" error={fields.title}><Input value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-      <Field label="Description" error={fields.description}><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
-      <Field label="Slug" hint="public URL" error={fields.slug}><Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="coollabs" required /></Field>
-      <Field label="Homepage" error={fields.homepage_url}><Input value={homepage} onChange={(event) => setHomepage(event.target.value)} placeholder="https://coolify.io" /></Field>
-      <label className="check-row">
-        <input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} />
-        Published
-      </label>
-      <div>
-        <div className="field-label">Monitors on this page</div>
-        <div className="space-y-2 rounded-lg bg-[var(--coollabs-recessed)] p-3 shadow-[0_0_0_1px_var(--coollabs-line)]">
-          {(monitors.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Create a monitor first.</p> : null}
-          {monitors.data?.map((monitor) => (
-            <label key={monitor.id} className="check-row">
-              <input
-                type="checkbox"
-                checked={selected.includes(monitor.id)}
-                onChange={(event) =>
-                  setSelected(event.target.checked ? [...selected, monitor.id] : selected.filter((item) => item !== monitor.id))
-                }
-              />
-              {monitor.name}
-            </label>
-          ))}
+    <form className="mx-auto flex w-full max-w-3xl flex-col gap-6" onSubmit={submit}>
+      <PageHeader
+        title={creating ? "New status page" : "Edit status page"}
+        description="Choose a slug and the monitors that appear on it."
+        actions={!creating && page?.published ? <Link to={`/status/${page.slug}`}><Button type="button">View public page</Button></Link> : null}
+      />
+      <LayerCard title="Details" description={!creating && page?.published ? `Public URL: /status/${page.slug}` : "What customers see at the top of the page."}>
+        <div className="flex flex-col gap-4">
+          <Field label="Title" error={fields.title}><Input value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
+          <Field label="Description" error={fields.description}><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Slug" hint="public URL" error={fields.slug}><Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="coollabs" required /></Field>
+            <Field label="Homepage" error={fields.homepage_url}><Input value={homepage} onChange={(event) => setHomepage(event.target.value)} placeholder="https://coolify.io" /></Field>
+          </div>
+          <Field label="Visibility">
+            <Select
+              value={published ? "published" : "draft"}
+              options={[
+                { value: "published", label: "Published" },
+                { value: "draft", label: "Draft" },
+              ]}
+              onChange={(value) => setPublished(value === "published")}
+              aria-label="Visibility"
+            />
+          </Field>
         </div>
-        {fields.monitor_ids ? <p className="mt-1 text-xs text-destructive">{fields.monitor_ids}</p> : null}
-      </div>
+      </LayerCard>
+      <LayerCard title="Monitors" description="Each selected monitor shows as a component on the page.">
+        {(monitors.data ?? []).length === 0 ? (
+          <p className="py-4 text-center text-[13px] text-[var(--ui-fg-faint)]">Create a monitor first.</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {monitors.data?.map((monitor) => (
+              <label key={monitor.id} className="check-row">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-[var(--ui-accent)]"
+                  checked={selected.includes(monitor.id)}
+                  onChange={(event) =>
+                    setSelected(event.target.checked ? [...selected, monitor.id] : selected.filter((item) => item !== monitor.id))
+                  }
+                />
+                {monitor.name}
+              </label>
+            ))}
+          </div>
+        )}
+        {fields.monitor_ids ? <p className="field-error">{fields.monitor_ids}</p> : null}
+      </LayerCard>
       <ErrorText error={save.error || remove.error} />
       <div className="flex justify-between gap-2">
         {!creating ? <Button type="button" variant="danger" onClick={() => remove.mutate()}>Delete</Button> : <span />}
-        <Button type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save page"}</Button>
+        <Button type="submit" variant="highlighted" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save page"}</Button>
       </div>
-      {!creating && page?.published ? (
-        <p className="text-[13px] text-[var(--coollabs-subtle)]">
-          Public URL: <Link className="auth-text-link" to={`/status/${page.slug}`}>/status/{page.slug}</Link>
-        </p>
-      ) : null}
     </form>
   );
 }

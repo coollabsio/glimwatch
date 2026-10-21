@@ -1,108 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity,
-  Bell,
-  Bug,
-  CalendarDays,
-  ChartLine,
-  ChevronLeft,
-  ChevronRight,
-  Element3,
-  Global,
-  Home,
-  type IconComponent,
-  Link,
-  Menu,
-  Setting2,
-  Siren,
-  Sitemap,
-  X,
-} from "reicon-react";
+import { ChevronLeft, ChevronRight, Menu, Search, X } from "reicon-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { dashboard, manage, type NavLinkItem, type Product, products } from "@/app/nav";
+import { CommandPalette, modKeyLabel } from "@/components/command-palette";
 import { ProfileMenu } from "@/components/profile-menu";
 import { api, type Meta, type User } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-type NavLinkItem = {
-  to: string;
-  label: string;
-  icon: IconComponent;
-  end?: boolean;
-};
-
-type NavGroup = {
-  label?: string;
-  links: NavLinkItem[];
-};
-
-type Product = {
-  id: string;
-  label: string;
-  description: string;
-  icon: IconComponent;
-  groups: NavGroup[];
-};
-
-export const products: Product[] = [
-  {
-    id: "status",
-    label: "Status",
-    description: "Uptime monitors, agents, status pages, and incidents.",
-    icon: Activity,
-    groups: [
-      {
-        label: "Workspace",
-        links: [
-          { to: "/status", label: "Overview", icon: Home, end: true },
-          { to: "/monitors", label: "Monitors", icon: Activity },
-          { to: "/agents", label: "Agents", icon: Sitemap },
-          { to: "/pages", label: "Status pages", icon: Global },
-        ],
-      },
-      {
-        label: "Operations",
-        links: [
-          { to: "/incidents", label: "Incidents", icon: Siren },
-          { to: "/maintenance", label: "Maintenance", icon: CalendarDays },
-          { to: "/notifications", label: "Notifications", icon: Bell },
-        ],
-      },
-    ],
-  },
-  {
-    id: "errors",
-    label: "Errors",
-    description: "Exceptions from your apps, grouped into issues.",
-    icon: Bug,
-    groups: [
-      {
-        links: [
-          { to: "/errors", label: "Issues", icon: Bug },
-          { to: "/error-projects", label: "Projects", icon: Element3 },
-        ],
-      },
-    ],
-  },
-  {
-    id: "analytics",
-    label: "Analytics",
-    description: "Cookieless site analytics and short links.",
-    icon: ChartLine,
-    groups: [
-      {
-        links: [
-          { to: "/analytics", label: "Sites", icon: ChartLine },
-          { to: "/links", label: "Links", icon: Link },
-        ],
-      },
-    ],
-  },
-];
-
-const manage: NavLinkItem[] = [
-  { to: "/settings", label: "Settings", icon: Setting2 },
-];
 
 function linkActive(pathname: string, link: NavLinkItem) {
   if (link.end || link.to === "/") return pathname === link.to;
@@ -178,7 +82,19 @@ function NavItems({
       ) : (
         <>
           <li>
-            <div className="nav-section">Products</div>
+            <NavLink
+              to={dashboard.to}
+              end
+              title={dashboard.label}
+              onClick={onNavigate}
+              className={({ isActive }) => cn("menu-item", isActive && "menu-item-active")}
+            >
+              <dashboard.icon className="menu-item-icon" />
+              <span className="menu-item-label">{dashboard.label}</span>
+            </NavLink>
+          </li>
+          <li>
+            <div className="nav-section mt-3">Products</div>
             <ul className="flex flex-col gap-0.5">
               {products.map((product) => {
                 const active = productLinks(product).some((link) => linkActive(pathname, link));
@@ -233,12 +149,29 @@ export function Shell() {
   const [pinned, setPinned] = useState<string | "root" | null>(null);
   const [swap, setSwap] = useState<"" | "forward" | "back">("");
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "true");
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement;
+      const typing = target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchOpen((value) => !value);
+      } else if (event.key === "/" && !typing) {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const routeProduct = products.find((product) =>
     productLinks(product).some((link) => linkActive(location.pathname, link)),
   );
   const shownId = pinned === "root" ? null : (pinned ?? routeProduct?.id ?? null);
   const shown = products.find((product) => product.id === shownId) ?? null;
-  const section = [...products.flatMap(productLinks), ...manage].find((link) => linkActive(location.pathname, link));
+  const section = [dashboard, ...products.flatMap(productLinks), ...manage].find((link) => linkActive(location.pathname, link));
 
   useEffect(() => {
     setPinned(null);
@@ -253,6 +186,24 @@ export function Shell() {
     setSwap("back");
     setPinned("root");
   }
+
+  const searchButton = (onClick?: () => void) => (
+    <button
+      type="button"
+      className="menu-item sidebar-search mb-3"
+      title={`Search (${modKeyLabel} or /)`}
+      onClick={() => {
+        onClick?.();
+        setSearchOpen(true);
+      }}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <Search className="menu-item-icon" />
+        <span className="menu-item-label">Search</span>
+      </span>
+      <kbd>{modKeyLabel}</kbd>
+    </button>
+  );
 
   function toggleSidebar() {
     setCollapsed((value) => {
@@ -279,33 +230,32 @@ export function Shell() {
 
   return (
     <div className="min-h-svh text-[var(--color-fg)]">
-      <header className="fixed inset-x-0 top-0 z-40 hidden h-12 items-center border-b border-neutral-200 bg-neutral-50/95 backdrop-blur lg:flex dark:border-white/[0.06] dark:bg-[var(--color-app)]/95">
+      <header className="fixed inset-x-0 top-0 z-40 hidden h-12 items-center border-b border-[var(--ui-chrome-border)] bg-[var(--ui-panel)]/95 backdrop-blur lg:flex">
         <div
           className={cn(
-            "flex h-full shrink-0 items-center gap-2 border-r border-neutral-200 transition-[width] duration-200 dark:border-white/[0.06]",
+            "flex h-full shrink-0 items-center gap-2 border-r border-[var(--ui-chrome-border)] bg-[var(--ui-canvas)] transition-[width] duration-200",
             collapsed ? "w-16 justify-center" : "w-56 px-4",
           )}
         >
           <NavLink
             to="/"
             title="Haruvo"
-            className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-black dark:text-white"
+            className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-[var(--ui-fg)]"
           >
-            <Logo className="size-5" />
-            {collapsed ? null : "Haruvo"}
+            {collapsed ? <Logo className="size-5" /> : "Haruvo"}
           </NavLink>
           {collapsed ? null : (
-            <span className="truncate text-[10.5px] font-medium text-neutral-400 dark:text-[var(--color-fg-faint)]">
+            <span className="truncate text-[10.5px] font-medium text-[var(--ui-fg-faint)]">
               v{meta.data?.version ?? "0.1.0"}
             </span>
           )}
         </div>
         <div className="flex h-full min-w-0 flex-1 items-center px-4">
-          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Home"}</div>
+          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Dashboard"}</div>
         </div>
       </header>
 
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-200 bg-neutral-50/95 px-4 py-3 backdrop-blur lg:hidden dark:border-white/[0.06] dark:bg-[var(--color-app)]/95">
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--ui-chrome-border)] bg-[var(--ui-panel)]/95 px-4 py-3 backdrop-blur lg:hidden">
         <NavLink to="/" className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
           <Logo className="size-5" />
           Haruvo
@@ -318,8 +268,8 @@ export function Shell() {
       {open ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-[var(--color-panel)]">
-            <div className="flex h-12 items-center justify-between border-b border-neutral-200 px-4 dark:border-white/[0.06]">
+          <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col rounded-l-2xl border-l border-[var(--ui-card-border)] bg-[var(--ui-panel)] shadow-[var(--ui-modal-shadow)]">
+            <div className="flex h-12 items-center justify-between border-b border-[var(--ui-chrome-border)] px-4">
               <span className="flex items-center gap-2 text-[15px] font-semibold">
                 <Logo className="size-5" />
                 Haruvo
@@ -328,8 +278,10 @@ export function Shell() {
                 <X className="size-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 py-2">{nav(() => setOpen(false))}</div>
-            <div className="border-t border-neutral-200 p-3 dark:border-white/[0.06]">
+            <div className="flex-1 overflow-y-auto px-3 py-2">{searchButton(() => setOpen(false))}
+              {nav(() => setOpen(false))}
+            </div>
+            <div className="border-t border-[var(--ui-chrome-border)] p-3">
               <ProfileMenu user={me.data} onLogout={() => void logout()} onNavigate={() => setOpen(false)} />
             </div>
           </div>
@@ -338,14 +290,17 @@ export function Shell() {
 
       <aside
         className={cn(
-          "fixed top-12 bottom-0 left-0 z-30 hidden flex-col border-r border-neutral-200 bg-neutral-50 transition-[width] duration-200 lg:flex dark:border-white/[0.06] dark:bg-[var(--color-app)]",
+          "fixed top-12 bottom-0 left-0 z-30 hidden flex-col border-r border-[var(--ui-chrome-border)] bg-[var(--ui-canvas)] transition-[width] duration-200 lg:flex",
           collapsed ? "sidebar-collapsed w-16" : "w-56",
         )}
       >
-        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-2">{nav()}</nav>
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-2">
+          {searchButton()}
+          {nav()}
+        </nav>
         <div
           className={cn(
-            "sidebar-footer flex shrink-0 items-center gap-1 border-t border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-white/[0.06] dark:bg-[var(--color-app)]",
+            "sidebar-footer flex shrink-0 items-center gap-1 bg-[var(--ui-canvas)] px-3 py-2",
             collapsed && "flex-col",
           )}
         >
@@ -368,7 +323,7 @@ export function Shell() {
 
       <main
         className={cn(
-          "min-h-svh bg-neutral-50 px-5 py-6 transition-[margin] duration-200 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10 dark:bg-[var(--color-app)]",
+          "min-h-svh bg-[var(--ui-canvas)] px-5 py-6 transition-[margin] duration-200 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10",
           collapsed ? "lg:ml-16" : "lg:ml-56",
         )}
       >
@@ -376,6 +331,7 @@ export function Shell() {
           <Outlet />
         </div>
       </main>
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

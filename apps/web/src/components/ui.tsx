@@ -1,11 +1,16 @@
-import { X } from "reicon-react";
+import { Check, ChevronDown, X } from "reicon-react";
 import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
+  type KeyboardEvent,
   type ReactNode,
-  type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
+  useEffect,
+  useId,
+  useRef,
+  useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "default" | "primary" | "highlighted" | "danger" | "error" | "ghost";
@@ -38,8 +43,132 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={cn("input", props.className)} />;
 }
 
-export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn("select", props.className)} />;
+export type SelectOption<T extends string> = { value: T; label: string };
+
+/* Custom listbox (DESIGN.md P4: no native <select>). The menu renders in a
+   portal with fixed position, so a card or modal edge never clips it. */
+export function Select<T extends string>({
+  value,
+  options,
+  onChange,
+  placeholder = "Choose",
+  className,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  value: T;
+  options: SelectOption<T>[];
+  onChange: (value: T) => void;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const selected = options.find((option) => option.value === value);
+
+  function show() {
+    if (disabled || !trigger.current) return;
+    setRect(trigger.current.getBoundingClientRect());
+    setActive(Math.max(0, options.findIndex((option) => option.value === value)));
+    setOpen(true);
+  }
+
+  function choose(option: SelectOption<T>) {
+    onChange(option.value);
+    setOpen(false);
+    trigger.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: Event) => {
+      if (event.type === "mousedown" && (trigger.current?.contains(event.target as Node) || panel.current?.contains(event.target as Node))) return;
+      if (event.type === "scroll" && panel.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open]);
+
+  function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!open) {
+      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+        event.preventDefault();
+        show();
+      }
+      return;
+    }
+    if (event.key === "Escape" || event.key === "Tab") setOpen(false);
+    else if (event.key === "ArrowDown") setActive((index) => Math.min(options.length - 1, index + 1));
+    else if (event.key === "ArrowUp") setActive((index) => Math.max(0, index - 1));
+    else if ((event.key === "Enter" || event.key === " ") && options[active]) choose(options[active]);
+    else return;
+    event.preventDefault();
+  }
+
+  const below = rect ? window.innerHeight - rect.bottom > 280 || rect.top < 280 : true;
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        className={cn("input select-trigger", className)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-label={ariaLabel}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onKeyDown}
+      >
+        <span className={cn("truncate", !selected && "text-[var(--ui-fg-faint)]")}>{selected?.label ?? placeholder}</span>
+        <ChevronDown className="size-4 shrink-0 text-[var(--ui-fg-faint)]" aria-hidden="true" />
+      </button>
+      {open && rect
+        ? createPortal(
+            <div
+              ref={panel}
+              id={listId}
+              role="listbox"
+              className="listbox-panel"
+              style={{
+                left: rect.left,
+                minWidth: rect.width,
+                ...(below ? { top: rect.bottom + 4 } : { bottom: window.innerHeight - rect.top + 4 }),
+              }}
+            >
+              {options.map((option, index) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  className={cn("listbox-option", index === active && "is-active")}
+                  onMouseEnter={() => setActive(index)}
+                  onClick={() => choose(option)}
+                >
+                  <span className="truncate">{option.label}</span>
+                  {option.value === value ? <Check className="size-3.5 shrink-0 text-[var(--ui-fg)]" aria-hidden="true" /> : null}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
 }
 
 export function Field({
@@ -175,9 +304,9 @@ export function Dialog({
 export function Empty({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
     <LayerCard>
-      <div className="px-2 py-8 text-center">
-        <h2 className="text-sm font-medium text-[var(--color-fg)]">{title}</h2>
-        <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--coollabs-subtle)]">{body}</p>
+      <div className="flex min-h-40 flex-col items-center justify-center px-2 py-8 text-center">
+        <h2 className="text-[14px] font-medium text-[var(--ui-fg)]">{title}</h2>
+        <p className="mx-auto mt-1 max-w-[28rem] text-[13px] text-[var(--ui-fg-faint)]">{body}</p>
         {action ? <div className="mt-4">{action}</div> : null}
       </div>
     </LayerCard>

@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function percent(value?: number | null) {
-  if (value == null || Number.isNaN(value)) return "—";
+  if (value == null || Number.isNaN(value)) return "-";
   return `${(value * 100).toFixed(2)}%`;
 }
 
@@ -22,7 +22,7 @@ export function timeAgo(iso?: string | null) {
 }
 
 export function fullTime(iso?: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "medium",
@@ -30,7 +30,7 @@ export function fullTime(iso?: string | null) {
 }
 
 export function formatTime(iso?: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",

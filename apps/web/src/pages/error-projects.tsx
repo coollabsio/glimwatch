@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { PageHeader } from "@/components/ui";
 import { Badge } from "@/components/issue-badge";
-import { Button } from "@/components/ui";
-import { Input } from "@/components/ui";
+import { Button, Field, Input, LayerCard, PageHeader, Select } from "@/components/ui";
 import { api, type Project } from "@/lib/api";
 
 export function ErrorProjectsPage() {
@@ -26,55 +24,77 @@ export function ErrorProjectsPage() {
   });
 
   return (
-    <div>
-      <PageHeader title="Projects" />
-      <div className="px-4 py-4">
-      <p className="mb-4 text-[13px] text-[var(--color-fg-dim)]">
-        Each project has a Sentry DSN. Paste it into an official SDK and errors land in Issues.
-      </p>
-      <form
-        className="card mb-4 flex flex-col gap-3 p-4 md:flex-row md:items-end"
-        onSubmit={(event) => {
-          event.preventDefault();
-          setError("");
-          create.mutate();
-        }}
-      >
-        <label className="block flex-1 text-[13px]">
-          <span className="mb-1 block text-[var(--color-fg-dim)]">Name</span>
-          <Input value={name} required placeholder="PHP checkout" onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label className="block text-[13px] md:w-44">
-          <span className="mb-1 block text-[var(--color-fg-dim)]">Platform</span>
-          <select className="field w-full" value={platform} onChange={(event) => setPlatform(event.target.value)}>
-            <option value="php">PHP</option>
-            <option value="javascript">JavaScript</option>
-            <option value="rust">Rust</option>
-            <option value="python">Python</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <Button variant="highlighted" type="submit" disabled={create.isPending}>
-          Create project
-        </Button>
-      </form>
-      {error ? <p className="mb-3 text-[13px] text-error">{error}</p> : null}
-      {projects.isLoading ? <p className="text-[13px]">Loading projects...</p> : null}
-      {projects.data && projects.data.length === 0 ? (
-        <div className="card p-8 text-center text-[13px] text-[var(--color-fg-dim)]">No projects yet.</div>
-      ) : null}
-      <div className="grid gap-3 md:grid-cols-2">
-        {(projects.data ?? []).map((project) => (
-          <Link key={project.id} to={`/error-projects/${project.id}`} className="card block p-4 hover:bg-[var(--row-hover)]">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-medium">{project.name}</h2>
-              <Badge>{project.platform}</Badge>
-            </div>
-            <p className="mt-2 truncate font-mono text-[12px] text-[var(--color-fg-faint)]">{project.dsn}</p>
-          </Link>
-        ))}
-      </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Projects"
+        description="Each project has a Sentry DSN. Paste it into an official SDK and errors land in Issues."
+      />
+      <LayerCard title="New project" description="Pick the platform you will install the SDK on.">
+        <form
+          className="flex flex-col gap-3 md:flex-row md:items-end"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setError("");
+            create.mutate();
+          }}
+        >
+          <div className="flex-1">
+            <Field label="Name">
+              <Input value={name} required placeholder="PHP checkout" onChange={(event) => setName(event.target.value)} />
+            </Field>
+          </div>
+          <div className="md:w-44">
+            <Field label="Platform">
+              <Select aria-label="Platform" value={platform} onChange={setPlatform} options={platforms} />
+            </Field>
+          </div>
+          <Button variant="highlighted" type="submit" disabled={create.isPending}>
+            Create project
+          </Button>
+        </form>
+        {error ? <p className="field-error">{error}</p> : null}
+      </LayerCard>
+      <LayerCard title="All projects" flush>
+        {projects.isLoading ? <p className="p-4 text-[13px] text-[var(--ui-fg-faint)]">Loading projects...</p> : null}
+        {projects.data && projects.data.length === 0 ? (
+          <div className="flex min-h-40 flex-col items-center justify-center px-4 py-10 text-center">
+            <h2 className="text-[14px] font-medium text-[var(--ui-fg)]">No projects yet</h2>
+            <p className="mx-auto mt-1 max-w-[28rem] text-[13px] text-[var(--ui-fg-faint)]">
+              Create a project above to get a DSN for your SDK.
+            </p>
+          </div>
+        ) : null}
+        {projects.data && projects.data.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="cool-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Platform</th>
+                  <th className="hidden md:table-cell">DSN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.data.map((project) => (
+                  <tr key={project.id} className="clickable-row" onClick={() => navigate(`/error-projects/${project.id}`)}>
+                    <td>
+                      <Link className="row-link" to={`/error-projects/${project.id}`} onClick={(event) => event.stopPropagation()}>
+                        {project.name}
+                      </Link>
+                    </td>
+                    <td>
+                      <Badge>{platformLabel(project.platform)}</Badge>
+                    </td>
+                    <td className="hidden max-w-0 md:table-cell md:w-1/2">
+                      <span className="block truncate font-mono text-[12px] text-[var(--ui-fg-faint)]">{project.dsn}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </LayerCard>
     </div>
   );
 }
@@ -96,48 +116,37 @@ export function ProjectDetailPage() {
     },
   });
 
-  if (project.isLoading) return <p className="text-[13px]">Loading project...</p>;
+  if (project.isLoading) return <p className="text-[13px] text-[var(--ui-fg-faint)]">Loading project...</p>;
   if (project.isError || !project.data) {
-    return <p className="text-[13px] text-error">{(project.error as Error)?.message || "Project not found"}</p>;
+    return <p className="text-[13px] text-[var(--ui-error)]">{(project.error as Error)?.message || "Project not found"}</p>;
   }
   const data = project.data;
   const snippets = snippetsFor(data);
 
   return (
-    <div>
-      <PageHeader
-        title={
-          <span className="flex items-center gap-2 text-[13px] font-normal">
-            <Link to="/error-projects" className="text-[var(--color-fg-dim)]">
-              Projects
-            </Link>
-            <span className="text-[var(--color-fg-faint)]">/</span>
-            <span className="font-medium">{data.name}</span>
-          </span>
-        }
-        actions={
-          <Button variant="error" onClick={() => remove.mutate()} disabled={remove.isPending}>
-            Delete project
-          </Button>
-        }
-      />
-      <div className="px-4 py-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-medium">{data.name}</h1>
-          <p className="text-[13px] text-[var(--color-fg-dim)]">
-            Project id {data.id} · {data.platform}
-          </p>
-        </div>
+    <div className="flex flex-col gap-6">
+      <div>
+        <nav className="mb-2 flex items-center gap-2 text-[13px] text-[var(--ui-fg-faint)]">
+          <Link to="/error-projects">
+            Projects
+          </Link>
+          <span>/</span>
+          <span className="text-[var(--ui-fg-dim)]">{data.name}</span>
+        </nav>
+        <PageHeader
+          title={data.name}
+          description={`Project id ${data.id} · ${platformLabel(data.platform)}`}
+          actions={
+            <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
+              Delete project
+            </Button>
+          }
+        />
       </div>
-      <section className="card p-4">
-        <h2 className="text-[13px] font-medium">Sentry DSN</h2>
-        <p className="mt-1 text-[13px] text-[var(--color-fg-dim)]">
-          Use this with any official Sentry SDK. The public key identifies the project. It is not a secret, which is
-          why browser SDKs can ship it.
-        </p>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <Input readOnly value={data.dsn} className="font-mono" onFocus={(event) => event.currentTarget.select()} />
+      <LayerCard
+        title="Sentry DSN"
+        description="Use this with any official Sentry SDK. The public key identifies the project. It is not a secret, which is why browser SDKs can ship it."
+        actions={
           <Button
             variant="highlighted"
             onClick={async () => {
@@ -147,21 +156,36 @@ export function ProjectDetailPage() {
           >
             {copied ? "Copied" : "Copy DSN"}
           </Button>
+        }
+      >
+        <Input readOnly value={data.dsn} className="font-mono text-[13px]" onFocus={(event) => event.currentTarget.select()} />
+      </LayerCard>
+      <LayerCard title="SDK setup" description="Initialize the SDK with this DSN as early as possible in your app.">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {snippets.map((snippet) => (
+            <div key={snippet.title}>
+              <h3 className="field-label">{snippet.title}</h3>
+              <pre className="overflow-auto rounded-lg border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] p-3 font-mono text-[12px] leading-5 text-[var(--ui-fg)]">
+                {snippet.code}
+              </pre>
+            </div>
+          ))}
         </div>
-      </section>
-      <div className="mt-4 grid gap-3">
-        {snippets.map((snippet) => (
-          <section key={snippet.title} className="card p-4">
-            <h3 className="text-[13px] font-medium">{snippet.title}</h3>
-            <pre className="mt-2 overflow-auto rounded-md bg-black/5 p-3 font-mono text-[12px] leading-5 dark:bg-black/30">
-              {snippet.code}
-            </pre>
-          </section>
-        ))}
-      </div>
-      </div>
+      </LayerCard>
     </div>
   );
+}
+
+const platforms = [
+  { value: "php", label: "PHP" },
+  { value: "javascript", label: "JavaScript" },
+  { value: "rust", label: "Rust" },
+  { value: "python", label: "Python" },
+  { value: "other", label: "Other" },
+];
+
+function platformLabel(platform: string) {
+  return platforms.find((item) => item.value === platform)?.label ?? platform;
 }
 
 function snippetsFor(project: Project) {

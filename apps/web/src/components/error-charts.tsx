@@ -11,7 +11,7 @@ export function Sparkline({ values }: { values: number[] }) {
     })
     .join(" ");
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="text-coollabs dark:text-warning" aria-hidden="true">
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="text-[var(--ui-accent)]" aria-hidden="true">
       <path d={points} fill="none" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
@@ -25,8 +25,8 @@ export function Histogram({ values }: { values: number[] }) {
         <div
           key={index}
           title={`${value}`}
-          className="min-w-0 flex-1 rounded-sm bg-coollabs/70 dark:bg-warning/80"
-          style={{ height: `${Math.max(4, (value / max) * 100)}%`, opacity: value === 0 ? 0.25 : 1 }}
+          className="min-w-0 flex-1 rounded-sm bg-[var(--ui-accent)]"
+          style={{ height: `${Math.max(4, (value / max) * 100)}%`, opacity: value === 0 ? 0.2 : 0.85 }}
         />
       ))}
     </div>
@@ -36,11 +36,11 @@ export function Histogram({ values }: { values: number[] }) {
 export function PriorityMark({ priority }: { priority: string }) {
   const rank = priority === "high" ? 3 : priority === "medium" ? 2 : 1;
   return (
-    <span className="inline-flex items-end gap-0.5 text-[var(--color-fg-dim)]" title={priority}>
+    <span className="inline-flex items-end gap-0.5 text-[var(--ui-fg-dim)]" title={priority}>
       {[1, 2, 3].map((bar) => (
         <span
           key={bar}
-          className={`w-[3px] rounded-sm ${bar <= rank ? "bg-current" : "bg-[var(--coollabs-fill)]"}`}
+          className={`w-[3px] rounded-sm ${bar <= rank ? "bg-current" : "bg-[var(--ui-hover)]"}`}
           style={{ height: 4 + bar * 4 }}
         />
       ))}

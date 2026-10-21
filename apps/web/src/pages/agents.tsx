@@ -10,6 +10,7 @@ export function AgentsPage() {
   const [name, setName] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<CreatedAgent | null>(null);
+  const [search, setSearch] = useState("");
   const save = useMutation({
     mutationFn: () => createAgent(name),
     onSuccess: async (agent) => {
@@ -30,40 +31,71 @@ export function AgentsPage() {
     save.mutate();
   }
 
+  const agents = (query.data ?? []).filter((agent) => agent.name.toLowerCase().includes(search.trim().toLowerCase()));
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="flex flex-col gap-4">
-        <PageHeader title="Agents" description="Agents run checks inside private networks. Each agent reads its checks from a config file on its host and reports results over outbound HTTPS, so nothing needs to be exposed." />
-        {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading agents…</p> : null}
-        {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Agents" description="Agents run checks inside private networks. Each agent reads its checks from a config file on its host and reports results over outbound HTTPS, so nothing needs to be exposed." />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {query.isLoading ? (
+          <p className="text-[13px] text-[var(--ui-fg-faint)]">Loading agents…</p>
+        ) : (query.data?.length ?? 0) === 0 ? (
           <Empty title="No agents" body="Add one, list the checks in its config file, and run it next to the services you want to check. Its checks show up under Monitors." />
         ) : (
-          query.data?.map((agent) => (
-            <LayerCard
-              key={agent.id}
-              title={agent.name}
-              description={`${agent.monitor_count} ${agent.monitor_count === 1 ? "monitor" : "monitors"} · last seen ${timeAgo(agent.last_seen_at)}`}
-              actions={<StatusBadge tone={agent.online ? "success" : "neutral"}>{agent.online ? "Online" : "Offline"}</StatusBadge>}
-            >
-              <Button variant="danger" onClick={() => remove.mutate(agent.id)} disabled={remove.isPending && remove.variables === agent.id}>Delete</Button>
-              {remove.variables === agent.id ? <ErrorText error={remove.error} /> : null}
-            </LayerCard>
-          ))
+          <LayerCard title="All agents" flush>
+            <div className="flex items-center gap-2 border-b border-[var(--ui-divider)] p-2">
+              <Input className="max-w-64" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search agents" aria-label="Search agents" />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="cool-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th className="hidden sm:table-cell">Monitors</th>
+                    <th className="hidden md:table-cell">Last seen</th>
+                    <th className="w-0" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {agents.map((agent) => (
+                    <tr key={agent.id}>
+                      <td className="font-medium text-[var(--ui-fg)]">{agent.name}</td>
+                      <td><StatusBadge tone={agent.online ? "success" : "neutral"}>{agent.online ? "Online" : "Offline"}</StatusBadge></td>
+                      <td className="hidden sm:table-cell">{agent.monitor_count}</td>
+                      <td className="hidden md:table-cell">{timeAgo(agent.last_seen_at)}</td>
+                      <td className="text-right">
+                        <Button variant="danger" onClick={() => remove.mutate(agent.id)} disabled={remove.isPending && remove.variables === agent.id}>Delete</Button>
+                        {remove.variables === agent.id ? <ErrorText error={remove.error} /> : null}
+                      </td>
+                    </tr>
+                  ))}
+                  {agents.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center text-[var(--ui-fg-faint)]">No agents match your search.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          </LayerCard>
+        )}
+        {created ? (
+          <AgentToken agent={created} onDone={() => setCreated(null)} />
+        ) : (
+          <LayerCard title="Add an agent" description="The name is shown as the check region.">
+            <form className="flex flex-col gap-4" onSubmit={submit}>
+              <Field label="Name" error={fields.name}>
+                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="office-vpc" required />
+              </Field>
+              <ErrorText error={fields.name ? null : save.error} />
+              <div className="flex justify-end">
+                <Button type="submit" variant="highlighted" disabled={save.isPending}>{save.isPending ? "Saving…" : "Add agent"}</Button>
+              </div>
+            </form>
+          </LayerCard>
         )}
       </div>
-      {created ? (
-        <AgentToken agent={created} onDone={() => setCreated(null)} />
-      ) : (
-        <LayerCard title="Add an agent" className="h-fit">
-          <form className="space-y-3" onSubmit={submit}>
-            <Field label="Name" hint="shown as the check region" error={fields.name}>
-              <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="office-vpc" required />
-            </Field>
-            <ErrorText error={fields.name ? null : save.error} />
-            <Button className="w-full" type="submit" variant="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Add agent"}</Button>
-          </form>
-        </LayerCard>
-      )}
     </div>
   );
 }
@@ -84,14 +116,16 @@ function AgentToken({ agent, onDone }: { agent: CreatedAgent; onDone: () => void
   const docker = `docker run -d --name status-agent --restart unless-stopped --no-healthcheck -e STATUS_AGENT_SERVER=${origin} -e STATUS_AGENT_TOKEN=${agent.token} -e STATUS_AGENT_CONFIG=${configPath} -e PG_PASSWORD=... -v ${configPath}:${configPath}:ro ghcr.io/coollabsio/status:latest agent`;
   const binary = `PG_PASSWORD=... status agent --server ${origin} --token ${agent.token} --config ${configPath}`;
   return (
-    <LayerCard title={`${agent.name} is ready`} description="Copy the token now. Haruvo stores only its hash and cannot show it again." className="h-fit">
-      <div className="space-y-3">
+    <LayerCard title={`${agent.name} is ready`} description="Copy the token now. Haruvo stores only its hash and cannot show it again." >
+      <div className="flex flex-col gap-4">
         <Snippet label="Token" value={agent.token} />
         <Snippet label={configPath} value={exampleConfig} multiline />
-        <p className="text-[12px] text-[var(--coollabs-subtle)]">Passwords stay on the agent host. The config names an environment variable, not the password.</p>
+        <p className="text-[12px] text-[var(--ui-fg-faint)]">Passwords stay on the agent host. The config names an environment variable, not the password.</p>
         <Snippet label="Docker" value={docker} />
         <Snippet label="Binary" value={binary} />
-        <Button className="w-full" variant="primary" onClick={onDone}>Done</Button>
+        <div className="flex justify-end">
+          <Button variant="highlighted" onClick={onDone}>Done</Button>
+        </div>
       </div>
     </LayerCard>
   );
@@ -110,11 +144,11 @@ function Snippet({ label, value, multiline = false }: { label: string; value: st
     <div>
       <div className="field-label">
         <span>{label}</span>
-        <button type="button" className="ml-auto text-[11px] font-normal hover:text-[var(--color-fg)]" onClick={() => void copy()}>
+        <button type="button" className="ml-auto text-[11px] font-normal hover:text-[var(--ui-fg)]" onClick={() => void copy()}>
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <code className={`block select-all ${multiline ? "whitespace-pre overflow-x-auto" : "break-all"} rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-2 font-mono text-[12px] text-[var(--color-fg)] dark:border-white/[0.08] dark:bg-white/[0.03]`}>
+      <code className={`block select-all ${multiline ? "whitespace-pre overflow-x-auto" : "break-all"} rounded-lg border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] px-2.5 py-2 font-mono text-[12px] text-[var(--ui-fg)]`}>
         {value}
       </code>
     </div>

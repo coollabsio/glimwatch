@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useParams } from "react-router";
-import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select } from "@/components/ui";
+import { BarList, DailyBars, Stat } from "@/components/charts";
+import { Button, Dialog, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge } from "@/components/ui";
 import { api, type InsightDomain, type InsightLink, type InsightRow, type LinkOverview } from "@/lib/api";
 
 export function LinksPage() {
@@ -34,43 +35,77 @@ export function LinksPage() {
       await client.invalidateQueries({ queryKey: ["links"] });
     },
   });
+  const domainRows = domains.data ?? [];
+  const linkRows = links.data ?? [];
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Links"
         description="Short links on your own hostnames, plus /go/{slug} on this Haruvo server. Clicks are counted the same way as page views: no cookies."
-        actions={
-          <>
-            <Button onClick={() => setOpenDomain(true)}>New domain</Button>
-            <Button variant="primary" onClick={() => setOpenLink(true)} disabled={(domains.data ?? []).length === 0}>New link</Button>
-          </>
-        }
       />
-      <LayerCard title="Domains" description="A hostname here is only used for redirects when it is not this server's own host." flush>
-        {(domains.data ?? []).length === 0 ? <p className="px-4 py-6 text-[13px] text-[var(--coollabs-subtle)]">Add a domain before you create a link.</p> : (
-          <ul className="divide-y divide-[var(--coollabs-hairline)] text-[13px]">
-            {(domains.data ?? []).map((domain) => (
-              <li key={domain.id} className="flex justify-between px-4 py-2">
-                <span>{domain.hostname}</span>
-                <span className="text-[var(--coollabs-subtle)]">{domain.enabled ? "Enabled" : "Off"}</span>
-              </li>
-            ))}
-          </ul>
+      <LayerCard
+        title="Short links"
+        description="Open a link to see its clicks and referrers."
+        actions={<Button variant="primary" onClick={() => setOpenLink(true)} disabled={domainRows.length === 0}>New link</Button>}
+        flush
+      >
+        {linkRows.length === 0 ? (
+          <CardEmpty title="No short links" body="Create a link. Visitors who open /go/your-slug are redirected, and the click is stored." />
+        ) : (
+          <table className="cool-table">
+            <thead>
+              <tr>
+                <th>Slug</th>
+                <th className="hidden md:table-cell">Destination</th>
+                <th className="hidden sm:table-cell">Domain</th>
+                <th className="text-right!">Clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linkRows.map((link) => {
+                const to = `/links/${link.id}`;
+                return (
+                  <tr key={link.id} className="clickable-row">
+                    <td className="cell-link">
+                      <Link className="row-link" to={to}>/{link.slug}</Link>
+                      {rowCover(to)}
+                      <div className="font-mono text-[11px] text-[var(--ui-fg-faint)]">/go/{link.slug}</div>
+                    </td>
+                    <td className="cell-link hidden md:table-cell">{rowCover(to)}<div className="max-w-[24rem] truncate">{link.destination}</div></td>
+                    <td className="cell-link hidden sm:table-cell">{rowCover(to)}{link.hostname}</td>
+                    <td className="cell-link text-right font-mono text-[12px]">{rowCover(to)}{link.total_clicks}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </LayerCard>
-      {(links.data ?? []).length === 0 ? (
-        <Empty title="No short links" body="Create a link. Visitors who open /go/your-slug are redirected, and the click is stored." />
-      ) : (
-        <div className="grid gap-4">
-          {(links.data ?? []).map((link) => (
-            <Link key={link.id} to={`/links/${link.id}`}>
-              <LayerCard title={`/${link.slug}`} description={link.destination}>
-                <p className="text-[13px] text-[var(--coollabs-subtle)]">{link.total_clicks} clicks · {link.hostname} · /go/{link.slug}</p>
-              </LayerCard>
-            </Link>
-          ))}
-        </div>
-      )}
+      <LayerCard
+        title="Domains"
+        description="A hostname here is only used for redirects when it is not this server's own host."
+        actions={<Button onClick={() => setOpenDomain(true)}>New domain</Button>}
+        flush
+      >
+        {domainRows.length === 0 ? <CardEmpty title="No domains" body="Add a domain before you create a link." /> : (
+          <table className="cool-table">
+            <thead>
+              <tr>
+                <th>Hostname</th>
+                <th className="text-right!">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {domainRows.map((domain) => (
+                <tr key={domain.id}>
+                  <td className="font-medium text-[var(--ui-fg)]">{domain.hostname}</td>
+                  <td className="text-right"><StatusBadge tone={domain.enabled ? "success" : "neutral"}>{domain.enabled ? "Enabled" : "Off"}</StatusBadge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </LayerCard>
       <Dialog open={openDomain} title="New domain" onClose={() => setOpenDomain(false)}>
         <form className="space-y-4" onSubmit={(event: FormEvent) => { event.preventDefault(); createDomain.mutate(); }}>
           <Field label="Hostname"><Input required value={hostname} onChange={(event) => setHostname(event.target.value)} placeholder="go.example.com" /></Field>
@@ -81,9 +116,13 @@ export function LinksPage() {
       <Dialog open={openLink} title="New link" onClose={() => setOpenLink(false)}>
         <form className="space-y-4" onSubmit={(event: FormEvent) => { event.preventDefault(); createLink.mutate(); }}>
           <Field label="Domain">
-            <Select value={domainId || domains.data?.[0]?.id || ""} onChange={(event) => setDomainId(event.target.value)}>
-              {(domains.data ?? []).map((domain) => <option key={domain.id} value={domain.id}>{domain.hostname}</option>)}
-            </Select>
+            <Select
+              aria-label="Domain"
+              className="w-full"
+              value={domainId || domains.data?.[0]?.id || ""}
+              options={(domains.data ?? []).map((domain) => ({ value: domain.id, label: domain.hostname }))}
+              onChange={(value) => setDomainId(value)}
+            />
           </Field>
           <Field label="Slug"><Input required value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="coolify" /></Field>
           <Field label="Destination"><Input required value={destination} onChange={(event) => setDestination(event.target.value)} /></Field>
@@ -115,30 +154,35 @@ export function LinkDetailPage() {
     enabled: Boolean(linkId),
   });
   const item = link.data;
-  const values = (overview.data?.series ?? []).map((point) => point.clicks ?? 0);
-  const max = Math.max(...values, 1);
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={item ? `/${item.slug}` : "Link"} description={item ? `${item.destination} · ${window.location.origin}/go/${item.slug}` : "Loading…"} />
+      <PageHeader title={item ? `/${item.slug}` : "Link"} description={item ? `${item.destination} · ${window.location.origin}/go/${item.slug}` : "Loading..."} />
       <ErrorText error={link.error ?? overview.error} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <LayerCard title="Clicks"><p className="text-2xl font-semibold">{overview.data?.clicks ?? item?.total_clicks ?? "—"}</p></LayerCard>
-        <LayerCard title="Visitors"><p className="text-2xl font-semibold">{overview.data?.visitors ?? "—"}</p></LayerCard>
-      </div>
-      <LayerCard title="Last 30 days">
-        <div className="flex h-28 items-end gap-1">
-          {(overview.data?.series ?? []).map((point, index) => (
-            <div key={point.day} className="min-w-0 flex-1 rounded-sm bg-[var(--color-brand)]" style={{ height: values[index] === 0 ? "0%" : `${Math.max(8, (values[index] / max) * 100)}%` }} />
-          ))}
+      <LayerCard title="Summary" description="Last 30 days.">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Stat label="Clicks" value={overview.data?.clicks ?? item?.total_clicks} />
+          <Stat label="Visitors" value={overview.data?.visitors} />
         </div>
       </LayerCard>
-      <LayerCard title="Referrers" flush>
-        <ul className="divide-y divide-[var(--coollabs-hairline)] text-[13px]">
-          {(referrers.data?.rows ?? []).map((row) => (
-            <li key={row.label} className="flex justify-between px-4 py-2"><span>{row.label}</span><span>{row.count}</span></li>
-          ))}
-        </ul>
+      <LayerCard title="Clicks" description="Clicks per day over the last 30 days.">
+        <DailyBars series={overview.data?.series ?? []} field="clicks" />
       </LayerCard>
+      <LayerCard title="Referrers" flush>
+        <BarList rows={referrers.data?.rows ?? []} empty="No referrers in the last 30 days." />
+      </LayerCard>
+    </div>
+  );
+}
+
+function rowCover(to: string) {
+  return <Link className="cell-link-anchor" to={to} tabIndex={-1} aria-hidden="true" />;
+}
+
+function CardEmpty({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="px-4 py-10 text-center">
+      <p className="text-[14px] font-medium text-[var(--ui-fg)]">{title}</p>
+      <p className="mx-auto mt-1 max-w-[28rem] text-[13px] text-[var(--ui-fg-faint)]">{body}</p>
     </div>
   );
 }

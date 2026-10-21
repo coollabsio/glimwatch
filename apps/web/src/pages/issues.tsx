@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { PageHeader } from "@/components/ui";
 import { PriorityMark, Sparkline } from "@/components/error-charts";
 import { Badge } from "@/components/issue-badge";
-import { Button } from "@/components/ui";
+import { Button, Input, LayerCard, PageHeader, Select } from "@/components/ui";
 import { api, type Issue, type IssueFeed, type Project } from "@/lib/api";
 import { cn, formatTime, fullTime } from "@/lib/utils";
 
@@ -95,161 +94,174 @@ export function IssuesPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
-      <PageHeader title="Issues" />
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--coollabs-hairline)] px-4 py-2">
-        <select className="field w-40" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-          <option value="">All projects</option>
-          {(projects.data ?? []).map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-        <select className="field w-40" value={environment} onChange={(event) => setEnvironment(event.target.value)}>
-          <option value="">All envs</option>
-          {(feed.data?.environments ?? []).map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select className="field w-[88px]" value={range} onChange={(event) => setRange(event.target.value as (typeof ranges)[number])}>
-          {ranges.map((item) => (
-            <option key={item} value={item}>
-              {item.toUpperCase()}
-            </option>
-          ))}
-        </select>
-        <form
-          className="flex min-w-[240px] flex-1 flex-wrap items-center gap-1 rounded-md border border-[var(--coollabs-line)] bg-[var(--coollabs-recessed)] px-2 py-1"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setQ(draft.trim());
-          }}
-        >
-          {status && status !== "all" ? (
-            <Token label={`is: ${status}`} onRemove={() => setStatus("all")} />
-          ) : null}
-          {q ? <Token label={q} onRemove={() => { setQ(""); setDraft(""); }} /> : null}
-          <input
-            className="min-w-[8rem] flex-1 bg-transparent px-1 text-[13px] outline-none"
-            placeholder="Search title, culprit, or id"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-        </form>
-        <select className="field w-36" value={sort} onChange={(event) => setSort(event.target.value)}>
-          {sorts.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <div className="relative">
-          <Button type="button" onClick={() => setSaveOpen((open) => !open)}>
-            Save as
-          </Button>
-          {saveOpen ? (
-            <div className="absolute right-0 z-20 mt-1 w-56 rounded-md border border-[var(--coollabs-hairline)] bg-[var(--color-panel)] p-2 shadow-[var(--shadow-dropdown,0_8px_24px_rgb(0_0_0/0.25))]">
-              <input
-                className="field w-full"
-                placeholder="View name"
-                value={saveName}
-                onChange={(event) => setSaveName(event.target.value)}
-              />
-              <Button className="mt-2" variant="highlighted" type="button" onClick={saveView}>
-                Save view
+    <div className="flex flex-col gap-6">
+      <PageHeader title="Issues" description="Errors from your Sentry SDKs, grouped into issues. The list refreshes every few seconds." />
+      <LayerCard
+        title="Issue feed"
+        flush
+        actions={
+          <>
+            {selected.length > 0 ? (
+              <>
+                <span className="text-[12px] text-[var(--ui-fg-faint)]">{selected.length} selected</span>
+                <Button variant="highlighted" size="sm" onClick={() => bulk.mutate("resolved")}>
+                  Resolve
+                </Button>
+                <Button size="sm" onClick={() => bulk.mutate("ignored")}>
+                  Archive
+                </Button>
+              </>
+            ) : null}
+            <div className="relative">
+              <Button type="button" size="sm" onClick={() => setSaveOpen((open) => !open)}>
+                Save as
               </Button>
-              {saved.length > 0 ? (
-                <div className="mt-2 flex flex-col">
-                  {saved.map((view) => (
-                    <button key={view.name} className="rounded px-2 py-1 text-left text-[13px] hover:bg-[var(--nav-hover)]" type="button" onClick={() => applySaved(view)}>
-                      {view.name}
-                    </button>
-                  ))}
+              {saveOpen ? (
+                <div className="absolute right-0 z-20 mt-1 w-56 rounded-[10px] border border-[var(--ui-menu-border)] bg-[var(--ui-menu-bg)] p-2 shadow-[var(--ui-menu-shadow)]">
+                  <Input placeholder="View name" value={saveName} onChange={(event) => setSaveName(event.target.value)} />
+                  <Button className="mt-2 w-full" variant="highlighted" type="button" onClick={saveView}>
+                    Save view
+                  </Button>
+                  {saved.length > 0 ? (
+                    <div className="mt-2 flex flex-col gap-px border-t border-[var(--ui-divider)] pt-2">
+                      {saved.map((view) => (
+                        <button
+                          key={view.name}
+                          className="rounded-md px-2 py-1.5 text-left text-[13px] text-[var(--ui-fg)] hover:bg-[var(--ui-hover)]"
+                          type="button"
+                          onClick={() => applySaved(view)}
+                        >
+                          {view.name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-          ) : null}
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--ui-divider)] p-3">
+          <form
+            className="flex h-8 min-w-[240px] flex-1 items-center gap-1 overflow-hidden rounded-lg border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] px-1.5 focus-within:border-[var(--ui-accent)]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setQ(draft.trim());
+            }}
+          >
+            {status && status !== "all" ? <Token label={`is: ${status}`} onRemove={() => setStatus("all")} /> : null}
+            {q ? <Token label={q} onRemove={() => { setQ(""); setDraft(""); }} /> : null}
+            <input
+              className="h-full min-w-[8rem] flex-1 bg-transparent px-1 text-[14px] text-[var(--ui-fg)] outline-none placeholder:text-[var(--ui-fg-faint)]"
+              placeholder="Search title, culprit, or id"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+          </form>
+          <div className="w-40">
+            <Select
+              aria-label="Project"
+              value={projectId}
+              onChange={setProjectId}
+              options={[{ value: "", label: "All projects" }, ...(projects.data ?? []).map((project) => ({ value: project.id, label: project.name }))]}
+            />
+          </div>
+          <div className="w-44">
+            <Select
+              aria-label="Environment"
+              value={environment}
+              onChange={setEnvironment}
+              options={[{ value: "", label: "All environments" }, ...(feed.data?.environments ?? []).map((item) => ({ value: item, label: item }))]}
+            />
+          </div>
+          <div className="w-28">
+            <Select
+              aria-label="Time range"
+              value={range}
+              onChange={setRange}
+              options={ranges.map((item) => ({ value: item, label: `Last ${item}` }))}
+            />
+          </div>
+          <div className="w-32">
+            <Select
+              aria-label="Sort"
+              value={sort}
+              onChange={setSort}
+              options={sorts.map((item) => ({ value: item.id, label: item.label }))}
+            />
+          </div>
         </div>
-      </div>
-      {selected.length > 0 ? (
-        <div className="flex items-center gap-2 border-b border-[var(--coollabs-hairline)] px-4 py-2 text-[13px]">
-          <span>{selected.length} selected</span>
-          <Button variant="highlighted" size="sm" onClick={() => bulk.mutate("resolved")}>
-            Resolve
-          </Button>
-          <Button size="sm" onClick={() => bulk.mutate("ignored")}>
-            Archive
-          </Button>
-        </div>
-      ) : null}
-      <div className="min-w-0 flex-1 overflow-auto">
-        {feed.isLoading ? <p className="p-4 text-[13px] text-[var(--color-fg-dim)]">Loading issues...</p> : null}
-        {feed.isError ? <p className="p-4 text-[13px] text-error">{(feed.error as Error).message}</p> : null}
+        {feed.isLoading ? <p className="p-4 text-[13px] text-[var(--ui-fg-faint)]">Loading issues...</p> : null}
+        {feed.isError ? <p className="p-4 text-[13px] text-[var(--ui-error)]">{(feed.error as Error).message}</p> : null}
         {feed.data && issues.length === 0 ? (
-          <div className="p-10 text-center">
-            <h2 className="text-[15px] font-medium">No issues in this view</h2>
-            <p className="mx-auto mt-1 max-w-md text-[13px] text-[var(--color-fg-dim)]">
+          <div className="flex min-h-40 flex-col items-center justify-center px-4 py-10 text-center">
+            <h2 className="text-[14px] font-medium text-[var(--ui-fg)]">No issues in this view</h2>
+            <p className="mx-auto mt-1 max-w-[28rem] text-[13px] text-[var(--ui-fg-faint)]">
               Point a Sentry SDK at a project DSN and throw an error. Events in the selected range show up here.
             </p>
           </div>
         ) : null}
         {issues.length > 0 ? (
-          <table className="data-table min-w-[960px]">
-            <thead>
-              <tr>
-                <th className="w-8">
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
-                    onChange={() => setSelected(allChecked ? [] : issues.map((issue) => issue.id))}
-                    aria-label="Select all issues"
-                  />
-                </th>
-                <th>Issue</th>
-                <th>Last seen</th>
-                <th>Age</th>
-                <th>
-                  <span className="inline-flex items-center gap-2">
-                    Trend
-                    <span className="inline-flex overflow-hidden rounded border border-[var(--coollabs-line)]">
-                      {(["24h", "14d"] as const).map((item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          className={cn("px-1.5 py-0.5 text-[11px]", trend === item && "bg-[var(--nav-active)]")}
-                          onClick={() => setTrend(item)}
-                        >
-                          {item}
-                        </button>
-                      ))}
+          <div className="overflow-x-auto">
+            <table className="cool-table min-w-[960px]">
+              <thead>
+                <tr>
+                  <th className="w-10 !pr-0">
+                    <input
+                      type="checkbox"
+                      className="align-middle"
+                      checked={allChecked}
+                      onChange={() => setSelected(allChecked ? [] : issues.map((issue) => issue.id))}
+                      aria-label="Select all issues"
+                    />
+                  </th>
+                  <th>Issue</th>
+                  <th>Last seen</th>
+                  <th>Age</th>
+                  <th>
+                    <span className="inline-flex items-center gap-2">
+                      Trend
+                      <span className="inline-flex gap-px rounded-md border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] p-px">
+                        {(["24h", "14d"] as const).map((item) => (
+                          <button
+                            key={item}
+                            type="button"
+                            className={cn(
+                              "rounded-[5px] px-1.5 py-0.5 text-[11px] text-[var(--ui-fg-faint)] hover:text-[var(--ui-fg)]",
+                              trend === item && "bg-[var(--ui-hover)] text-[var(--ui-fg)]",
+                            )}
+                            onClick={() => setTrend(item)}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </span>
                     </span>
-                  </span>
-                </th>
-                <th>Events</th>
-                <th>Users</th>
-                <th>Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              {issues.map((issue) => (
-                <IssueRowView
-                  key={issue.id}
-                  issue={issue}
-                  trend={trend}
-                  checked={selected.includes(issue.id)}
-                  onCheck={(checked) =>
-                    setSelected((current) => (checked ? [...current, issue.id] : current.filter((id) => id !== issue.id)))
-                  }
-                  onOpen={() => navigate(`/errors/${issue.shortId || issue.id}`)}
-                />
-              ))}
-            </tbody>
-          </table>
+                  </th>
+                  <th>Events</th>
+                  <th>Users</th>
+                  <th>Priority</th>
+                </tr>
+              </thead>
+              <tbody>
+                {issues.map((issue) => (
+                  <IssueRowView
+                    key={issue.id}
+                    issue={issue}
+                    trend={trend}
+                    checked={selected.includes(issue.id)}
+                    onCheck={(checked) =>
+                      setSelected((current) => (checked ? [...current, issue.id] : current.filter((id) => id !== issue.id)))
+                    }
+                    onOpen={() => navigate(`/errors/${issue.shortId || issue.id}`)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
-      </div>
+      </LayerCard>
     </div>
   );
 }
@@ -269,15 +281,15 @@ function IssueRowView({
 }) {
   const parts = splitTitle(issue.title);
   return (
-    <tr onClick={onOpen}>
-      <td onClick={(event) => event.stopPropagation()}>
-        <input type="checkbox" checked={checked} aria-label={`Select ${issue.shortId}`} onChange={(event) => onCheck(event.target.checked)} />
+    <tr className="clickable-row" onClick={onOpen}>
+      <td className="!pr-0" onClick={(event) => event.stopPropagation()}>
+        <input type="checkbox" className="align-middle" checked={checked} aria-label={`Select ${issue.shortId}`} onChange={(event) => onCheck(event.target.checked)} />
       </td>
       <td>
-        <div className="font-medium">{parts.type}</div>
-        {parts.message ? <div className="text-[13px] text-[var(--color-fg-dim)]">{parts.message}</div> : null}
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--color-fg-faint)]">
-          <span className="font-medium text-[var(--color-fg)]">{issue.shortId}</span>
+        <div className="font-medium text-[var(--ui-fg)]">{parts.type}</div>
+        {parts.message ? <div className="text-[13px] text-[var(--ui-fg-dim)]">{parts.message}</div> : null}
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--ui-fg-faint)]">
+          <span className="font-mono text-[var(--ui-fg-dim)]">{issue.shortId}</span>
           {issue.unhandled ? <Badge tone="fatal">Unhandled</Badge> : null}
           <span>{issue.culprit || "No culprit"}</span>
         </div>
@@ -289,8 +301,8 @@ function IssueRowView({
         {formatTime(issue.firstSeen)}
       </td>
       <td>{trend === "24h" ? <Sparkline values={issue.trend24h} /> : <Sparkline values={issue.trend14d} />}</td>
-      <td>{issue.periodEventCount}</td>
-      <td>{issue.userCount}</td>
+      <td className="tabular-nums">{issue.periodEventCount}</td>
+      <td className="tabular-nums">{issue.userCount}</td>
       <td>
         <PriorityMark priority={issue.priority} />
       </td>
@@ -300,9 +312,9 @@ function IssueRowView({
 
 function Token({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded bg-[var(--nav-active)] px-1.5 py-0.5 text-[12px]">
+    <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-[var(--ui-control-border)] bg-[var(--ui-hover)] px-1.5 text-[12px] text-[var(--ui-fg)]">
       {label}
-      <button type="button" className="text-[var(--color-fg-faint)]" onClick={onRemove} aria-label={`Remove ${label}`}>
+      <button type="button" className="text-[var(--ui-fg-faint)] hover:text-[var(--ui-fg)]" onClick={onRemove} aria-label={`Remove ${label}`}>
         ×
       </button>
     </span>
