@@ -1,27 +1,36 @@
 [package]
-name = "status-server"
+name = "haruvo-server"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [lib]
-name = "status_server"
+name = "haruvo_server"
 path = "src/lib.rs"
 
 [[bin]]
-name = "status"
+name = "haruvo"
 path = "src/main.rs"
 
 [dependencies]
 axum = "0.8"
 axum-extra = { version = "0.10", features = ["cookie"] }
 chrono.workspace = true
+flate2.workspace = true
+hex.workspace = true
 clap = { version = "4", features = ["derive", "env"] }
-status-domain = { path = "../../crates/status" }
-status-platform = { path = "../../crates/platform" }
+haruvo-domain = { path = "../../crates/status" }
+haruvo-errors = { path = "../../crates/errors" }
+haruvo-insights = { path = "../../crates/insights" }
+haruvo-platform = { path = "../../crates/platform" }
+isbot = "0.1.3"
+maxminddb = "0.30.3"
+http-body-util = "0.1"
 include_dir = "0.7"
 lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1", "tokio1-rustls", "ring", "webpki-roots"] }
 mime_guess = "2"
+rand.workspace = true
+uuid.workspace = true
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde.workspace = true
 serde_json.workspace = true
@@ -33,7 +42,7 @@ tracing.workspace = true
 toml = "1.1.8"
 
 [dev-dependencies]
-status-platform = { path = "../../crates/platform" }
+haruvo-platform = { path = "../../crates/platform" }
 http-body-util = "0.1"
 tempfile = "3"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }

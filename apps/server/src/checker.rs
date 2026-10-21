@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
+use haruvo_domain::{HeaderPair, JobType, Probe, parse_tcp_target};
 use sqlx::Connection;
 use sqlx::mysql::{MySqlConnectOptions, MySqlConnection};
 use sqlx::postgres::{PgConnectOptions, PgConnection};
-use status_domain::{HeaderPair, JobType, Probe, parse_tcp_target};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
@@ -47,22 +47,14 @@ pub async fn probe(http: &HttpClients, job: &Job) -> Probe {
     }
 }
 
-async fn http_probe(
-    http: &HttpClients,
-    job: &Job,
-    timeout: Duration,
-    started: Instant,
-) -> Probe {
+async fn http_probe(http: &HttpClients, job: &Job, timeout: Duration, started: Instant) -> Probe {
     let client = if job.follow_redirects {
         &http.follow
     } else {
         &http.direct
     };
-    let method =
-        reqwest::Method::from_bytes(job.method.as_bytes()).unwrap_or(reqwest::Method::GET);
-    let mut request = client
-        .request(method.clone(), &job.url)
-        .timeout(timeout);
+    let method = reqwest::Method::from_bytes(job.method.as_bytes()).unwrap_or(reqwest::Method::GET);
+    let mut request = client.request(method.clone(), &job.url).timeout(timeout);
     let mut headers = reqwest::header::HeaderMap::new();
     for header in &job.headers {
         let Ok(name) = reqwest::header::HeaderName::from_bytes(header.name.as_bytes()) else {
@@ -181,7 +173,12 @@ pub struct Login {
 
 /// Logs in and runs a trivial command (`SELECT 1` or `PING`), so a pass proves more than an
 /// open port.
-pub async fn database_probe(kind: Database, target: &str, login: &Login, timeout: Duration) -> Probe {
+pub async fn database_probe(
+    kind: Database,
+    target: &str,
+    login: &Login,
+    timeout: Duration,
+) -> Probe {
     let started = Instant::now();
     let Some((host, port)) = parse_tcp_target(target) else {
         return Probe {

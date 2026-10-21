@@ -716,3 +716,48 @@ textarea.input {
   font-size: 13px;
   color: var(--color-fg-dim);
 }
+
+.field {
+  height: 2rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--coollabs-line);
+  background: var(--coollabs-recessed);
+  padding: 0 0.5rem;
+  font-size: 13px;
+  color: var(--color-fg);
+}
+
+.card {
+  border-radius: 0.5rem;
+  background: var(--coollabs-base);
+  box-shadow: 0 0 0 1px var(--coollabs-hairline);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-fg-faint);
+  border-bottom: 1px solid var(--coollabs-hairline);
+}
+
+.data-table td {
+  padding: 0.7rem 0.75rem;
+  border-bottom: 1px solid var(--coollabs-hairline);
+  vertical-align: top;
+}
+
+.data-table tbody tr {
+  cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+  background: color-mix(in oklab, var(--color-fg) 4%, transparent);
+}

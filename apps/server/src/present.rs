@@ -1,15 +1,15 @@
 use chrono::{DateTime, Utc};
+use haruvo_domain::{
+    Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
+    JobType, MonitorState, PageBanner, summarize,
+};
+use haruvo_platform::{Id, TimestampMillis};
 use serde::Serialize;
 use serde_json::Value;
-use status_domain::{
-    Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
-    MonitorState, PageBanner, summarize,
-};
-use status_platform::{Id, TimestampMillis};
 
 use crate::repo::{
-    self, Audit, Channel, CheckRow, Component, DailyRow, Delivery, Incident, IncidentUpdate, Maintenance,
-    Monitor, Page, StatusCount, User,
+    self, Audit, Channel, CheckRow, Component, DailyRow, Delivery, Incident, IncidentUpdate,
+    Maintenance, Monitor, Page, StatusCount, User,
 };
 
 #[derive(Serialize)]
@@ -177,7 +177,7 @@ fn average(sum: i64, count: i64) -> Option<i64> {
     if count <= 0 { None } else { Some(sum / count) }
 }
 
-fn bar(bucket: status_domain::DayBucket) -> BarResponse {
+fn bar(bucket: haruvo_domain::DayBucket) -> BarResponse {
     BarResponse {
         day: day_label(bucket.day),
         status: bucket.status.as_str().to_owned(),

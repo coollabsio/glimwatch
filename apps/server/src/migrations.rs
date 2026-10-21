@@ -1,4 +1,4 @@
-use status_platform::{Migration, MigrationRunner};
+use haruvo_platform::{Migration, MigrationRunner};
 
 pub fn runner() -> MigrationRunner {
     MigrationRunner::new(
@@ -33,6 +33,12 @@ pub fn runner() -> MigrationRunner {
             ),
             Migration::new(8, "audit", include_str!("../migrations/0008_audit.sql")),
             Migration::new(9, "agents", include_str!("../migrations/0009_agents.sql")),
+            Migration::new(
+                10,
+                "insights",
+                include_str!("../migrations/0010_insights.sql"),
+            ),
+            Migration::new(11, "errors", include_str!("../migrations/0011_errors.sql")),
         ],
     )
 }

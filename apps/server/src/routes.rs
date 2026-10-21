@@ -7,16 +7,16 @@ use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use serde::Deserialize;
-use serde_json::{Value, json};
-use status_domain::{
-    Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput, MonitorState,
-    NotificationEvent, NotificationPayload, OpenIncident, page_banner, resolved_at_after_update,
-    validate_monitor, validate_slug,
+use haruvo_domain::{
+    Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput,
+    MonitorState, NotificationEvent, NotificationPayload, OpenIncident, page_banner,
+    resolved_at_after_update, validate_monitor, validate_slug,
 };
-use status_platform::{
+use haruvo_platform::{
     Id, PasswordError, TimestampMillis, generate_token, hash_token, normalize_email,
 };
+use serde::Deserialize;
+use serde_json::{Value, json};
 use tower_http::trace::TraceLayer;
 
 use crate::engine;
@@ -29,7 +29,8 @@ use crate::repo::{
 use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
 use crate::state::{self, AppState};
 
-const COOKIE: &str = "status_session";
+const COOKIE: &str = "haruvo_session";
+const LEGACY_COOKIE: &str = "status_session";
 const DAY_MS: i64 = 86_400_000;
 
 pub fn router(state: AppState) -> Router {
@@ -77,10 +78,13 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/notifications/{id}/test", post(test_channel))
         .route("/public/{slug}", get(public_page))
+        .merge(crate::insights::api_routes())
+        .merge(crate::errors::api_routes())
         .fallback(api_missing);
     Router::new()
         .nest("/api", api)
-        .fallback(crate::static_assets::spa)
+        .merge(crate::insights::public_routes())
+        .fallback(crate::insights::fallback)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -106,6 +110,7 @@ async fn meta(State(state): State<AppState>) -> Json<Value> {
         "version": env!("CARGO_PKG_VERSION"),
         "signup_open": state.config.open_signup,
         "database": state.config.backend_name(),
+        "public_origin": state.config.public_origin,
         "demo": demo,
     }))
 }
@@ -226,12 +231,16 @@ async fn logout(
     State(state): State<AppState>,
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    if let Some(token) = jar.get(COOKIE).map(|cookie| cookie.value().to_owned()) {
-        repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
+    for name in [COOKIE, LEGACY_COOKIE] {
+        if let Some(token) = jar.get(name).map(|cookie| cookie.value().to_owned()) {
+            repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
+        }
     }
     let mut expired = Cookie::from(COOKIE);
     expired.set_path("/");
-    Ok((jar.remove(expired), StatusCode::NO_CONTENT))
+    let mut legacy = Cookie::from(LEGACY_COOKIE);
+    legacy.set_path("/");
+    Ok((jar.remove(expired).remove(legacy), StatusCode::NO_CONTENT))
 }
 
 async fn me(
@@ -406,7 +415,9 @@ async fn list_agents(
 ) -> Result<Json<Vec<present::AgentResponse>>, AppError> {
     require_user(&state, &jar).await?;
     let agents = repo::list_agents(&state.db).await?;
-    Ok(Json(agents.iter().map(present::AgentResponse::from).collect()))
+    Ok(Json(
+        agents.iter().map(present::AgentResponse::from).collect(),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -425,7 +436,10 @@ async fn create_agent(
         return Err(AppError::field("name", "Use 1 to 60 characters."));
     }
     if repo::agent_by_name(&state.db, name).await?.is_some() {
-        return Err(AppError::field("name", "An agent with this name already exists."));
+        return Err(AppError::field(
+            "name",
+            "An agent with this name already exists.",
+        ));
     }
     let id = Id::new();
     let token = generate_token();
@@ -523,10 +537,16 @@ async fn agent_checks(
                 .map(|(field, message)| format!("{field}: {message}"))
                 .collect::<Vec<_>>()
                 .join(" ");
-            return Err(AppError::field("checks", format!("Check \"{name}\": {detail}")));
+            return Err(AppError::field(
+                "checks",
+                format!("Check \"{name}\": {detail}"),
+            ));
         }
         if checks.iter().any(|known| known.name == name) {
-            return Err(AppError::field("checks", format!("Check \"{name}\" is listed twice.")));
+            return Err(AppError::field(
+                "checks",
+                format!("Check \"{name}\" is listed twice."),
+            ));
         }
         checks.push(repo::AgentCheck {
             name,
@@ -571,7 +591,9 @@ async fn agent_result(
         .await?
         .ok_or(AppError::NotFound)?;
     if monitor.agent_id != Some(agent.id) {
-        return Err(AppError::Forbidden("This monitor does not belong to this agent."));
+        return Err(AppError::Forbidden(
+            "This monitor does not belong to this agent.",
+        ));
     }
     engine::submit(&state, monitor.id, body.outcome, &agent.name).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -1080,7 +1102,7 @@ async fn test_channel(
         monitor: None,
         check: None,
         incident: None,
-        message: Some("This is a test notification from Status.".to_owned()),
+        message: Some("This is a test notification from Haruvo.".to_owned()),
     };
     notify::deliver(&state, &channel, &payload, None, None).await;
     Ok(Json(channel_view(&state, channel).await?))
@@ -1219,14 +1241,14 @@ async fn notify_incident(state: &AppState, incident: &Incident, message: &str) {
     let payload = NotificationPayload {
         event: NotificationEvent::IncidentUpdated.as_str().to_owned(),
         sent_at: TimestampMillis::now().to_string(),
-        monitor: monitor.map(|monitor| status_domain::PayloadMonitor {
+        monitor: monitor.map(|monitor| haruvo_domain::PayloadMonitor {
             id: monitor.id.to_string(),
             name: monitor.name,
             url: monitor.url,
             state: monitor.state,
         }),
         check: None,
-        incident: Some(status_domain::PayloadIncident {
+        incident: Some(haruvo_domain::PayloadIncident {
             id: incident.id.to_string(),
             title: incident.title.clone(),
             status: incident.status,
@@ -1479,8 +1501,12 @@ async fn require_agent(state: &AppState, headers: &HeaderMap) -> Result<Agent, A
         .ok_or(AppError::Unauthorized)
 }
 
-async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
-    let Some(token) = jar.get(COOKIE).map(|cookie| cookie.value().to_owned()) else {
+pub(crate) async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
+    let Some(token) = jar
+        .get(COOKIE)
+        .or_else(|| jar.get(LEGACY_COOKIE))
+        .map(|cookie| cookie.value().to_owned())
+    else {
         return Err(AppError::Unauthorized);
     };
     repo::authenticate(&state.db, &hash_token(&token), TimestampMillis::now())
@@ -1513,7 +1539,9 @@ async fn issue_session(
         .path("/")
         .secure(state.config.secure_cookies())
         .build();
-    Ok(jar.add(cookie))
+    let mut legacy = Cookie::from(LEGACY_COOKIE);
+    legacy.set_path("/");
+    Ok(jar.remove(legacy).add(cookie))
 }
 
 fn valid_email(email: &str) -> bool {

@@ -1,5 +1,5 @@
-use status_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
-use status_platform::{Id, TimestampMillis};
+use haruvo_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
+use haruvo_platform::{Id, TimestampMillis};
 
 use crate::error::AppError;
 use crate::repo::{self, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page};
@@ -132,6 +132,8 @@ pub async fn seed(state: &AppState) -> Result<bool, AppError> {
         created_at: now,
     };
     repo::insert_channel(&state.db, &channel, &[]).await?;
+    crate::insights::seed_demo(state).await?;
+    crate::errors::seed_demo(state).await?;
     let _ = repo::insert_audit(
         &state.db,
         Some(user_id),

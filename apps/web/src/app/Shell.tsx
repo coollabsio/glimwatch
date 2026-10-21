@@ -1,9 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
+  Bug,
+  Boxes,
   Bell,
   CalendarClock,
   LayoutDashboard,
+  LineChart,
+  Link2,
   LogOut,
   Menu,
   Moon,
@@ -34,6 +38,20 @@ const groups = [
       { to: "/incidents", label: "Incidents", icon: Siren },
       { to: "/maintenance", label: "Maintenance", icon: CalendarClock },
       { to: "/notifications", label: "Notifications", icon: Bell },
+    ],
+  },
+  {
+    label: "Errors",
+    links: [
+      { to: "/errors", label: "Issues", icon: Bug },
+      { to: "/error-projects", label: "Projects", icon: Boxes },
+    ],
+  },
+  {
+    label: "Analytics",
+    links: [
+      { to: "/analytics", label: "Sites", icon: LineChart },
+      { to: "/links", label: "Links", icon: Link2 },
     ],
   },
   {
@@ -77,7 +95,9 @@ export function Shell() {
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const section = groups.flatMap((group) => group.links).find((link) =>
-    link.end ? location.pathname === "/" : location.pathname.startsWith(link.to),
+    link.end
+      ? location.pathname === link.to
+      : location.pathname === link.to || location.pathname.startsWith(`${link.to}/`),
   );
 
   async function logout() {
@@ -87,7 +107,7 @@ export function Shell() {
 
   function toggleTheme() {
     const next = document.documentElement.classList.toggle("dark");
-    localStorage.setItem("status-theme", next ? "dark" : "light");
+    localStorage.setItem("haruvo-theme", next ? "dark" : "light");
     setDark(next);
   }
 
@@ -96,14 +116,14 @@ export function Shell() {
       <header className="fixed inset-x-0 top-0 z-40 hidden h-12 items-center border-b border-neutral-200 bg-white/95 backdrop-blur lg:flex dark:border-white/[0.06] dark:bg-[var(--color-panel)]/95">
         <div className="flex h-full w-56 shrink-0 items-center gap-2 border-r border-neutral-200 px-4 dark:border-white/[0.06]">
           <NavLink to="/" className="text-[15px] font-semibold tracking-tight text-black dark:text-white">
-            Status
+            Haruvo
           </NavLink>
           <span className="truncate text-[10.5px] font-medium text-neutral-400 dark:text-[var(--color-fg-faint)]">
             v{meta.data?.version ?? "0.1.0"}
           </span>
         </div>
         <div className="flex h-full min-w-0 flex-1 items-center justify-between px-4">
-          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Status"}</div>
+          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Haruvo"}</div>
           <div className="flex items-center gap-1">
             <button type="button" className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
               {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -120,7 +140,7 @@ export function Shell() {
 
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden dark:border-white/[0.06] dark:bg-[var(--color-panel)]/95">
         <NavLink to="/" className="text-[15px] font-semibold tracking-tight">
-          Status
+          Haruvo
         </NavLink>
         <button type="button" className="icon-button" onClick={() => setOpen(true)} aria-label="Open menu">
           <Menu className="size-5" />
@@ -132,7 +152,7 @@ export function Shell() {
           <button className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 right-0 flex w-72 max-w-[85vw] flex-col rounded-l-2xl border-l border-neutral-200 bg-white shadow-[-8px_0_30px_-6px_rgba(0,0,0,0.18)] dark:border-white/[0.12] dark:bg-[var(--color-panel)]">
             <div className="flex h-12 items-center justify-between border-b border-neutral-200 px-4 dark:border-white/[0.06]">
-              <span className="text-[15px] font-semibold">Status</span>
+              <span className="text-[15px] font-semibold">Haruvo</span>
               <button type="button" className="icon-button" onClick={() => setOpen(false)} aria-label="Close menu">
                 <X className="size-4" />
               </button>

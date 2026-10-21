@@ -21,6 +21,14 @@ export function timeAgo(iso?: string | null) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+export function fullTime(iso?: string | null) {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(new Date(iso));
+}
+
 export function formatTime(iso?: string | null) {
   if (!iso) return "—";
   return new Intl.DateTimeFormat(undefined, {
