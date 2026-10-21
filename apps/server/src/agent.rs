@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
+use haruvo_domain::{Assertion, CheckType, Rules, StrCompare};
+use haruvo_platform::Id;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::json;
-use status_domain::{Assertion, CheckType, Rules, StrCompare};
-use status_platform::Id;
 
 use crate::checker::{self, Database, Job, Login};
 use crate::connectivity::Connectivity;
@@ -98,10 +98,9 @@ fn parse(text: &str, env: impl Fn(&str) -> Option<String>) -> Result<Vec<Check>,
 fn resolve(check: CheckConfig, env: &impl Fn(&str) -> Option<String>) -> Result<Check, String> {
     let name = check.name.trim().to_owned();
     let password = match &check.password_env {
-        Some(variable) => Some(
-            env(variable)
-                .ok_or_else(|| format!("check \"{name}\": environment variable {variable} is not set"))?,
-        ),
+        Some(variable) => Some(env(variable).ok_or_else(|| {
+            format!("check \"{name}\": environment variable {variable} is not set")
+        })?),
         None => None,
     };
     let database = match check.check_type {
@@ -111,7 +110,10 @@ fn resolve(check: CheckConfig, env: &impl Fn(&str) -> Option<String>) -> Result<
         CheckType::Redis => Some(Database::Redis),
     };
     if matches!(database, Some(Database::Postgres | Database::Mysql)) && check.user.is_none() {
-        return Err(format!("check \"{name}\": set user for a {} check", check.check_type.as_str()));
+        return Err(format!(
+            "check \"{name}\": set user for a {} check",
+            check.check_type.as_str()
+        ));
     }
     let probe = match database {
         Some(kind) => Probe::Database(
@@ -184,7 +186,7 @@ pub async fn run(
     let server = Server {
         client: reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
-            .user_agent(concat!("Status-Agent/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Haruvo-Agent/", env!("CARGO_PKG_VERSION")))
             .build()?,
         base: server.trim_end_matches('/').to_owned(),
         token,
@@ -200,7 +202,7 @@ pub async fn run(
             }
         }
     };
-    tracing::info!(server = %server.base, checks = checks.len(), "Status agent started");
+    tracing::info!(server = %server.base, checks = checks.len(), "Haruvo agent started");
     for check in checks {
         let Some(&monitor_id) = ids.get(&check.name) else {
             continue;
@@ -284,7 +286,9 @@ impl Server {
                 .as_str()
                 .or(problem["detail"].as_str())
                 .unwrap_or("unknown reason");
-            return Err(Rejected::Final(format!("the server rejected the config: {reason}")));
+            return Err(Rejected::Final(format!(
+                "the server rejected the config: {reason}"
+            )));
         }
         let registered: Registered = response
             .error_for_status()
@@ -346,8 +350,10 @@ body_contains = "ok"
 
     #[test]
     fn reads_checks_and_resolves_passwords_from_the_environment() {
-        let checks = parse(CONFIG, |name| (name == "PG_PASSWORD").then(|| "secret".to_owned()))
-            .unwrap();
+        let checks = parse(CONFIG, |name| {
+            (name == "PG_PASSWORD").then(|| "secret".to_owned())
+        })
+        .unwrap();
         let Probe::Database(Database::Postgres, login) = &checks[0].probe else {
             panic!("first check is a postgres probe");
         };
@@ -367,14 +373,20 @@ body_contains = "ok"
     #[test]
     fn rejects_a_missing_password_variable() {
         let error = parse(CONFIG, |_| None).err().unwrap();
-        assert_eq!(error, "check \"Main DB\": environment variable PG_PASSWORD is not set");
+        assert_eq!(
+            error,
+            "check \"Main DB\": environment variable PG_PASSWORD is not set"
+        );
     }
 
     #[test]
     fn rejects_unknown_keys() {
-        let error = parse("[[check]]\nname = \"x\"\ntype = \"tcp\"\ntarget = \"a:1\"\npasword_env = \"X\"\n", |_| None)
-            .err()
-            .unwrap();
+        let error = parse(
+            "[[check]]\nname = \"x\"\ntype = \"tcp\"\ntarget = \"a:1\"\npasword_env = \"X\"\n",
+            |_| None,
+        )
+        .err()
+        .unwrap();
         assert!(error.contains("unknown field `pasword_env`"), "{error}");
     }
 }

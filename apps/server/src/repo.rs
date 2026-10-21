@@ -3,13 +3,13 @@
 
 use std::ops::DerefMut;
 
+use haruvo_domain::{
+    Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
+    JobType, MonitorState,
+};
+use haruvo_platform::{Database, Id, ParseIdError, TimestampMillis};
 use serde::de::DeserializeOwned;
 use sqlx::{Any, Row, Transaction};
-use status_domain::{
-    Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
-    MonitorState,
-};
-use status_platform::{Database, Id, ParseIdError, TimestampMillis};
 
 const MONITOR_COLUMNS: &str = "\
 id, name, description, job_type, url, method, headers_json, body, timeout_ms, interval_seconds, \
@@ -481,10 +481,12 @@ pub async fn list_agents(db: &Database) -> Result<Vec<Agent>, sqlx::Error> {
 }
 
 pub async fn get_agent(db: &Database, id: Id) -> Result<Option<Agent>, sqlx::Error> {
-    let row = sqlx::query(&format!("SELECT {AGENT_COLUMNS} FROM agents a WHERE a.id = $1"))
-        .bind(id.to_string())
-        .fetch_optional(db.pool())
-        .await?;
+    let row = sqlx::query(&format!(
+        "SELECT {AGENT_COLUMNS} FROM agents a WHERE a.id = $1"
+    ))
+    .bind(id.to_string())
+    .fetch_optional(db.pool())
+    .await?;
     row.as_ref().map(map_agent).transpose()
 }
 
@@ -594,8 +596,14 @@ pub async fn sync_agent_checks(
     }
     for monitor in &existing {
         if monitor.active && !checks.iter().any(|check| check.name == monitor.name) {
-            set_active(db, monitor.id, false, monitor.next_check_at.as_millis(), now.as_millis())
-                .await?;
+            set_active(
+                db,
+                monitor.id,
+                false,
+                monitor.next_check_at.as_millis(),
+                now.as_millis(),
+            )
+            .await?;
         }
     }
     Ok(ids)
@@ -1463,7 +1471,9 @@ fn map_monitor(row: &sqlx::any::AnyRow) -> Result<Monitor, sqlx::Error> {
         agent_id: optional_id(row, "agent_id")?,
         check_type: row
             .try_get::<Option<String>, _>("check_type")?
-            .map(|value| CheckType::parse(&value).ok_or_else(|| corrupt(format!("check type {value}"))))
+            .map(|value| {
+                CheckType::parse(&value).ok_or_else(|| corrupt(format!("check type {value}")))
+            })
             .transpose()?,
     })
 }

@@ -1,8 +1,8 @@
-//! Shared platform for Status.
+//! Shared platform for Haruvo.
 //!
 //! This crate mirrors the role of Orbit's `orbit-platform`: configuration,
 //! the SQLite/Postgres access layer, migrations, password hashing, identifiers,
-//! timestamps, and RFC 9457 problem responses. Status does not include
+//! timestamps, and RFC 9457 problem responses. Haruvo does not include
 //! Orbit's realtime, file, or collaboration subsystems.
 
 mod auth;

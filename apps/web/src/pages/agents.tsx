@@ -84,7 +84,7 @@ function AgentToken({ agent, onDone }: { agent: CreatedAgent; onDone: () => void
   const docker = `docker run -d --name status-agent --restart unless-stopped --no-healthcheck -e STATUS_AGENT_SERVER=${origin} -e STATUS_AGENT_TOKEN=${agent.token} -e STATUS_AGENT_CONFIG=${configPath} -e PG_PASSWORD=... -v ${configPath}:${configPath}:ro ghcr.io/coollabsio/status:latest agent`;
   const binary = `PG_PASSWORD=... status agent --server ${origin} --token ${agent.token} --config ${configPath}`;
   return (
-    <LayerCard title={`${agent.name} is ready`} description="Copy the token now. Status stores only its hash and cannot show it again." className="h-fit">
+    <LayerCard title={`${agent.name} is ready`} description="Copy the token now. Haruvo stores only its hash and cannot show it again." className="h-fit">
       <div className="space-y-3">
         <Snippet label="Token" value={agent.token} />
         <Snippet label={configPath} value={exampleConfig} multiline />

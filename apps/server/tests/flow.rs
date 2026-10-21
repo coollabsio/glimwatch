@@ -3,9 +3,9 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use haruvo_server::{DEMO_PASSWORD, boot, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::Value;
-use status_server::{DEMO_PASSWORD, boot, router, testing_config};
 use tower::ServiceExt;
 
 async fn app() -> Router {
@@ -208,8 +208,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
     assert_eq!(public["components"].as_array().unwrap().len(), 2);
     assert!(!public["incidents"].as_array().unwrap().is_empty());
 
-    let starts = status_platform::TimestampMillis::now();
-    let ends = status_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
+    let starts = haruvo_platform::TimestampMillis::now();
+    let ends = haruvo_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
     let (status, maintenance, _) = call(
         &app,
         "POST",
@@ -299,7 +299,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
 
 #[tokio::test]
 async fn postgres_accepts_the_same_api() {
-    let Some(url) = std::env::var("STATUS_APP_POSTGRES_URL")
+    let Some(url) = std::env::var("HARUVO_APP_POSTGRES_URL")
+        .or_else(|_| std::env::var("STATUS_APP_POSTGRES_URL"))
         .ok()
         .filter(|url| !url.is_empty())
     else {
@@ -309,7 +310,7 @@ async fn postgres_accepts_the_same_api() {
     config.database_url = Some(url);
     let state = boot(config).await.expect("postgres boot");
     let app = router(state);
-    let email = format!("pg-{}@coollabs.io", status_platform::Id::new());
+    let email = format!("pg-{}@coollabs.io", haruvo_platform::Id::new());
     let (status, user, _) = call(
         &app,
         "POST",
@@ -419,7 +420,10 @@ async fn agent_call(app: &Router, uri: &str, body: Value, token: &str) -> (Statu
         .unwrap();
     let status = response.status();
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 #[tokio::test]
@@ -464,22 +468,46 @@ async fn agent_registers_its_own_checks_and_reports_outcomes() {
     };
     let (status, _) = agent_call(&app, "/api/agent/checks", checks(&["Main DB"]), "wrong").await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    let (status, registered) =
-        agent_call(&app, "/api/agent/checks", checks(&["Main DB", "Replica"]), &token).await;
+    let (status, registered) = agent_call(
+        &app,
+        "/api/agent/checks",
+        checks(&["Main DB", "Replica"]),
+        &token,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "{registered}");
-    let id = registered["checks"][0]["monitor_id"].as_str().unwrap().to_owned();
-    let replica = registered["checks"][1]["monitor_id"].as_str().unwrap().to_owned();
+    let id = registered["checks"][0]["monitor_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let replica = registered["checks"][1]["monitor_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
 
     let (_, again) = agent_call(&app, "/api/agent/checks", checks(&["Main DB"]), &token).await;
-    assert_eq!(again["checks"][0]["monitor_id"], id.as_str(), "same name, same monitor");
+    assert_eq!(
+        again["checks"][0]["monitor_id"],
+        id.as_str(),
+        "same name, same monitor"
+    );
     let (_, monitors, _) = call(&app, "GET", "/api/monitors", None, Some(&cookie)).await;
     let monitors = monitors.as_array().unwrap();
     assert_eq!(monitors.len(), 2, "{monitors:?}");
-    let main = monitors.iter().find(|monitor| monitor["id"] == id.as_str()).unwrap();
+    let main = monitors
+        .iter()
+        .find(|monitor| monitor["id"] == id.as_str())
+        .unwrap();
     assert_eq!(main["check_type"], "postgres");
     assert_eq!(main["agent_id"], agent_id.as_str());
-    let dropped = monitors.iter().find(|monitor| monitor["id"] == replica.as_str()).unwrap();
-    assert_eq!(dropped["active"], false, "a check removed from the config is paused");
+    let dropped = monitors
+        .iter()
+        .find(|monitor| monitor["id"] == replica.as_str())
+        .unwrap();
+    assert_eq!(
+        dropped["active"], false,
+        "a check removed from the config is paused"
+    );
 
     let outcome = serde_json::json!({
         "monitor_id": id,
@@ -490,15 +518,36 @@ async fn agent_registers_its_own_checks_and_reports_outcomes() {
     });
     let (status, body) = agent_call(&app, "/api/agent/results", outcome.clone(), &token).await;
     assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
-    let (_, monitor, _) = call(&app, "GET", &format!("/api/monitors/{id}"), None, Some(&cookie)).await;
+    let (_, monitor, _) = call(
+        &app,
+        "GET",
+        &format!("/api/monitors/{id}"),
+        None,
+        Some(&cookie),
+    )
+    .await;
     assert_eq!(monitor["state"], "down", "{monitor}");
-    assert_eq!(monitor["recent"][0]["error"], "password authentication failed");
+    assert_eq!(
+        monitor["recent"][0]["error"],
+        "password authentication failed"
+    );
     assert_eq!(monitor["recent"][0]["region"], "vpc-eu");
     let (_, incidents, _) = call(&app, "GET", "/api/incidents", None, Some(&cookie)).await;
     assert_eq!(incidents.as_array().unwrap().len(), 1, "{incidents}");
 
-    let (status, _, _) = call(&app, "POST", &format!("/api/monitors/{id}/checks"), None, Some(&cookie)).await;
-    assert_eq!(status, StatusCode::CONFLICT, "the server does not run agent checks");
+    let (status, _, _) = call(
+        &app,
+        "POST",
+        &format!("/api/monitors/{id}/checks"),
+        None,
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "the server does not run agent checks"
+    );
     let (status, _, _) = call(
         &app,
         "PUT",
@@ -507,7 +556,11 @@ async fn agent_registers_its_own_checks_and_reports_outcomes() {
         Some(&cookie),
     )
     .await;
-    assert_eq!(status, StatusCode::CONFLICT, "the dashboard cannot change an agent target");
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "the dashboard cannot change an agent target"
+    );
 
     let (_, other, _) = call(
         &app,
@@ -517,8 +570,13 @@ async fn agent_registers_its_own_checks_and_reports_outcomes() {
         Some(&cookie),
     )
     .await;
-    let (status, _) =
-        agent_call(&app, "/api/agent/results", outcome, other["token"].as_str().unwrap()).await;
+    let (status, _) = agent_call(
+        &app,
+        "/api/agent/results",
+        outcome,
+        other["token"].as_str().unwrap(),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     let (_, agents, _) = call(&app, "GET", "/api/agents", None, Some(&cookie)).await;
@@ -528,7 +586,13 @@ async fn agent_registers_its_own_checks_and_reports_outcomes() {
     assert_eq!(first["monitor_count"], 2);
     assert!(first.get("token").is_none());
 
-    let (status, problem, _) =
-        call(&app, "DELETE", &format!("/api/agents/{agent_id}"), None, Some(&cookie)).await;
+    let (status, problem, _) = call(
+        &app,
+        "DELETE",
+        &format!("/api/agents/{agent_id}"),
+        None,
+        Some(&cookie),
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT, "{problem}");
 }
