@@ -18,7 +18,7 @@ pub use assertion::{
 pub use banner::{OpenIncident, PageBanner, page_banner};
 pub use incident::{IncidentImpact, IncidentStatus, resolved_at_after_update};
 pub use monitor::{
-    HeaderPair, JobType, MonitorInput, MonitorState, Transition, apply_outcome, parse_tcp_target,
+    CheckType, HeaderPair, JobType, MonitorInput, MonitorState, Transition, apply_outcome, parse_tcp_target,
     validate_monitor,
 };
 pub use notification::{

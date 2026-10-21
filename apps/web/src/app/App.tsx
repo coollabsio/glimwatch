@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { Shell } from "@/app/Shell";
 import { ApiError, api, type User } from "@/lib/api";
 import { LoginPage, RegisterPage } from "@/pages/auth";
+import { AgentsPage } from "@/pages/agents";
 import { DashboardPage } from "@/pages/dashboard";
 import { IncidentDetailPage, IncidentsPage } from "@/pages/incidents";
 import { MaintenancePage } from "@/pages/maintenance";
@@ -47,6 +48,7 @@ export function App() {
           <Route path="incidents/:id" element={<IncidentDetailPage />} />
           <Route path="maintenance" element={<MaintenancePage />} />
           <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="agents" element={<AgentsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>

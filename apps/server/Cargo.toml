@@ -16,7 +16,7 @@ path = "src/main.rs"
 axum = "0.8"
 axum-extra = { version = "0.10", features = ["cookie"] }
 chrono.workspace = true
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 status-domain = { path = "../../crates/status" }
 status-platform = { path = "../../crates/platform" }
 include_dir = "0.7"
@@ -25,11 +25,12 @@ mime_guess = "2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde.workspace = true
 serde_json.workspace = true
-sqlx.workspace = true
+sqlx = { workspace = true, features = ["mysql"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 tower-http = { version = "0.6", features = ["trace"] }
 tracing.workspace = true
+toml = "1.1.8"
 
 [dev-dependencies]
 status-platform = { path = "../../crates/platform" }

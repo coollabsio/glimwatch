@@ -5,6 +5,8 @@ use std::time::Duration;
 use clap::{Parser, Subcommand};
 use status_platform::Config;
 
+use crate::agent;
+use crate::connectivity::Connectivity;
 use crate::scheduler;
 use crate::seed;
 use crate::state::{self, BootError};
@@ -43,6 +45,18 @@ enum Command {
     },
     /// Exit successfully when /api/health answers on the configured port.
     Healthcheck,
+    /// Run the checks in a config file from this network and report them to a Status server.
+    Agent {
+        /// Status server URL, for example https://status.example.com.
+        #[arg(long, env = "STATUS_AGENT_SERVER")]
+        server: String,
+        /// Token shown once when the agent was created.
+        #[arg(long, env = "STATUS_AGENT_TOKEN", hide_env_values = true)]
+        token: String,
+        /// TOML file with [[check]] entries.
+        #[arg(long, env = "STATUS_AGENT_CONFIG")]
+        config: PathBuf,
+    },
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -80,6 +94,14 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 println!("database already has an account; left it unchanged");
             }
+        }
+        Command::Agent {
+            server,
+            token,
+            config,
+        } => {
+            let targets = Config::from_env()?.connectivity_targets;
+            agent::run(&server, token, &config, Connectivity::new(targets)).await?;
         }
         Command::Healthcheck => {
             let config = Config::from_env()?;

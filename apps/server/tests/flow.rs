@@ -402,3 +402,133 @@ async fn failed_check_is_not_counted_when_the_host_has_no_network() {
     let (_, incidents, _) = call(&app, "GET", "/api/incidents", None, Some(&cookie)).await;
     assert_eq!(incidents.as_array().unwrap().len(), 0, "{incidents}");
 }
+
+async fn agent_call(app: &Router, uri: &str, body: Value, token: &str) -> (StatusCode, Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(uri)
+                .header("content-type", "application/json")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+#[tokio::test]
+async fn agent_registers_its_own_checks_and_reports_outcomes() {
+    let app = app().await;
+    let (_, _, cookie) = call(
+        &app,
+        "POST",
+        "/api/auth/register",
+        Some(serde_json::json!({
+            "email": "ada@coollabs.io",
+            "password": "correct-horse-battery",
+        })),
+        None,
+    )
+    .await;
+    let cookie = cookie.expect("session cookie");
+    let (status, agent, _) = call(
+        &app,
+        "POST",
+        "/api/agents",
+        Some(serde_json::json!({ "name": "vpc-eu" })),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{agent}");
+    let token = agent["token"].as_str().unwrap().to_owned();
+    let agent_id = agent["id"].as_str().unwrap().to_owned();
+    assert_eq!(agent["online"], false);
+
+    let checks = |names: &[&str]| {
+        serde_json::json!({
+            "checks": names.iter().map(|name| serde_json::json!({
+                "name": name,
+                "check_type": "postgres",
+                "target": "10.0.0.5:5432",
+                "interval_seconds": 30,
+                "timeout_ms": 10000,
+                "failure_threshold": 1,
+            })).collect::<Vec<_>>()
+        })
+    };
+    let (status, _) = agent_call(&app, "/api/agent/checks", checks(&["Main DB"]), "wrong").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, registered) =
+        agent_call(&app, "/api/agent/checks", checks(&["Main DB", "Replica"]), &token).await;
+    assert_eq!(status, StatusCode::OK, "{registered}");
+    let id = registered["checks"][0]["monitor_id"].as_str().unwrap().to_owned();
+    let replica = registered["checks"][1]["monitor_id"].as_str().unwrap().to_owned();
+
+    let (_, again) = agent_call(&app, "/api/agent/checks", checks(&["Main DB"]), &token).await;
+    assert_eq!(again["checks"][0]["monitor_id"], id.as_str(), "same name, same monitor");
+    let (_, monitors, _) = call(&app, "GET", "/api/monitors", None, Some(&cookie)).await;
+    let monitors = monitors.as_array().unwrap();
+    assert_eq!(monitors.len(), 2, "{monitors:?}");
+    let main = monitors.iter().find(|monitor| monitor["id"] == id.as_str()).unwrap();
+    assert_eq!(main["check_type"], "postgres");
+    assert_eq!(main["agent_id"], agent_id.as_str());
+    let dropped = monitors.iter().find(|monitor| monitor["id"] == replica.as_str()).unwrap();
+    assert_eq!(dropped["active"], false, "a check removed from the config is paused");
+
+    let outcome = serde_json::json!({
+        "monitor_id": id,
+        "status": "failure",
+        "status_code": null,
+        "latency_ms": 12,
+        "error": "password authentication failed"
+    });
+    let (status, body) = agent_call(&app, "/api/agent/results", outcome.clone(), &token).await;
+    assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+    let (_, monitor, _) = call(&app, "GET", &format!("/api/monitors/{id}"), None, Some(&cookie)).await;
+    assert_eq!(monitor["state"], "down", "{monitor}");
+    assert_eq!(monitor["recent"][0]["error"], "password authentication failed");
+    assert_eq!(monitor["recent"][0]["region"], "vpc-eu");
+    let (_, incidents, _) = call(&app, "GET", "/api/incidents", None, Some(&cookie)).await;
+    assert_eq!(incidents.as_array().unwrap().len(), 1, "{incidents}");
+
+    let (status, _, _) = call(&app, "POST", &format!("/api/monitors/{id}/checks"), None, Some(&cookie)).await;
+    assert_eq!(status, StatusCode::CONFLICT, "the server does not run agent checks");
+    let (status, _, _) = call(
+        &app,
+        "PUT",
+        &format!("/api/monitors/{id}"),
+        Some(serde_json::json!({ "name": "x", "job_type": "tcp", "url": "evil.internal:22" })),
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "the dashboard cannot change an agent target");
+
+    let (_, other, _) = call(
+        &app,
+        "POST",
+        "/api/agents",
+        Some(serde_json::json!({ "name": "vpc-us" })),
+        Some(&cookie),
+    )
+    .await;
+    let (status, _) =
+        agent_call(&app, "/api/agent/results", outcome, other["token"].as_str().unwrap()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (_, agents, _) = call(&app, "GET", "/api/agents", None, Some(&cookie)).await;
+    let first = &agents.as_array().unwrap()[0];
+    assert_eq!(first["name"], "vpc-eu", "{agents}");
+    assert_eq!(first["online"], true);
+    assert_eq!(first["monitor_count"], 2);
+    assert!(first.get("token").is_none());
+
+    let (status, problem, _) =
+        call(&app, "DELETE", &format!("/api/agents/{agent_id}"), None, Some(&cookie)).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+}

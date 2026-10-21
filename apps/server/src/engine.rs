@@ -3,17 +3,99 @@ use std::ops::DerefMut;
 use sqlx::Row;
 use status_domain::{
     CheckStatus, IncidentImpact, IncidentStatus, NotificationEvent, NotificationPayload,
-    PayloadCheck, PayloadIncident, PayloadMonitor, Rules, apply_outcome, judge,
+    PayloadCheck, PayloadIncident, PayloadMonitor, Probe, Rules, apply_outcome, judge,
 };
+use serde::{Deserialize, Serialize};
 use status_platform::{Id, TimestampMillis};
 
-use crate::checker;
+use crate::checker::{self, Job};
 use crate::error::AppError;
 use crate::notify;
-use crate::repo::{self, Incident, IncidentUpdate, NewCheck};
+use crate::repo::{self, Incident, IncidentUpdate, Monitor, NewCheck};
 use crate::state::AppState;
 
+pub const LOCAL_REGION: &str = "local";
+
+/// A judged check result.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Outcome {
+    pub status: CheckStatus,
+    pub status_code: Option<i64>,
+    pub latency_ms: i64,
+    pub error: Option<String>,
+}
+
+impl Outcome {
+    fn maintenance() -> Self {
+        Self {
+            status: CheckStatus::Maintenance,
+            status_code: None,
+            latency_ms: 0,
+            error: Some("Skipped during a maintenance window.".to_owned()),
+        }
+    }
+}
+
+pub fn judge_probe(rules: &Rules, probe: &Probe) -> Outcome {
+    let judgement = judge(rules, probe);
+    Outcome {
+        status: judgement.status,
+        status_code: probe.status_code,
+        latency_ms: probe.latency_ms,
+        error: judgement.error,
+    }
+}
+
+/// Runs a check from this server and records it.
 pub async fn execute(state: &AppState, id: Id) -> Result<(), AppError> {
+    let monitor = active_monitor(state, id).await?;
+    let _guard = state
+        .inflight
+        .try_acquire(&id.to_string())
+        .ok_or(AppError::Busy)?;
+    let now = TimestampMillis::now();
+    let outcome = if repo::in_maintenance(&state.db, id, now.as_millis()).await? {
+        Outcome::maintenance()
+    } else {
+        let probe = checker::probe(&state.http, &Job::from(&monitor)).await;
+        if probe.transport_error.is_some() && !state.connectivity.online().await {
+            return Err(AppError::Offline);
+        }
+        judge_probe(
+            &Rules {
+                job_type: monitor.job_type,
+                expected_status: monitor.expected_status,
+                degraded_after_ms: monitor.degraded_after_ms,
+                assertions: monitor.assertions.clone(),
+            },
+            &probe,
+        )
+    };
+    record(state, &monitor, outcome, LOCAL_REGION, now).await
+}
+
+/// Records an outcome that an agent judged inside its network.
+pub async fn submit(
+    state: &AppState,
+    id: Id,
+    outcome: Outcome,
+    region: &str,
+) -> Result<(), AppError> {
+    let monitor = active_monitor(state, id).await?;
+    let _guard = state
+        .inflight
+        .try_acquire(&id.to_string())
+        .ok_or(AppError::Busy)?;
+    let now = TimestampMillis::now();
+    let outcome = if repo::in_maintenance(&state.db, id, now.as_millis()).await? {
+        Outcome::maintenance()
+    } else {
+        outcome
+    };
+    record(state, &monitor, outcome, region, now).await
+}
+
+async fn active_monitor(state: &AppState, id: Id) -> Result<Monitor, AppError> {
     let monitor = repo::get_monitor(&state.db, id)
         .await?
         .ok_or(AppError::NotFound)?;
@@ -22,40 +104,23 @@ pub async fn execute(state: &AppState, id: Id) -> Result<(), AppError> {
             "Resume the monitor before running a check.".into(),
         ));
     }
-    let _guard = state
-        .inflight
-        .try_acquire(&id.to_string())
-        .ok_or(AppError::Busy)?;
-    let now = TimestampMillis::now();
-    let maintenance = repo::in_maintenance(&state.db, id, now.as_millis()).await?;
-    let (status, status_code, latency_ms, error) = if maintenance {
-        (
-            CheckStatus::Maintenance,
-            None,
-            0,
-            Some("Skipped during a maintenance window.".to_owned()),
-        )
-    } else {
-        let probe = checker::probe(&state.http, &monitor).await;
-        if probe.transport_error.is_some() && !state.connectivity.online().await {
-            return Err(AppError::Offline);
-        }
-        let judgement = judge(
-            &Rules {
-                job_type: monitor.job_type,
-                expected_status: monitor.expected_status,
-                degraded_after_ms: monitor.degraded_after_ms,
-                assertions: monitor.assertions.clone(),
-            },
-            &probe,
-        );
-        (
-            judgement.status,
-            probe.status_code,
-            probe.latency_ms,
-            judgement.error,
-        )
-    };
+    Ok(monitor)
+}
+
+async fn record(
+    state: &AppState,
+    monitor: &Monitor,
+    outcome: Outcome,
+    region: &str,
+    now: TimestampMillis,
+) -> Result<(), AppError> {
+    let id = monitor.id;
+    let Outcome {
+        status,
+        status_code,
+        latency_ms,
+        error,
+    } = outcome;
     let transition = apply_outcome(
         monitor.state,
         monitor.consecutive_failures,
@@ -69,6 +134,7 @@ pub async fn execute(state: &AppState, id: Id) -> Result<(), AppError> {
         status_code,
         latency_ms,
         error: error.clone(),
+        region: region.to_owned(),
         checked_at: now,
     };
     let next = now.as_millis() + monitor.interval_seconds.saturating_mul(1000);

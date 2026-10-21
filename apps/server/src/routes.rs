@@ -3,13 +3,14 @@ use std::collections::BTreeMap;
 use axum::Json;
 use axum::Router;
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
+use axum::http::header::AUTHORIZATION;
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use status_domain::{
-    Assertion, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput, MonitorState,
+    Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput, MonitorState,
     NotificationEvent, NotificationPayload, OpenIncident, page_banner, resolved_at_after_update,
     validate_monitor, validate_slug,
 };
@@ -22,7 +23,9 @@ use crate::engine;
 use crate::error::AppError;
 use crate::notify;
 use crate::present::{self, Stats};
-use crate::repo::{self, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page, User};
+use crate::repo::{
+    self, Agent, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page, User,
+};
 use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
 use crate::state::{self, AppState};
 
@@ -46,6 +49,11 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/monitors/{id}/checks", post(run_check))
         .route("/monitors/{id}/active", post(set_active))
+        .route("/agents", get(list_agents).post(create_agent))
+        .route("/agents/{id}", axum::routing::delete(delete_agent))
+        .route("/agent/checks", post(agent_checks))
+        .route("/agent/heartbeat", post(agent_heartbeat))
+        .route("/agent/results", post(agent_result))
         .route("/pages", get(list_pages).post(create_page))
         .route(
             "/pages/{id}",
@@ -336,6 +344,7 @@ async fn update_monitor(
     let existing = repo::get_monitor(&state.db, id)
         .await?
         .ok_or(AppError::NotFound)?;
+    reject_agent_monitor(&existing, "Edit this check in the agent config.")?;
     let input = monitor_input(body);
     validate_monitor(&input).map_err(AppError::Validation)?;
     let now = TimestampMillis::now();
@@ -383,8 +392,189 @@ async fn run_check(
     Path(id): Path<Id>,
 ) -> Result<Json<present::MonitorResponse>, AppError> {
     require_user(&state, &jar).await?;
+    let monitor = repo::get_monitor(&state.db, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    reject_agent_monitor(&monitor, "The agent runs this check on its own schedule.")?;
     engine::execute(&state, id).await?;
     Ok(Json(detail(&state, id).await?))
+}
+
+async fn list_agents(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> Result<Json<Vec<present::AgentResponse>>, AppError> {
+    require_user(&state, &jar).await?;
+    let agents = repo::list_agents(&state.db).await?;
+    Ok(Json(agents.iter().map(present::AgentResponse::from).collect()))
+}
+
+#[derive(Deserialize)]
+struct AgentBody {
+    name: String,
+}
+
+async fn create_agent(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(body): Json<AgentBody>,
+) -> Result<(StatusCode, Json<Value>), AppError> {
+    let user = require_user(&state, &jar).await?;
+    let name = body.name.trim();
+    if name.is_empty() || name.chars().count() > 60 {
+        return Err(AppError::field("name", "Use 1 to 60 characters."));
+    }
+    if repo::agent_by_name(&state.db, name).await?.is_some() {
+        return Err(AppError::field("name", "An agent with this name already exists."));
+    }
+    let id = Id::new();
+    let token = generate_token();
+    let now = TimestampMillis::now();
+    repo::insert_agent(&state.db, id, name, &hash_token(&token), now).await?;
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(user.id),
+        "agent.created",
+        "agent",
+        Some(&id.to_string()),
+        now,
+    )
+    .await;
+    let agent = repo::get_agent(&state.db, id)
+        .await?
+        .ok_or(AppError::Internal)?;
+    let mut response = json!(present::AgentResponse::from(&agent));
+    response["token"] = json!(token);
+    Ok((StatusCode::CREATED, Json(response)))
+}
+
+async fn delete_agent(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<Id>,
+) -> Result<StatusCode, AppError> {
+    let user = require_user(&state, &jar).await?;
+    let agent = repo::get_agent(&state.db, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    if !repo::delete_agent(&state.db, id).await? {
+        return Err(AppError::Conflict(format!(
+            "{} still has {} monitor(s). Delete them first.",
+            agent.name, agent.monitor_count
+        )));
+    }
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(user.id),
+        "agent.deleted",
+        "agent",
+        Some(&id.to_string()),
+        TimestampMillis::now(),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+struct AgentChecksBody {
+    checks: Vec<AgentCheckBody>,
+}
+
+#[derive(Deserialize)]
+struct AgentCheckBody {
+    name: String,
+    check_type: CheckType,
+    target: String,
+    interval_seconds: i64,
+    timeout_ms: i64,
+    failure_threshold: i32,
+}
+
+/// The agent sends its config, without secrets, when it starts.
+async fn agent_checks(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<AgentChecksBody>,
+) -> Result<Json<Value>, AppError> {
+    let agent = require_agent(&state, &headers).await?;
+    let mut checks: Vec<repo::AgentCheck> = Vec::new();
+    for check in body.checks {
+        let name = check.name.trim().to_owned();
+        let input = MonitorInput {
+            name: name.clone(),
+            description: String::new(),
+            job_type: check.check_type.job_type(),
+            url: check.target.trim().to_owned(),
+            method: "GET".to_owned(),
+            headers: Vec::new(),
+            body: String::new(),
+            timeout_ms: check.timeout_ms,
+            interval_seconds: check.interval_seconds,
+            degraded_after_ms: None,
+            expected_status: None,
+            assertions: Vec::new(),
+            follow_redirects: true,
+            failure_threshold: check.failure_threshold,
+            active: true,
+        };
+        if let Err(fields) = validate_monitor(&input) {
+            let detail = fields
+                .iter()
+                .map(|(field, message)| format!("{field}: {message}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            return Err(AppError::field("checks", format!("Check \"{name}\": {detail}")));
+        }
+        if checks.iter().any(|known| known.name == name) {
+            return Err(AppError::field("checks", format!("Check \"{name}\" is listed twice.")));
+        }
+        checks.push(repo::AgentCheck {
+            name,
+            check_type: check.check_type,
+            target: input.url,
+            interval_seconds: input.interval_seconds,
+            timeout_ms: input.timeout_ms,
+            failure_threshold: input.failure_threshold,
+        });
+    }
+    let ids = repo::sync_agent_checks(&state.db, agent.id, &checks, TimestampMillis::now()).await?;
+    Ok(Json(json!({
+        "checks": ids
+            .iter()
+            .map(|(name, id)| json!({ "name": name, "monitor_id": id }))
+            .collect::<Vec<_>>(),
+    })))
+}
+
+async fn agent_heartbeat(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<StatusCode, AppError> {
+    require_agent(&state, &headers).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Deserialize)]
+struct AgentResultBody {
+    monitor_id: Id,
+    #[serde(flatten)]
+    outcome: engine::Outcome,
+}
+
+async fn agent_result(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<AgentResultBody>,
+) -> Result<StatusCode, AppError> {
+    let agent = require_agent(&state, &headers).await?;
+    let monitor = repo::get_monitor(&state.db, body.monitor_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    if monitor.agent_id != Some(agent.id) {
+        return Err(AppError::Forbidden("This monitor does not belong to this agent."));
+    }
+    engine::submit(&state, monitor.id, body.outcome, &agent.name).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize)]
@@ -1100,6 +1290,8 @@ fn materialize(
         next_check_at: previous.map(|monitor| monitor.next_check_at).unwrap_or(now),
         created_at: previous.map(|monitor| monitor.created_at).unwrap_or(now),
         updated_at: now,
+        agent_id: None,
+        check_type: None,
     }
 }
 
@@ -1267,6 +1459,24 @@ async fn channel_view(
     let monitors = repo::channel_monitors(&state.db, channel.id).await?;
     let deliveries = repo::recent_deliveries(&state.db, channel.id).await?;
     Ok(present::channel_response(&channel, monitors, deliveries))
+}
+
+fn reject_agent_monitor(monitor: &Monitor, reason: &str) -> Result<(), AppError> {
+    match monitor.agent_id {
+        Some(_) => Err(AppError::Conflict(reason.to_owned())),
+        None => Ok(()),
+    }
+}
+
+async fn require_agent(state: &AppState, headers: &HeaderMap) -> Result<Agent, AppError> {
+    let token = headers
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or(AppError::Unauthorized)?;
+    repo::authenticate_agent(&state.db, &hash_token(token.trim()), TimestampMillis::now())
+        .await?
+        .ok_or(AppError::Unauthorized)
 }
 
 async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {

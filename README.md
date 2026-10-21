@@ -14,6 +14,7 @@ Status is a self-hosted status page, incident desk, and uptime monitor from [coo
 - Incidents with the OpenStatus timeline: investigating, identified, monitoring, resolved.
 - Maintenance windows. Checks inside a window are stored and are not counted as downtime.
 - Notifications. Email (SMTP) and signed webhooks work now. Slack and Discord are incoming-webhook channels on the same interface.
+- Agents for private networks. An agent runs checks on targets that only a VPC or Docker network can reach, such as an internal database.
 
 ## Run it
 
@@ -107,6 +108,49 @@ docker run --rm -p 8080:8080 -v status-data:/var/lib/status status:local
 ```
 
 The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/status`, and uses `status healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service.
+
+## Agents
+
+An agent checks targets that the Status server cannot reach, for example a database on a private Docker network or a host in a VPC. The agent is the same binary. You start it on the target server or in the same network. It makes only outbound HTTPS requests to the server, so you do not need to open a port into the private network.
+
+The checks are in a config file on the agent host. The server cannot add or change agent checks, so a compromised dashboard cannot make an agent connect to other hosts. Passwords stay on the agent host. The agent judges each check and sends only the status, the status code, the latency, and the error. It never sends a response body.
+
+1. In the web app, open **Agents** and create an agent. Copy the token. The token is shown once.
+2. Write the config file, for example `/etc/status/agent.toml`:
+
+   ```toml
+   [[check]]
+   name = "Main DB"
+   type = "postgres"            # http, tcp, postgres, mysql, redis
+   target = "localhost:5432"    # a URL for http
+   user = "status"
+   password_env = "PG_PASSWORD" # the name of an environment variable, not the password
+   database = "app"
+   interval = 30                # seconds, 15 or more, default 60
+   ```
+
+   | Key | Types | Default |
+   |---|---|---|
+   | `name`, `type`, `target` | all | required |
+   | `interval`, `timeout` (seconds), `failure_threshold` | all | 60, 10, 3 |
+   | `degraded_after_ms` | all | none |
+   | `user`, `password_env`, `database` | postgres, mysql (`user` required); redis (`user` and `password_env` optional) | none |
+   | `expected_status`, `body_contains` | http | 2xx, none |
+
+   A `postgres` or `mysql` check logs in and runs `SELECT 1`. A `redis` check sends `AUTH` when a password is set, then `PING`. Redis over TLS is not supported.
+3. Start the agent:
+
+   ```bash
+   PG_PASSWORD=... status agent --server https://status.example.com --token <token> --config /etc/status/agent.toml
+   ```
+
+   The command also reads `STATUS_AGENT_SERVER`, `STATUS_AGENT_TOKEN`, and `STATUS_AGENT_CONFIG`. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
+
+When the agent starts, it sends its list of checks to the server, without secrets. The server creates a monitor for each new check name, updates the monitors that already exist, and pauses the monitors of checks that are no longer in the file. History stays. To change a check, edit the file and restart the agent. The agent stops at once when the server rejects the token or the config, and it shows the reason.
+
+The server records each result with the agent name as the region, and opens or resolves incidents as it does for its own checks. In the dashboard you can pause, resume, and delete agent monitors, and add them to status pages, but you cannot edit them or run them. The agent sends a heartbeat every 15 seconds. It shows as offline when the server has not heard from it for 30 seconds. While an agent is offline, its monitors keep their last state. The agent uses `STATUS_CONNECTIVITY_TARGETS` in the same way as the server: when its own host has no network, it does not send failed checks.
+
+You cannot delete an agent while it has monitors.
 
 ## How this maps to Orbit
 

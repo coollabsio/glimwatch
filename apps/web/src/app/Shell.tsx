@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  Network,
   Radio,
   Settings,
   Siren,
@@ -37,7 +38,10 @@ const groups = [
   },
   {
     label: "Manage",
-    links: [{ to: "/settings", label: "Settings", icon: Settings }],
+    links: [
+      { to: "/agents", label: "Agents", icon: Network },
+      { to: "/settings", label: "Settings", icon: Settings },
+    ],
   },
 ];
 

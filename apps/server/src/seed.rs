@@ -181,6 +181,8 @@ fn monitor(
         next_check_at: now,
         created_at: TimestampMillis::from_millis(now.as_millis() - 90 * 86_400_000),
         updated_at: now,
+        agent_id: None,
+        check_type: None,
     }
 }
 

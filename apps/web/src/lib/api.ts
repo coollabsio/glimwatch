@@ -42,6 +42,7 @@ export type Check = {
   status_code: number | null;
   latency_ms: number;
   error: string | null;
+  region: string;
   checked_at: string;
 };
 
@@ -53,6 +54,7 @@ export type Monitor = {
   name: string;
   description: string;
   job_type: "http" | "tcp";
+  check_type: "http" | "tcp" | "postgres" | "mysql" | "redis";
   url: string;
   method: string;
   headers: HeaderPair[];
@@ -65,6 +67,7 @@ export type Monitor = {
   follow_redirects: boolean;
   failure_threshold: number;
   active: boolean;
+  agent_id: string | null;
   state: "pending" | "up" | "degraded" | "down";
   consecutive_failures: number;
   last_checked_at: string | null;
@@ -77,6 +80,24 @@ export type Monitor = {
   bars: Bar[];
   recent?: Check[];
 };
+
+export type Agent = {
+  id: string;
+  name: string;
+  last_seen_at: string | null;
+  online: boolean;
+  monitor_count: number;
+  created_at: string;
+};
+
+export type CreatedAgent = Agent & { token: string };
+
+export const listAgents = () => api<Agent[]>("/api/agents");
+
+export const createAgent = (name: string) =>
+  api<CreatedAgent>("/api/agents", { method: "POST", body: JSON.stringify({ name }) });
+
+export const deleteAgent = (id: string) => api<void>(`/api/agents/${id}`, { method: "DELETE" });
 
 export type Component = {
   id: string;

@@ -2,13 +2,13 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
 use status_domain::{
-    Assertion, CheckStatus, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
+    Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus, JobType,
     MonitorState, PageBanner, summarize,
 };
 use status_platform::{Id, TimestampMillis};
 
 use crate::repo::{
-    Audit, Channel, CheckRow, Component, DailyRow, Delivery, Incident, IncidentUpdate, Maintenance,
+    self, Audit, Channel, CheckRow, Component, DailyRow, Delivery, Incident, IncidentUpdate, Maintenance,
     Monitor, Page, StatusCount, User,
 };
 
@@ -47,6 +47,8 @@ pub struct CheckResponse {
     pub status_code: Option<i64>,
     pub latency_ms: i64,
     pub error: Option<String>,
+    /// `local` for this server, or the name of the agent that ran the check.
+    pub region: String,
     pub checked_at: TimestampMillis,
 }
 
@@ -73,6 +75,8 @@ pub struct MonitorResponse {
     pub last_checked_at: Option<TimestampMillis>,
     pub next_check_at: TimestampMillis,
     pub created_at: TimestampMillis,
+    pub agent_id: Option<Id>,
+    pub check_type: CheckType,
     pub uptime_24h: Option<f64>,
     pub uptime_30d: Option<f64>,
     pub uptime_90d: Option<f64>,
@@ -126,6 +130,11 @@ pub fn monitor_response(
         last_checked_at: monitor.last_checked_at,
         next_check_at: monitor.next_check_at,
         created_at: monitor.created_at,
+        agent_id: monitor.agent_id,
+        check_type: monitor.check_type.unwrap_or(match monitor.job_type {
+            JobType::Http => CheckType::Http,
+            JobType::Tcp => CheckType::Tcp,
+        }),
         uptime_24h: uptime_24h(stats.counts, monitor.id).or(long_window_today(&mine, today)),
         uptime_30d: mid.uptime_ratio,
         uptime_90d: long.uptime_ratio,
@@ -185,6 +194,7 @@ fn check_response(check: CheckRow) -> CheckResponse {
         status_code: check.status_code,
         latency_ms: check.latency_ms,
         error: check.error,
+        region: check.region,
         checked_at: check.checked_at,
     }
 }
@@ -403,4 +413,33 @@ pub struct PublicPage {
 
 pub fn banner_label(banner: PageBanner) -> &'static str {
     banner.as_str()
+}
+
+/// An agent counts as online when it polled within this window. Agents poll every 5 s.
+const AGENT_ONLINE_MS: i64 = 30_000;
+
+#[derive(Serialize)]
+pub struct AgentResponse {
+    pub id: Id,
+    pub name: String,
+    pub last_seen_at: Option<TimestampMillis>,
+    pub online: bool,
+    pub monitor_count: i64,
+    pub created_at: TimestampMillis,
+}
+
+impl From<&repo::Agent> for AgentResponse {
+    fn from(agent: &repo::Agent) -> Self {
+        let now = TimestampMillis::now().as_millis();
+        Self {
+            id: agent.id,
+            name: agent.name.clone(),
+            last_seen_at: agent.last_seen_at,
+            online: agent
+                .last_seen_at
+                .is_some_and(|seen| now - seen.as_millis() < AGENT_ONLINE_MS),
+            monitor_count: agent.monitor_count,
+            created_at: agent.created_at,
+        }
+    }
 }

@@ -3,7 +3,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { LatencyChart, UptimeBars } from "@/components/charts";
 import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
-import { ApiError, api, type Assertion, type Monitor } from "@/lib/api";
+import { ApiError, api, type Assertion, listAgents, type Monitor } from "@/lib/api";
 import { formatTime, percent, stateLabel, timeAgo } from "@/lib/utils";
 
 type Draft = {
@@ -80,12 +80,13 @@ function payload(draft: Draft) {
 
 export function MonitorsPage() {
   const query = useQuery({ queryKey: ["monitors"], queryFn: () => api<Monitor[]>("/api/monitors"), refetchInterval: 10_000 });
+  const label = useMonitorLabel();
   const [open, setOpen] = useState(false);
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Monitors"
-        description="HTTP and TCP checks from this server."
+        description="HTTP and TCP checks from this server. Agents add checks from their own config files."
         actions={<Button variant="primary" onClick={() => setOpen(true)}>New monitor</Button>}
       />
       {query.isLoading ? <p className="text-[13px] text-[var(--coollabs-subtle)]">Loading monitors…</p> : null}
@@ -108,7 +109,7 @@ export function MonitorsPage() {
                 <tr key={monitor.id}>
                   <td>
                     <Link className="font-medium text-[var(--color-fg)]" to={`/monitors/${monitor.id}`}>{monitor.name}</Link>
-                    <div className="text-[11px] text-[var(--coollabs-subtle)]">{monitor.job_type.toUpperCase()} · {monitor.url}</div>
+                    <div className="text-[11px] text-[var(--coollabs-subtle)]">{label(monitor)}</div>
                   </td>
                   <td><StatusBadge tone={monitor.state === "up" ? "success" : monitor.state === "down" ? "error" : monitor.state === "degraded" ? "warning" : "neutral"}>{stateLabel[monitor.state]}</StatusBadge></td>
                   <td className="hidden md:table-cell">{percent(monitor.uptime_24h)}</td>
@@ -135,6 +136,7 @@ export function MonitorDetailPage() {
     queryFn: () => api<Monitor>(`/api/monitors/${id}`),
     refetchInterval: 10_000,
   });
+  const label = useMonitorLabel();
   const run = useMutation({
     mutationFn: () => api<Monitor>(`/api/monitors/${id}/checks`, { method: "POST" }),
     onSuccess: (monitor) => client.setQueryData(["monitor", id], monitor),
@@ -156,18 +158,21 @@ export function MonitorDetailPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={monitor.name}
-        description={`${monitor.job_type.toUpperCase()} ${monitor.url}`}
+        description={label(monitor)}
         actions={
           <>
             <StatusBadge tone={monitor.active ? stateToneName : "neutral"}>{monitor.active ? stateLabel[monitor.state] : "Paused"}</StatusBadge>
-            <Button variant="primary" onClick={() => run.mutate()} disabled={run.isPending}>{run.isPending ? "Checking…" : "Run check"}</Button>
+            {monitor.agent_id ? null : <Button variant="primary" onClick={() => run.mutate()} disabled={run.isPending}>{run.isPending ? "Checking…" : "Run check"}</Button>}
             <Button onClick={() => pause.mutate(!monitor.active)}>{monitor.active ? "Pause" : "Resume"}</Button>
-            <Button onClick={() => setEditing(true)}>Edit</Button>
+            {monitor.agent_id ? null : <Button onClick={() => setEditing(true)}>Edit</Button>}
             <Button variant="danger" onClick={() => remove.mutate()}>Delete</Button>
           </>
         }
       />
       <ErrorText error={run.error || pause.error || remove.error} />
+      {monitor.agent_id ? (
+        <p className="text-[13px] text-[var(--coollabs-subtle)]">This check is defined in the agent's config file. Change it there and restart the agent.</p>
+      ) : null}
       <div className="grid gap-4 sm:grid-cols-4">
         <Stat label="Today" value={percent(monitor.uptime_24h)} />
         <Stat label="30 days" value={percent(monitor.uptime_30d)} />
@@ -192,6 +197,7 @@ export function MonitorDetailPage() {
                 <th>Status</th>
                 <th>Latency</th>
                 <th>Error</th>
+                <th>From</th>
                 <th>When</th>
               </tr>
             </thead>
@@ -202,6 +208,7 @@ export function MonitorDetailPage() {
                   <td>{check.status_code ?? "-"}</td>
                   <td>{check.latency_ms} ms</td>
                   <td>{check.error ?? ""}</td>
+                  <td>{check.region === "local" ? "This server" : check.region}</td>
                   <td>{formatTime(check.checked_at)}</td>
                 </tr>
               ))}
@@ -209,9 +216,19 @@ export function MonitorDetailPage() {
           </table>
         </div>
       </LayerCard>
-      <MonitorDialog open={editing} onClose={() => setEditing(false)} monitor={monitor} />
+      {monitor.agent_id ? null : <MonitorDialog open={editing} onClose={() => setEditing(false)} monitor={monitor} />}
     </div>
   );
+}
+
+function useMonitorLabel() {
+  const agents = useQuery({ queryKey: ["agents"], queryFn: listAgents });
+  return (monitor: Monitor) => {
+    const base = `${monitor.check_type.toUpperCase()} · ${monitor.url}`;
+    if (!monitor.agent_id) return base;
+    const agent = agents.data?.find((agent) => agent.id === monitor.agent_id)?.name ?? "unknown";
+    return `${base} · agent ${agent}`;
+  };
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

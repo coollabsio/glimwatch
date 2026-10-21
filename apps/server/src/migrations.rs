@@ -32,6 +32,7 @@ pub fn runner() -> MigrationRunner {
                 include_str!("../migrations/0007_notifications.sql"),
             ),
             Migration::new(8, "audit", include_str!("../migrations/0008_audit.sql")),
+            Migration::new(9, "agents", include_str!("../migrations/0009_agents.sql")),
         ],
     )
 }
