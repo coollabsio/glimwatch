@@ -79,6 +79,7 @@ pub fn router(state: AppState) -> Router {
         .route("/notifications/{id}/test", post(test_channel))
         .route("/public/{slug}", get(public_page))
         .merge(crate::insights::api_routes())
+        .merge(crate::errors::api_routes())
         .fallback(api_missing);
     Router::new()
         .nest("/api", api)

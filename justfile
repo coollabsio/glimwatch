@@ -30,6 +30,6 @@ build:
     cd apps/web && bun run build
     cargo build --release -p haruvo-server
 
-# Demo account, monitors, status page, analytics site, and short links.
+# Demo account, monitors, status page, analytics site, short links, and error events.
 seed:
     cargo run -p haruvo-server -- seed

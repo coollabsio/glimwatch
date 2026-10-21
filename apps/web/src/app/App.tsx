@@ -7,7 +7,10 @@ import { AgentsPage } from "@/pages/agents";
 import { AnalyticsPage, VisitorPage } from "@/pages/analytics";
 import { DashboardPage } from "@/pages/dashboard";
 import { LinkDetailPage, LinksPage } from "@/pages/links";
+import { ErrorProjectsPage, ProjectDetailPage } from "@/pages/error-projects";
 import { IncidentDetailPage, IncidentsPage } from "@/pages/incidents";
+import { IssueDetailPage } from "@/pages/issue-detail";
+import { IssuesPage } from "@/pages/issues";
 import { MaintenancePage } from "@/pages/maintenance";
 import { MonitorDetailPage, MonitorsPage } from "@/pages/monitors";
 import { NotificationsPage } from "@/pages/notifications";
@@ -58,6 +61,11 @@ export function App() {
           <Route path="analytics/:siteId/visitors/:visitorId" element={<VisitorPage />} />
           <Route path="links" element={<LinksPage />} />
           <Route path="links/:linkId" element={<LinkDetailPage />} />
+          <Route path="errors" element={<IssuesPage />} />
+          <Route path="errors/:id" element={<IssueDetailPage />} />
+          <Route path="errors/:id/events/:eventId" element={<IssueDetailPage />} />
+          <Route path="error-projects" element={<ErrorProjectsPage />} />
+          <Route path="error-projects/:id" element={<ProjectDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Route>

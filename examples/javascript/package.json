@@ -1,0 +1,14 @@
+{
+  "name": "haruvo-javascript-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "node": "node node-error.mjs",
+    "browser": "node serve.mjs"
+  },
+  "dependencies": {
+    "@sentry/browser": "^10.12.0",
+    "@sentry/node": "^10.12.0",
+    "esbuild": "^0.25.10"
+  }
+}

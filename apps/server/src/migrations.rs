@@ -38,6 +38,7 @@ pub fn runner() -> MigrationRunner {
                 "insights",
                 include_str!("../migrations/0010_insights.sql"),
             ),
+            Migration::new(11, "errors", include_str!("../migrations/0011_errors.sql")),
         ],
     )
 }

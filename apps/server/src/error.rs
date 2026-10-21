@@ -15,6 +15,7 @@ pub enum AppError {
     /// The Haruvo host has no network, so a failed check proves nothing.
     Offline,
     Conflict(String),
+    BadRequest(String),
     Validation(BTreeMap<String, String>),
     TooManyRequests,
     Internal,
@@ -40,6 +41,7 @@ impl std::fmt::Display for AppError {
             Self::Busy => formatter.write_str("check already running"),
             Self::Offline => formatter.write_str("status host has no network"),
             Self::Conflict(detail) => write!(formatter, "conflict: {detail}"),
+            Self::BadRequest(detail) => write!(formatter, "bad request: {detail}"),
             Self::Validation(_) => formatter.write_str("validation failed"),
             Self::TooManyRequests => formatter.write_str("too many requests"),
             Self::Internal => formatter.write_str("internal error"),
@@ -93,6 +95,14 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::Conflict(detail) => Problem::conflict(detail),
+            Self::BadRequest(detail) => Problem {
+                type_uri: "https://haruvo.io/problems/bad-request".to_owned(),
+                title: "Bad request".to_owned(),
+                status: 400,
+                code: "bad_request".to_owned(),
+                detail,
+                fields: None,
+            },
             Self::Validation(fields) => Problem::validation(fields),
             Self::Internal => Problem::internal(),
         };

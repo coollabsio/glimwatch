@@ -133,6 +133,7 @@ pub async fn seed(state: &AppState) -> Result<bool, AppError> {
     };
     repo::insert_channel(&state.db, &channel, &[]).await?;
     crate::insights::seed_demo(state).await?;
+    crate::errors::seed_demo(state).await?;
     let _ = repo::insert_audit(
         &state.db,
         Some(user_id),

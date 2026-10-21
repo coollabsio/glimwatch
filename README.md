@@ -17,6 +17,7 @@ Haruvo is a self-hosted status page, incident desk, and uptime monitor from [coo
 - Agents for private networks. An agent runs checks on targets that only a VPC or Docker network can reach, such as an internal database.
 - Cookieless web analytics. A site gets a public id and a `/data.js` snippet. Page views, custom events, and Core Web Vitals are grouped without cookies. The client address is hashed into a visitor id and is not stored.
 - A link shortener. Links live on a hostname you add, and also at `/go/{slug}` on this server, with click counts, referrers, and an optional public page.
+- Error tracking. Create a project, copy its Sentry DSN, and point an official Sentry SDK at it. Issues group on a fingerprint, with a short id such as `CHECKOUT-1`, stack traces, breadcrumbs, tags, and the raw event.
 
 ## Run it
 
@@ -34,7 +35,7 @@ Open http://127.0.0.1:43123.
 
 - email `test@example.com`
 - password `password`
-- a coolLabs status page, a demo analytics site (`coolify.io`, public id `pub_coollabs_demo`), and short links at `/go/coolify` and `/go/docs`
+- a coolLabs status page, a demo analytics site (`coolify.io`, public id `pub_coollabs_demo`), short links at `/go/coolify` and `/go/docs`, and demo error projects (`Checkout`, `API`) with sample events
 
 `just dev` runs `seed` before it starts the server.
 
@@ -156,6 +157,20 @@ When the agent starts, it sends its list of checks to the server, without secret
 The server records each result with the agent name as the region, and opens or resolves incidents as it does for its own checks. In the dashboard you can pause, resume, and delete agent monitors, and add them to status pages, but you cannot edit them or run them. The agent sends a heartbeat every 15 seconds. It shows as offline when the server has not heard from it for 30 seconds. While an agent is offline, its monitors keep their last state. The agent uses `HARUVO_CONNECTIVITY_TARGETS` in the same way as the server: when its own host has no network, it does not send failed checks.
 
 You cannot delete an agent while it has monitors.
+
+## Errors
+
+**Issues** is the feed (unresolved, resolved, ignored, search, environment, sparkline). Open an issue for the histogram, tags, event navigation, stack trace, breadcrumbs, contexts, and raw JSON. A new event reopens a resolved issue. **Projects** shows the DSN:
+
+```text
+http://<public_key>@127.0.0.1:43123/<project_id>
+```
+
+SDKs post to `/api/<project_id>/envelope/` and `/api/<project_id>/store/` (with or without the trailing slash). Auth is `X-Sentry-Auth`, `Authorization: Sentry sentry_key=...`, or `?sentry_key=`. Gzip and deflate bodies are accepted. Those routes answer CORS preflight and do not use the dashboard cookie. `/api/<project_id>/security/` is accepted and ignored. Performance items, sessions, and client reports in an envelope are ignored so the SDK still gets HTTP 200.
+
+`examples/` has PHP, Node, browser, and Rust SDK programs. Set `SENTRY_DSN` to the project DSN.
+
+Short-link hostnames only take over a request when the `Host` is a configured link domain and not Haruvo's own origin, and only after `/api` and `/go` have already been routed. Sentry ingest stays on `/api/...`.
 
 ## Analytics
 

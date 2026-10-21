@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
+  Bug,
+  Boxes,
   Bell,
   CalendarClock,
   LayoutDashboard,
@@ -36,6 +38,13 @@ const groups = [
       { to: "/incidents", label: "Incidents", icon: Siren },
       { to: "/maintenance", label: "Maintenance", icon: CalendarClock },
       { to: "/notifications", label: "Notifications", icon: Bell },
+    ],
+  },
+  {
+    label: "Errors",
+    links: [
+      { to: "/errors", label: "Issues", icon: Bug },
+      { to: "/error-projects", label: "Projects", icon: Boxes },
     ],
   },
   {
@@ -86,7 +95,9 @@ export function Shell() {
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const section = groups.flatMap((group) => group.links).find((link) =>
-    link.end ? location.pathname === "/" : location.pathname.startsWith(link.to),
+    link.end
+      ? location.pathname === link.to
+      : location.pathname === link.to || location.pathname.startsWith(`${link.to}/`),
   );
 
   async function logout() {

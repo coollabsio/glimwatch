@@ -289,3 +289,117 @@ export type PublicInsight = {
   to: number;
   series: InsightPoint[];
 };
+
+export type Project = {
+  id: string;
+  name: string;
+  slug: string;
+  platform: string;
+  publicKey: string;
+  dsn: string;
+  createdAt: string;
+};
+
+export type Issue = {
+  id: string;
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  shortId: string;
+  title: string;
+  culprit?: string | null;
+  status: "unresolved" | "resolved" | "ignored";
+  level: string;
+  platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
+  firstSeen: string;
+  lastSeen: string;
+  eventCount: number;
+  unhandled: boolean;
+  priority: string;
+  userCount: number;
+  periodEventCount: number;
+  trend24h: number[];
+  trend14d: number[];
+};
+
+export type IssueFeed = {
+  issues: Issue[];
+  environments: string[];
+};
+
+export type TagCount = { key: string; value: string; count: number };
+
+export type EventSummary = {
+  id: string;
+  timestamp: string;
+  level: string;
+  title: string;
+  environment?: string | null;
+  release?: string | null;
+};
+
+export type Frame = {
+  filename?: string | null;
+  absPath?: string | null;
+  function?: string | null;
+  module?: string | null;
+  lineno?: number | null;
+  colno?: number | null;
+  contextLine?: string | null;
+  preContext: string[];
+  postContext: string[];
+  inApp: boolean;
+};
+
+export type ExceptionInfo = {
+  type?: string | null;
+  value?: string | null;
+  mechanism?: string | null;
+  handled?: boolean | null;
+  frames: Frame[];
+};
+
+export type Breadcrumb = {
+  timestamp?: string | null;
+  type?: string | null;
+  category?: string | null;
+  level?: string | null;
+  message?: string | null;
+  data: Record<string, unknown>;
+};
+
+export type NormalizedEvent = {
+  eventId: string;
+  timestamp: string;
+  level: string;
+  title: string;
+  message?: string | null;
+  culprit?: string | null;
+  platform?: string | null;
+  environment?: string | null;
+  release?: string | null;
+  serverName?: string | null;
+  transaction?: string | null;
+  logger?: string | null;
+  fingerprint: string;
+  sdk?: { name: string; version: string } | null;
+  exceptions: ExceptionInfo[];
+  breadcrumbs: Breadcrumb[];
+  tags: { key: string; value: string }[];
+  contexts: Record<string, unknown>;
+  user: Record<string, unknown>;
+  request: Record<string, unknown>;
+  extra: Record<string, unknown>;
+  raw: unknown;
+};
+
+export type IssueDetail = Issue & {
+  events: EventSummary[];
+  latest: NormalizedEvent | null;
+  histogram: number[];
+  periodEvents: number;
+  users: number;
+  tags: TagCount[];
+};
