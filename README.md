@@ -15,6 +15,8 @@ Haruvo is a self-hosted status page, incident desk, and uptime monitor from [coo
 - Maintenance windows. Checks inside a window are stored and are not counted as downtime.
 - Notifications. Email (SMTP) and signed webhooks work now. Slack and Discord are incoming-webhook channels on the same interface.
 - Agents for private networks. An agent runs checks on targets that only a VPC or Docker network can reach, such as an internal database.
+- Cookieless web analytics. A site gets a public id and a `/data.js` snippet. Page views, custom events, and Core Web Vitals are grouped without cookies. The client address is hashed into a visitor id and is not stored.
+- A link shortener. Links live on a hostname you add, and also at `/go/{slug}` on this server, with click counts, referrers, and an optional public page.
 
 ## Run it
 
@@ -32,6 +34,7 @@ Open http://127.0.0.1:43123.
 
 - email `test@example.com`
 - password `password`
+- a coolLabs status page, a demo analytics site (`coolify.io`, public id `pub_coollabs_demo`), and short links at `/go/coolify` and `/go/docs`
 
 `just dev` runs `seed` before it starts the server.
 
@@ -154,6 +157,31 @@ The server records each result with the agent name as the region, and opens or r
 
 You cannot delete an agent while it has monitors.
 
+## Analytics
+
+Add a site in **Sites**, then paste the snippet from **Tracker**:
+
+```html
+<script defer src="https://haruvo.example.com/data.js" data-site="YOUR_PUBLIC_ID"></script>
+```
+
+The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.haruvoEvent(name, data)` records a custom event. `window.beaconEvent` is the same function, so a snippet written for [Beacon](https://github.com/ShadowArcanist/beacons) still works.
+
+Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `HARUVO_PROXY_HOPS` when Haruvo sits behind a reverse proxy (`1` for one proxy, `2` when Cloudflare is in front, which also enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). Point `HARUVO_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
+
+Short links redirect with `307` or `308` and `Cache-Control: no-store`. On Haruvo's own hostname use `/go/{slug}`. On any other hostname that you added under **Links**, the path is the slug. `HEAD` requests and known bots follow the redirect and are not counted.
+
+When public sharing is on, these routes need no session. Counts below the site's threshold are folded into **Other**:
+
+```text
+GET /api/public/sites/{slug}/overview?from=<unix>&to=<unix>
+GET /api/public/sites/{slug}/{path|referrer|country|browser|os|device}
+GET /api/public/links/{slug}/overview
+GET /api/public/links/{slug}/{referrer|country|browser|os|device}
+```
+
+The matching pages are `/share/sites/{slug}` and `/share/links/{slug}`.
+
 ## How this maps to Orbit
 
 Haruvo follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves out its realtime stack (websockets, live sync, collaborative editing).
@@ -180,10 +208,15 @@ The interface takes Coolify's dark shell and pink primary action, which Orbit al
 apps/server     API, scheduler, checker, repositories, migrations
 apps/web        React dashboard and public status page
 crates/platform Config, SQLite/Postgres pool, migrations, passwords, ids
-crates/status  Assertions, state machine, uptime, slugs, notification signing
-deploy          Docker Compose
+crates/status    Assertions, state machine, uptime, slugs, notification signing
+crates/insights  Cookieless visitor ids, URL parsing, user-agent classification
+deploy           Docker Compose
 ```
+
+## Attribution
+
+Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is that script with the Haruvo event name added. See [NOTICE](NOTICE).
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE). Third-party MIT terms for the tracker are in [NOTICE](NOTICE).

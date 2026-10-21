@@ -16,6 +16,7 @@ pub enum AppError {
     Offline,
     Conflict(String),
     Validation(BTreeMap<String, String>),
+    TooManyRequests,
     Internal,
 }
 
@@ -40,6 +41,7 @@ impl std::fmt::Display for AppError {
             Self::Offline => formatter.write_str("status host has no network"),
             Self::Conflict(detail) => write!(formatter, "conflict: {detail}"),
             Self::Validation(_) => formatter.write_str("validation failed"),
+            Self::TooManyRequests => formatter.write_str("too many requests"),
             Self::Internal => formatter.write_str("internal error"),
         }
     }
@@ -73,6 +75,14 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::NotFound => Problem::not_found(),
+            Self::TooManyRequests => Problem {
+                type_uri: "https://haruvo.io/problems/too-many-requests".to_owned(),
+                title: "Too many requests".to_owned(),
+                status: 429,
+                code: "too_many_requests".to_owned(),
+                detail: "Slow down and try again.".to_owned(),
+                fields: None,
+            },
             Self::Busy => Problem::conflict("A check is already running for this monitor."),
             Self::Offline => Problem {
                 type_uri: "https://haruvo.io/problems/host-offline".to_owned(),

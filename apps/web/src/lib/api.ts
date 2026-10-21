@@ -203,5 +203,89 @@ export type Meta = {
   version: string;
   signup_open: boolean;
   database: string;
+  public_origin: string;
   demo: { email: string; password: string } | null;
+};
+
+export type InsightSite = {
+  id: string;
+  public_id: string;
+  name: string;
+  domain: string;
+  color: string;
+  public_slug: string;
+  public_enabled: boolean;
+  public_threshold: number;
+  public_sections: string[];
+  created_at: number;
+};
+
+export type InsightPoint = {
+  day: number;
+  views?: number;
+  visitors?: number;
+  events?: number;
+  visits?: number;
+  bounces?: number;
+  time?: number;
+  clicks?: number;
+};
+
+export type InsightOverview = {
+  pageviews: number;
+  visitors: number;
+  events: number;
+  visits: number;
+  bounces: number;
+  total_time: number;
+  from: number;
+  to: number;
+  series: InsightPoint[];
+};
+
+export type InsightRow = { label: string; count: number; visitors?: number };
+
+export type InsightDomain = {
+  id: string;
+  site_id: string | null;
+  hostname: string;
+  note: string;
+  enabled: boolean;
+  created_at: number;
+};
+
+export type InsightLink = {
+  id: string;
+  domain_id: string;
+  hostname: string;
+  slug: string;
+  destination: string;
+  redirect_type: "temporary" | "permanent";
+  enabled: boolean;
+  public_slug: string;
+  public_enabled: boolean;
+  public_threshold: number;
+  public_sections: string[];
+  created_at: number;
+  total_clicks: number;
+};
+
+export type LinkOverview = {
+  clicks: number;
+  visitors: number;
+  from: number;
+  to: number;
+  series: InsightPoint[];
+};
+
+export type PublicInsight = {
+  name: string;
+  subtitle: string;
+  sections: string[];
+  pageviews?: number | null;
+  clicks?: number | null;
+  visitors: number | null;
+  from: number;
+  to: number;
+  series: InsightPoint[];
 };

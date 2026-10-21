@@ -19,6 +19,10 @@ pub struct AppState {
     pub scheduler_id: String,
     pub inflight: Inflight,
     pub connectivity: Connectivity,
+    pub insights_secret: String,
+    pub collector_limit: Arc<crate::insights::RateLimiter>,
+    pub public_limit: Arc<crate::insights::RateLimiter>,
+    pub geo: Option<Arc<maxminddb::Reader<Vec<u8>>>>,
 }
 
 #[derive(Clone)]
@@ -86,6 +90,9 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
     let applied = migrations::runner().run(&database).await?;
     tracing::info!(applied, backend = config.backend_name(), "database ready");
     let passwords = PasswordService::new(config.argon_memory_kib)?;
+    let insights = crate::insights::prepare(&database, &config)
+        .await
+        .map_err(|error| BootError::Config(error.to_string()))?;
     Ok(AppState {
         db: database,
         http: HttpClients::new()?,
@@ -93,6 +100,10 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
         inflight: Inflight::default(),
         connectivity: Connectivity::new(config.connectivity_targets.clone()),
         passwords,
+        insights_secret: insights.secret,
+        collector_limit: insights.collector_limit,
+        public_limit: insights.public_limit,
+        geo: insights.geo,
         config: Arc::new(config),
     })
 }
@@ -131,6 +142,8 @@ pub fn testing_config(path: PathBuf) -> Config {
         smtp: None,
         argon_memory_kib: 32,
         connectivity_targets: Vec::new(),
+        proxy_hops: 0,
+        geoip_path: None,
     }
 }
 

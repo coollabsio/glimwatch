@@ -4,6 +4,8 @@ import {
   Bell,
   CalendarClock,
   LayoutDashboard,
+  LineChart,
+  Link2,
   LogOut,
   Menu,
   Moon,
@@ -34,6 +36,13 @@ const groups = [
       { to: "/incidents", label: "Incidents", icon: Siren },
       { to: "/maintenance", label: "Maintenance", icon: CalendarClock },
       { to: "/notifications", label: "Notifications", icon: Bell },
+    ],
+  },
+  {
+    label: "Analytics",
+    links: [
+      { to: "/analytics", label: "Sites", icon: LineChart },
+      { to: "/links", label: "Links", icon: Link2 },
     ],
   },
   {

@@ -9,6 +9,7 @@ mod cli;
 mod connectivity;
 mod engine;
 mod error;
+mod insights;
 mod migrations;
 mod notify;
 mod present;

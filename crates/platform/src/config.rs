@@ -20,6 +20,8 @@ const SMTP_PASSWORD: &str = "HARUVO_SMTP_PASSWORD";
 const SMTP_FROM: &str = "HARUVO_SMTP_FROM";
 const ARGON_MEMORY: &str = "HARUVO_ARGON_MEMORY_KIB";
 const CONNECTIVITY_TARGETS: &str = "HARUVO_CONNECTIVITY_TARGETS";
+const PROXY_HOPS: &str = "HARUVO_PROXY_HOPS";
+const GEOIP_PATH: &str = "HARUVO_GEOIP_PATH";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -35,6 +37,10 @@ pub struct Config {
     /// `host:port` targets that prove the Haruvo host itself has network.
     /// Empty disables the check.
     pub connectivity_targets: Vec<String>,
+    /// Trusted reverse proxies in front of Haruvo. `0` means the socket address is the client.
+    pub proxy_hops: usize,
+    /// Optional MaxMind or DB-IP city database (`.mmdb`) for analytics geolocation.
+    pub geoip_path: Option<PathBuf>,
 }
 
 impl Config {
@@ -53,6 +59,8 @@ impl Config {
             connectivity_targets: ["1.1.1.1:443", "8.8.8.8:443", "9.9.9.9:443"]
                 .map(str::to_owned)
                 .to_vec(),
+            proxy_hops: 0,
+            geoip_path: None,
         }
     }
 
@@ -141,6 +149,15 @@ impl Config {
                 name: CONNECTIVITY_TARGETS,
                 value: targets,
             })?;
+        }
+        if let Some(hops) = compat(PROXY_HOPS) {
+            config.proxy_hops = hops.parse().map_err(|_| ConfigError::Invalid {
+                name: PROXY_HOPS,
+                value: hops,
+            })?;
+        }
+        if let Some(path) = compat(GEOIP_PATH) {
+            config.geoip_path = Some(PathBuf::from(path));
         }
         Ok(config)
     }

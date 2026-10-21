@@ -78,10 +78,12 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/notifications/{id}/test", post(test_channel))
         .route("/public/{slug}", get(public_page))
+        .merge(crate::insights::api_routes())
         .fallback(api_missing);
     Router::new()
         .nest("/api", api)
-        .fallback(crate::static_assets::spa)
+        .merge(crate::insights::public_routes())
+        .fallback(crate::insights::fallback)
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -107,6 +109,7 @@ async fn meta(State(state): State<AppState>) -> Json<Value> {
         "version": env!("CARGO_PKG_VERSION"),
         "signup_open": state.config.open_signup,
         "database": state.config.backend_name(),
+        "public_origin": state.config.public_origin,
         "demo": demo,
     }))
 }
