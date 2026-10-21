@@ -1,89 +1,222 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
-  Bug,
-  Boxes,
   Bell,
+  Boxes,
+  Bug,
   CalendarClock,
+  ChevronLeft,
+  ChevronRight,
   LayoutDashboard,
   LineChart,
   Link2,
-  LogOut,
+  type LucideIcon,
   Menu,
-  Moon,
   Network,
   Radio,
   Settings,
   Siren,
-  Sun,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { ProfileMenu } from "@/components/profile-menu";
 import { api, type Meta, type User } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const groups = [
+type NavLinkItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+};
+
+type NavGroup = {
+  label?: string;
+  links: NavLinkItem[];
+};
+
+type Product = {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  groups: NavGroup[];
+};
+
+const products: Product[] = [
   {
-    label: "Workspace",
-    links: [
-      { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
-      { to: "/monitors", label: "Monitors", icon: Activity },
-      { to: "/pages", label: "Status pages", icon: Radio },
+    id: "status",
+    label: "Status",
+    icon: Activity,
+    groups: [
+      {
+        label: "Workspace",
+        links: [
+          { to: "/", label: "Overview", icon: LayoutDashboard, end: true },
+          { to: "/monitors", label: "Monitors", icon: Activity },
+          { to: "/pages", label: "Status pages", icon: Radio },
+        ],
+      },
+      {
+        label: "Operations",
+        links: [
+          { to: "/incidents", label: "Incidents", icon: Siren },
+          { to: "/maintenance", label: "Maintenance", icon: CalendarClock },
+          { to: "/notifications", label: "Notifications", icon: Bell },
+        ],
+      },
     ],
   },
   {
-    label: "Operations",
-    links: [
-      { to: "/incidents", label: "Incidents", icon: Siren },
-      { to: "/maintenance", label: "Maintenance", icon: CalendarClock },
-      { to: "/notifications", label: "Notifications", icon: Bell },
-    ],
-  },
-  {
+    id: "errors",
     label: "Errors",
-    links: [
-      { to: "/errors", label: "Issues", icon: Bug },
-      { to: "/error-projects", label: "Projects", icon: Boxes },
+    icon: Bug,
+    groups: [
+      {
+        links: [
+          { to: "/errors", label: "Issues", icon: Bug },
+          { to: "/error-projects", label: "Projects", icon: Boxes },
+        ],
+      },
     ],
   },
   {
+    id: "analytics",
     label: "Analytics",
-    links: [
-      { to: "/analytics", label: "Sites", icon: LineChart },
-      { to: "/links", label: "Links", icon: Link2 },
-    ],
-  },
-  {
-    label: "Manage",
-    links: [
-      { to: "/agents", label: "Agents", icon: Network },
-      { to: "/settings", label: "Settings", icon: Settings },
+    icon: LineChart,
+    groups: [
+      {
+        links: [
+          { to: "/analytics", label: "Sites", icon: LineChart },
+          { to: "/links", label: "Links", icon: Link2 },
+        ],
+      },
     ],
   },
 ];
 
-function NavItems({ onNavigate }: { onNavigate?: () => void }) {
+const manage: NavLinkItem[] = [
+  { to: "/agents", label: "Agents", icon: Network },
+  { to: "/settings", label: "Settings", icon: Settings },
+];
+
+function linkActive(pathname: string, link: NavLinkItem) {
+  if (link.end || link.to === "/") return pathname === link.to;
+  return pathname === link.to || pathname.startsWith(`${link.to}/`);
+}
+
+function productLinks(product: Product) {
+  return product.groups.flatMap((group) => group.links);
+}
+
+function NavItems({
+  pathname,
+  shown,
+  swap,
+  onOpenProduct,
+  onBack,
+  onNavigate,
+}: {
+  pathname: string;
+  shown: Product | null;
+  swap: "" | "forward" | "back";
+  onOpenProduct: (id: string) => void;
+  onBack: () => void;
+  onNavigate?: () => void;
+}) {
   return (
-    <div className="flex flex-col gap-0.5">
-      {groups.map((group, index) => (
-        <div key={group.label} className={index > 0 ? "mt-3" : undefined}>
-          <div className="nav-section">{group.label}</div>
-          {group.links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.end}
-              onClick={onNavigate}
-              className={({ isActive }) => cn("menu-item", isActive && "menu-item-active")}
+    <ul
+      key={`${shown?.id ?? "root"}-${swap}`}
+      className={cn(
+        "flex flex-col gap-0.5",
+        swap === "forward" && "nav-swap-forward",
+        swap === "back" && "nav-swap-back",
+      )}
+    >
+      {shown ? (
+        <>
+          <li className="mb-1">
+            <button
+              type="button"
+              className="menu-item menu-back"
+              title="Back to the main menu"
+              aria-label="Back to the main menu"
+              onClick={onBack}
             >
-              <link.icon className="menu-item-icon" />
-              <span className="menu-item-label">{link.label}</span>
-            </NavLink>
+              <span className="menu-back-icon">
+                <ChevronLeft className="size-3" />
+              </span>
+              <span className="menu-back-label">{shown.label}</span>
+            </button>
+          </li>
+          {shown.groups.map((group, index) => (
+            <li key={group.label ?? index}>
+              {group.label ? <div className={cn("nav-section", index > 0 && "mt-3")}>{group.label}</div> : null}
+              <ul className="flex flex-col gap-0.5">
+                {group.links.map((link) => (
+                  <li key={link.to}>
+                    <NavLink
+                      to={link.to}
+                      end={link.end}
+                      title={link.label}
+                      onClick={onNavigate}
+                      className={({ isActive }) => cn("menu-item", isActive && "menu-item-active")}
+                    >
+                      <link.icon className="menu-item-icon" />
+                      <span className="menu-item-label">{link.label}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </li>
           ))}
-        </div>
-      ))}
-    </div>
+        </>
+      ) : (
+        <>
+          <li>
+            <div className="nav-section">Products</div>
+            <ul className="flex flex-col gap-0.5">
+              {products.map((product) => {
+                const active = productLinks(product).some((link) => linkActive(pathname, link));
+                return (
+                  <li key={product.id}>
+                    <button
+                      type="button"
+                      className={cn("menu-item", active && "menu-item-active")}
+                      title={product.label}
+                      onClick={() => onOpenProduct(product.id)}
+                    >
+                      <product.icon className="menu-item-icon" />
+                      <span className="menu-item-label">{product.label}</span>
+                      <ChevronRight className="menu-chevron" aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+          <li>
+            <div className="nav-section mt-3">Manage</div>
+            <ul className="flex flex-col gap-0.5">
+              {manage.map((link) => (
+                <li key={link.to}>
+                  <NavLink
+                    to={link.to}
+                    end={link.end}
+                    title={link.label}
+                    onClick={onNavigate}
+                    className={({ isActive }) => cn("menu-item", isActive && "menu-item-active")}
+                  >
+                    <link.icon className="menu-item-icon" />
+                    <span className="menu-item-label">{link.label}</span>
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </li>
+        </>
+      )}
+    </ul>
   );
 }
 
@@ -93,23 +226,44 @@ export function Shell() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => api<User>("/api/auth/me") });
   const meta = useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/api/meta") });
   const [open, setOpen] = useState(false);
-  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
-  const section = groups.flatMap((group) => group.links).find((link) =>
-    link.end
-      ? location.pathname === link.to
-      : location.pathname === link.to || location.pathname.startsWith(`${link.to}/`),
+  const [pinned, setPinned] = useState<string | "root" | null>(null);
+  const [swap, setSwap] = useState<"" | "forward" | "back">("");
+  const routeProduct = products.find((product) =>
+    productLinks(product).some((link) => linkActive(location.pathname, link)),
   );
+  const shownId = pinned === "root" ? null : (pinned ?? routeProduct?.id ?? null);
+  const shown = products.find((product) => product.id === shownId) ?? null;
+  const section = [...products.flatMap(productLinks), ...manage].find((link) => linkActive(location.pathname, link));
+
+  useEffect(() => {
+    setPinned(null);
+  }, [location.pathname]);
+
+  function openProduct(id: string) {
+    setSwap("forward");
+    setPinned(id);
+  }
+
+  function backToProducts() {
+    setSwap("back");
+    setPinned("root");
+  }
 
   async function logout() {
     await api("/api/auth/logout", { method: "POST" });
     navigate("/login");
   }
 
-  function toggleTheme() {
-    const next = document.documentElement.classList.toggle("dark");
-    localStorage.setItem("haruvo-theme", next ? "dark" : "light");
-    setDark(next);
-  }
+  const nav = (onNavigate?: () => void) => (
+    <NavItems
+      pathname={location.pathname}
+      shown={shown}
+      swap={swap}
+      onOpenProduct={openProduct}
+      onBack={backToProducts}
+      onNavigate={onNavigate}
+    />
+  );
 
   return (
     <div className="min-h-svh text-[var(--color-fg)]">
@@ -122,19 +276,8 @@ export function Shell() {
             v{meta.data?.version ?? "0.1.0"}
           </span>
         </div>
-        <div className="flex h-full min-w-0 flex-1 items-center justify-between px-4">
+        <div className="flex h-full min-w-0 flex-1 items-center px-4">
           <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Haruvo"}</div>
-          <div className="flex items-center gap-1">
-            <button type="button" className="icon-button" onClick={toggleTheme} aria-label="Toggle theme">
-              {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </button>
-            <span className="hidden max-w-48 truncate px-2 text-[13px] text-[var(--color-fg-dim)] sm:inline">
-              {me.data?.display_name}
-            </span>
-            <button type="button" className="icon-button" onClick={() => void logout()} aria-label="Sign out">
-              <LogOut className="size-4" />
-            </button>
-          </div>
         </div>
       </header>
 
@@ -157,26 +300,18 @@ export function Shell() {
                 <X className="size-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-3 py-2">
-              <NavItems onNavigate={() => setOpen(false)} />
-            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2">{nav(() => setOpen(false))}</div>
             <div className="border-t border-neutral-200 p-3 dark:border-white/[0.06]">
-              <button type="button" className="menu-item" onClick={() => void logout()}>
-                <LogOut className="menu-item-icon" />
-                <span className="menu-item-label">Sign out</span>
-              </button>
+              <ProfileMenu user={me.data} onLogout={() => void logout()} onNavigate={() => setOpen(false)} />
             </div>
           </div>
         </div>
       ) : null}
 
       <aside className="fixed top-12 bottom-0 left-0 z-30 hidden w-56 flex-col border-r border-neutral-200 bg-white lg:flex dark:border-white/[0.06] dark:bg-[var(--color-panel)]">
-        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-2">
-          <NavItems />
-        </nav>
-        <div className="border-t border-neutral-200 px-4 py-3 dark:border-white/[0.06]">
-          <div className="truncate text-[13px] font-medium text-[var(--color-nav-active)]">{me.data?.display_name ?? "…"}</div>
-          <div className="truncate text-[11px] text-[var(--color-nav-muted)]">{me.data?.email}</div>
+        <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pt-2 pb-2">{nav()}</nav>
+        <div className="sidebar-footer shrink-0 border-t border-neutral-200 bg-white px-3 py-2 dark:border-white/[0.06] dark:bg-[var(--color-panel)]">
+          <ProfileMenu user={me.data} onLogout={() => void logout()} />
         </div>
       </aside>
 
