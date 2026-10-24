@@ -19,6 +19,7 @@ import { PageEditor, PagesPage } from "@/pages/pages";
 import { PublicStatusPage } from "@/pages/public";
 import { SharePage } from "@/pages/share";
 import { SettingsPage } from "@/pages/settings";
+import { AppearancePage } from "@/pages/appearance";
 
 function RequireAuth() {
   const location = useLocation();
@@ -69,6 +70,7 @@ export function App() {
           <Route path="error-projects" element={<ErrorProjectsPage />} />
           <Route path="error-projects/:id" element={<ProjectDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/appearance" element={<AppearancePage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

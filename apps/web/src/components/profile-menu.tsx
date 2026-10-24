@@ -1,8 +1,7 @@
-import { Check, ChevronDown, Logout, Profile, Setting2 } from "reicon-react";
+import { ChevronDown, Logout, Profile, Setting2 } from "reicon-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
 import type { User } from "@/lib/api";
-import { applyTheme, useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 function initial(name: string, email: string) {
@@ -28,8 +27,6 @@ export function ProfileMenu({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const [theme] = useTheme();
   const root = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const name = user?.display_name || "Account";
@@ -38,7 +35,6 @@ export function ProfileMenu({
 
   function close() {
     setOpen(false);
-    setAppearanceOpen(false);
   }
 
   useEffect(() => {
@@ -70,13 +66,7 @@ export function ProfileMenu({
         aria-haspopup="true"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => {
-          if (open) close();
-          else {
-            setAppearanceOpen(false);
-            setOpen(true);
-          }
-        }}
+        onClick={() => setOpen((value) => !value)}
       >
         <span className="profile-avatar" aria-hidden="true">
           {initial(name, email)}
@@ -105,28 +95,19 @@ export function ProfileMenu({
               Profile
             </span>
           </Link>
-          <button
-            type="button"
+          <Link
             className="listbox-option"
-            aria-expanded={appearanceOpen}
-            onClick={() => setAppearanceOpen((value) => !value)}
+            to="/settings/appearance"
+            onClick={() => {
+              close();
+              onNavigate?.();
+            }}
           >
             <span className="flex items-center gap-2">
               <Setting2 className="size-4 opacity-80" />
               Appearance
             </span>
-            <ChevronDown className={cn("profile-chevron", appearanceOpen && "is-open")} aria-hidden="true" />
-          </button>
-          {appearanceOpen ? (
-            <div className="profile-appearance">
-              {(["light", "dark"] as const).map((mode) => (
-                <button key={mode} type="button" className="profile-choice" onClick={() => applyTheme(mode)}>
-                  <span>{mode === "light" ? "Light" : "Dark"}</span>
-                  {theme === mode ? <Check className="size-3.5 text-[var(--ui-fg)]" /> : null}
-                </button>
-              ))}
-            </div>
-          ) : null}
+          </Link>
           <div className="profile-menu-divider" />
           <button
             type="button"

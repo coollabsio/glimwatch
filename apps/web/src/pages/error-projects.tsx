@@ -135,6 +135,7 @@ export function ProjectDetailPage() {
         </nav>
         <PageHeader
           title={data.name}
+          keepTitle
           description={`Project id ${data.id} · ${platformLabel(data.platform)}`}
           actions={
             <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>

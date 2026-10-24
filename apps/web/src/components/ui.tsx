@@ -194,22 +194,27 @@ export function Field({
   );
 }
 
+/* Like Coolify, the title and summary of a top-level page show only below
+   1024px; the sidebar already names the page on desktop. Detail pages keep
+   their title, because it names the item that is open. */
 export function PageHeader({
   title,
   description,
   actions,
+  keepTitle = false,
 }: {
   title: ReactNode;
   description?: string;
   actions?: ReactNode;
+  keepTitle?: boolean;
 }) {
   return (
-    <div className="page-header">
-      <div>
+    <div className={cn("page-header", !keepTitle && "is-mobile-title", !keepTitle && !actions && "is-empty-desktop")}>
+      <div className="page-header-text">
         <h1>{title}</h1>
         {description ? <p>{description}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="page-header-actions flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
@@ -274,18 +279,23 @@ export function Dialog({
   description,
   onClose,
   children,
+  footer,
+  wide,
 }: {
   open: boolean;
   title: string;
   description?: string;
   onClose: () => void;
   children: ReactNode;
+  /** Actions on the right, below a divider. */
+  footer?: ReactNode;
+  wide?: boolean;
 }) {
   if (!open) return null;
   return (
     <div className="modal-backdrop">
       <button className="absolute inset-0" aria-label="Close dialog" onClick={onClose} />
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <div className={cn("modal-panel", wide && "is-wide")} role="dialog" aria-modal="true" aria-labelledby="dialog-title">
         <div className="modal-heading">
           <div>
             <h2 id="dialog-title">{title}</h2>
@@ -296,6 +306,7 @@ export function Dialog({
           </button>
         </div>
         <div className="modal-body">{children}</div>
+        {footer ? <div className="modal-footer">{footer}</div> : null}
       </div>
     </div>
   );

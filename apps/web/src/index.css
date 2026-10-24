@@ -368,6 +368,20 @@ textarea.input {
   margin-bottom: 1.5rem;
 }
 
+@media (min-width: 1024px) {
+  .page-header.is-mobile-title .page-header-text {
+    display: none;
+  }
+
+  .page-header.is-mobile-title .page-header-actions {
+    margin-left: auto;
+  }
+
+  .page-header.is-empty-desktop {
+    display: none;
+  }
+}
+
 :is(.flex, .grid) > .page-header {
   margin-bottom: 0;
 }
@@ -605,7 +619,17 @@ textarea.input {
   white-space: nowrap;
 }
 
+/* Flat style (and the expanded Search row): a plain 18px icon. The 3D style
+   puts it in a tile with a raised edge (Coolify sidebar). */
 .menu-item-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.9;
+  color: inherit;
+}
+
+html:not([data-nav-items="flat"]) .menu-item-icon:not(.sidebar-search-icon) {
   box-sizing: content-box;
   width: 1rem;
   height: 1rem;
@@ -621,26 +645,26 @@ textarea.input {
   transition: border-color 120ms, background-color 120ms, box-shadow 80ms, transform 80ms, color 120ms;
 }
 
-.dark .menu-item-icon {
+html.dark:not([data-nav-items="flat"]) .menu-item-icon:not(.sidebar-search-icon) {
   border-color: color-mix(in oklab, var(--ui-sidebar-tint) 13%, transparent);
   background: color-mix(in oklab, var(--ui-accent) 7%, transparent);
   color: var(--ui-sidebar-tint-fg);
   --button-depth-color: rgb(255 255 255 / 0.05);
 }
 
-.menu-item:hover .menu-item-icon {
+html:not([data-nav-items="flat"]) .menu-item:hover .menu-item-icon:not(.sidebar-search-icon) {
   transform: translateY(-1px);
   box-shadow: 0 3px 0 var(--button-depth-color);
   border-color: oklch(0% 0 0 / 0.18);
   background: #fff;
 }
 
-.menu-item:active .menu-item-icon {
+html:not([data-nav-items="flat"]) .menu-item:active .menu-item-icon:not(.sidebar-search-icon) {
   transform: translateY(2px);
   box-shadow: none;
 }
 
-.dark .menu-item:hover .menu-item-icon {
+html.dark:not([data-nav-items="flat"]) .menu-item:hover .menu-item-icon:not(.sidebar-search-icon) {
   border-color: rgb(255 255 255 / 0.14);
   background: rgb(255 255 255 / 0.06);
   color: #fff;
@@ -649,22 +673,21 @@ textarea.input {
 /* Listed after the hover rules so the active tile wins. Light: a white tile
    with an accent glyph and edge. Dark: the accent gradient tile. No glow:
    the row clips it. */
-.menu-item.menu-item-active .menu-item-icon,
-.menu-item.menu-item-active:hover .menu-item-icon {
+html:not([data-nav-items="flat"]) .menu-item.menu-item-active .menu-item-icon:not(.sidebar-search-icon),
+html:not([data-nav-items="flat"]) .menu-item.menu-item-active:hover .menu-item-icon:not(.sidebar-search-icon) {
   color: var(--ui-accent);
   border-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
   background: #fff;
   --button-depth-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
 }
 
-.dark .menu-item.menu-item-active .menu-item-icon,
-.dark .menu-item.menu-item-active:hover .menu-item-icon {
+html.dark:not([data-nav-items="flat"]) .menu-item.menu-item-active .menu-item-icon:not(.sidebar-search-icon),
+html.dark:not([data-nav-items="flat"]) .menu-item.menu-item-active:hover .menu-item-icon:not(.sidebar-search-icon) {
   color: #fff;
   border-color: #5b8dff;
   background: linear-gradient(180deg, var(--ui-accent-top), var(--ui-accent-bottom));
   --button-depth-color: var(--ui-accent-edge);
 }
-
 
 .menu-item:focus-visible .menu-item-icon {
   outline: 1px solid var(--color-accent);
@@ -1053,7 +1076,7 @@ textarea.input {
   background: color-mix(in oklab, var(--ui-accent) 10%, oklch(20.02% 0 0));
 }
 
-.dark :is(.app-sidebar, .app-drawer) .profile-menu-panel :is(.listbox-option, .profile-choice):hover {
+.dark :is(.app-sidebar, .app-drawer) .profile-menu-panel .listbox-option:hover {
   background: color-mix(in oklab, var(--ui-sidebar-tint) 10%, transparent);
 }
 
@@ -1225,46 +1248,6 @@ textarea.input {
 .listbox-option.is-danger,
 .dark .listbox-option.is-danger {
   color: var(--color-error);
-}
-
-.profile-appearance {
-  display: grid;
-  gap: 2px;
-  margin: 0 0.25rem 0.25rem;
-  padding-left: 1.5rem;
-}
-
-.profile-choice {
-  display: flex;
-  height: 2rem;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  border: 0;
-  border-radius: 0.375rem;
-  background: transparent;
-  padding: 0 0.5rem;
-  font-size: 0.75rem;
-  text-align: left;
-  color: #525252;
-  cursor: pointer;
-}
-
-.profile-choice:hover,
-.profile-choice:focus-visible {
-  background: #e5e5e5;
-  color: #0a0a0a;
-  outline: none;
-}
-
-.dark .profile-choice {
-  color: var(--color-fg-dim);
-}
-
-.dark .profile-choice:hover,
-.dark .profile-choice:focus-visible {
-  background: rgb(255 255 255 / 0.06);
-  color: var(--color-fg);
 }
 
 button.menu-item {
@@ -1702,16 +1685,9 @@ button.menu-item {
   outline: 1px solid var(--ui-accent);
 }
 
-.sidebar-search .menu-item-icon,
-.sidebar-search:is(:hover, :active, :focus-visible) .menu-item-icon {
-  box-sizing: border-box;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  transform: none;
-  outline: none;
-  opacity: 0.9;
+.sidebar-search-icon {
+  width: 1rem;
+  height: 1rem;
 }
 
 .sidebar-search kbd {
@@ -1753,7 +1729,7 @@ button.menu-item {
   box-shadow: none;
 }
 
-.sidebar-collapsed .sidebar-search .menu-item-icon {
+html:not([data-nav-items="flat"]) .sidebar-collapsed .sidebar-search .menu-item-icon {
   box-sizing: content-box;
   padding: 0.375rem;
   border: 1px solid rgb(0 0 0 / 9%);
@@ -1762,20 +1738,20 @@ button.menu-item {
   opacity: 1;
 }
 
-.sidebar-collapsed .sidebar-search:hover .menu-item-icon {
+html:not([data-nav-items="flat"]) .sidebar-collapsed .sidebar-search:hover .menu-item-icon {
   transform: translateY(-1px);
   border-color: oklch(0% 0 0 / 0.18);
   background: #fff;
   box-shadow: 0 3px 0 var(--button-depth-color);
 }
 
-.dark .sidebar-collapsed .sidebar-search .menu-item-icon {
+html.dark:not([data-nav-items="flat"]) .sidebar-collapsed .sidebar-search .menu-item-icon {
   border-color: color-mix(in oklab, var(--ui-sidebar-tint) 13%, transparent);
   background: color-mix(in oklab, var(--ui-accent) 7%, transparent);
   color: var(--ui-sidebar-tint-fg);
 }
 
-.dark .sidebar-collapsed .sidebar-search:hover .menu-item-icon {
+html.dark:not([data-nav-items="flat"]) .sidebar-collapsed .sidebar-search:hover .menu-item-icon {
   border-color: rgb(255 255 255 / 0.14);
   background: rgb(255 255 255 / 0.06);
   color: #fff;
@@ -1802,4 +1778,400 @@ button.menu-item {
 .dark .sidebar-tooltip {
   border-color: rgb(255 255 255 / 0.1);
   background: oklch(25.2% 0 0);
+}
+
+/* ------------------------------------------------------------------------
+   Appearance (Coolify's Appearance page). src/lib/theme.ts sets these
+   attributes on <html>: data-theme, data-nav-items, data-nav-style, and
+   data-page-width.
+   ------------------------------------------------------------------------ */
+
+/* Style → Flat: no raised edges anywhere. Buttons press with a small scale;
+   sidebar items are plain 32px rows with a fill for the current page. */
+html[data-nav-items="flat"] .button {
+  --button-depth-color: transparent !important;
+}
+
+html[data-nav-items="flat"] .button:not(:disabled):hover {
+  transform: none;
+}
+
+html[data-nav-items="flat"] .button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+html[data-nav-items="flat"] .menu-item:not(.sidebar-toggle, .menu-back, .sidebar-search) {
+  height: 2rem;
+  padding: 0 0.625rem;
+  transition: background-color 120ms, color 120ms;
+}
+
+html[data-nav-items="flat"] .menu-item:not(.sidebar-toggle, .menu-back, .sidebar-search):hover {
+  background: rgb(0 0 0 / 0.04);
+}
+
+html.dark[data-nav-items="flat"] .menu-item:not(.sidebar-toggle, .menu-back, .sidebar-search):hover {
+  background: rgb(255 255 255 / 0.05);
+}
+
+html[data-nav-items="flat"] .menu-item.menu-item-active,
+html[data-nav-items="flat"] .menu-item.menu-item-active:hover {
+  background: rgb(0 0 0 / 0.05);
+}
+
+html.dark[data-nav-items="flat"] .menu-item.menu-item-active,
+html.dark[data-nav-items="flat"] .menu-item.menu-item-active:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+html[data-nav-items="flat"] .menu-item-active .menu-item-icon {
+  opacity: 1;
+}
+
+html[data-nav-items="flat"] .menu-back-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+html[data-nav-items="flat"] .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+  width: 2rem;
+  height: 2rem;
+  margin-left: 0.1875rem;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Page width → Full width. */
+html[data-page-width="full"] .app-content {
+  max-width: none;
+}
+
+/* Navigation style → Floating: the top bar (logo cell) and the sidebar are
+   framed panels on a dotted backdrop. Desktop only. */
+@media (min-width: 1024px) {
+  html[data-nav-style="floating"] {
+    --floating-gap: 0.5rem;
+    --floating-radius: 8px;
+    --floating-line: oklch(0% 0 0 / 0.09);
+    --floating-top: calc(3rem + var(--floating-gap) * 2);
+  }
+
+  html.dark[data-nav-style="floating"] {
+    --floating-line: oklch(100% 0 0 / 0.08);
+    --floating-dot: rgb(255 255 255 / 0.09);
+  }
+
+  html[data-nav-style="floating"] .app-shell {
+    background:
+      radial-gradient(circle, var(--floating-dot, rgb(0 0 0 / 0.13)) 1px, transparent 1.3px) 0 0 / 20px 20px fixed,
+      var(--ui-canvas);
+  }
+
+  html[data-nav-style="floating"] .app-main {
+    margin-left: calc(14rem + var(--floating-gap));
+    padding-top: calc(var(--floating-top) + 1px);
+    background: transparent;
+  }
+
+  html[data-nav-style="floating"] .app-shell.is-collapsed .app-main {
+    margin-left: calc(4rem + var(--floating-gap));
+  }
+
+  html[data-nav-style="floating"] :is(.app-topbar, .app-sidebar) {
+    overflow: hidden;
+    border: 1px solid var(--floating-line);
+    border-radius: var(--floating-radius);
+  }
+
+  /* The top bar hugs the logo cell instead of spanning an empty bar. */
+  html[data-nav-style="floating"] .app-topbar {
+    top: var(--floating-gap);
+    left: var(--floating-gap);
+    right: auto;
+    width: 14rem;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  html[data-nav-style="floating"] .app-shell.is-collapsed .app-topbar {
+    width: 4rem;
+  }
+
+  html[data-nav-style="floating"] .app-topbar-main {
+    display: none;
+  }
+
+  html[data-nav-style="floating"] .app-logo-cell {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 0;
+  }
+
+  html[data-nav-style="floating"] .app-sidebar {
+    top: var(--floating-top);
+    bottom: var(--floating-gap);
+    left: var(--floating-gap);
+  }
+}
+
+/* Appearance page option cards: a picture on top, the label and a check
+   mark below. */
+.choice-card {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid oklch(92.2% 0 0);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms var(--ui-ease-out), box-shadow 120ms var(--ui-ease-out);
+}
+
+.choice-card:hover {
+  border-color: oklch(87% 0 0);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+}
+
+.dark .choice-card {
+  border-color: rgb(255 255 255 / 0.07);
+  background: rgb(255 255 255 / 0.05);
+}
+
+.dark .choice-card:hover {
+  border-color: rgb(255 255 255 / 0.12);
+}
+
+.choice-card.is-selected,
+.choice-card.is-selected:hover {
+  border-color: var(--ui-accent-light);
+  background: color-mix(in oklab, var(--ui-accent-light) 6%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ui-accent-light) 25%, transparent);
+}
+
+.choice-card:focus-visible {
+  outline: 1px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+.choice-card-preview {
+  height: 5rem;
+  overflow: hidden;
+  border-bottom: 1px solid oklch(92.2% 0 0);
+  background: oklch(98.5% 0 0);
+}
+
+.dark .choice-card-preview {
+  border-bottom-color: rgb(255 255 255 / 0.07);
+  background: rgb(0 0 0 / 0.15);
+}
+
+.choice-card-check {
+  color: var(--ui-accent-light);
+}
+
+.preset-button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.375rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0.25rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.preset-button:hover > div {
+  box-shadow: var(--ui-menu-shadow);
+}
+
+.preset-button > div.is-pressed {
+  box-shadow: 0 0 0 2px var(--ui-panel), 0 0 0 4px var(--ui-accent-light);
+}
+
+.preset-button:focus-visible {
+  outline: 1px solid var(--ui-accent);
+}
+
+@media (min-width: 640px) {
+  .modal-panel.is-wide {
+    max-width: 64rem;
+  }
+}
+
+.modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.625rem 0.25rem 0.25rem;
+}
+
+/* Color theme → Custom. Every surface and text color comes from three
+   variables, like Coolify:
+     --t-bg     the background color
+     --t-text   the readable text color on it
+     --t-light  1 for a light background, 0 for a dark one
+   The sidebar, logo cell, and drawer use the sidebar color instead, so a
+   light sidebar works on a dark page and the other way around. */
+html[data-theme="custom"] {
+  --t-bg: var(--theme-bg);
+  --t-text: var(--theme-text);
+  --t-light: var(--theme-light);
+  /* Fills use the accent lifted 15% toward white (Coolify's bright color);
+     --theme-accent-fg is computed for it. */
+  --theme-bright: color-mix(in srgb, var(--theme-accent) 85%, white);
+  --ui-accent: var(--theme-bright);
+  --ui-accent-top: color-mix(in oklab, var(--theme-bright) 88%, white);
+  --ui-accent-bottom: color-mix(in oklab, var(--theme-bright) 88%, black);
+  --ui-accent-edge: color-mix(in oklab, var(--theme-bright) 72%, black);
+  --ui-accent-fg: var(--theme-accent-fg);
+  /* Accent text and icons: lightness forced into a readable band. */
+  --ui-accent-light: oklch(from var(--theme-accent) clamp(0.72, l, 0.86) min(c, 0.13) h);
+  --ui-sidebar: var(--theme-sidebar);
+}
+
+html[data-theme="custom"]:not(.dark) {
+  --ui-accent-light: oklch(from var(--theme-accent) clamp(0.3, l, 0.48) min(c, 0.16) h);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-logo-cell, .app-drawer) {
+  --t-bg: var(--theme-sidebar);
+  --t-text: var(--theme-sidebar-text);
+  --t-light: var(--theme-sidebar-light);
+  --color-fg: var(--ui-fg);
+  --color-fg-dim: var(--ui-fg-dim);
+  --color-fg-faint: var(--ui-fg-faint);
+}
+
+html[data-theme="custom"],
+html[data-theme="custom"] :is(.app-sidebar, .app-logo-cell, .app-drawer) {
+  --ui-canvas: color-mix(in oklab, var(--t-text) calc(var(--t-light) * 3%), var(--t-bg));
+  --ui-panel: color-mix(in oklab, var(--t-text) calc((1 - var(--t-light)) * 3%), var(--t-bg));
+  --ui-card-bg: color-mix(in oklab, var(--t-text) calc(1% + (1 - var(--t-light)) * 5%), transparent);
+  --ui-card-border: color-mix(in oklab, var(--t-text) 9%, transparent);
+  --ui-well-bg: color-mix(in oklab, var(--t-bg) calc(var(--t-light) * 100%), rgb(0 0 0 / 34%));
+  --ui-well-border: color-mix(in oklab, var(--t-text) 8%, transparent);
+  --ui-control-bg: color-mix(in oklab, var(--t-text) 4%, transparent);
+  --ui-control-border: color-mix(in oklab, var(--t-text) 10%, transparent);
+  --ui-menu-bg: color-mix(in oklab, var(--t-text) calc(4% + (1 - var(--t-light)) * 6%), var(--t-bg));
+  --ui-menu-border: color-mix(in oklab, var(--t-text) calc(10% + (1 - var(--t-light)) * 8%), var(--t-bg));
+  --ui-hover: color-mix(in oklab, var(--t-text) calc(8% + (1 - var(--t-light)) * 4%), var(--t-bg));
+  --ui-divider: color-mix(in oklab, var(--t-text) 8%, transparent);
+  --ui-chrome-border: color-mix(in oklab, var(--t-text) 7%, transparent);
+  --ui-sidebar-border: color-mix(in oklab, var(--t-text) 10%, transparent);
+  --ui-fg: var(--t-text);
+  --ui-fg-dim: color-mix(in oklab, var(--t-text) 74%, var(--t-bg));
+  --ui-fg-faint: color-mix(in oklab, var(--t-text) 60%, var(--t-bg));
+  --color-nav-text: color-mix(in oklab, var(--t-text) 74%, var(--t-bg));
+  --color-nav-muted: color-mix(in oklab, var(--t-text) 60%, var(--t-bg));
+  --color-nav-active: var(--t-text);
+}
+
+/* Custom sidebar: the flat sidebar color (no brand wash), and tiles, Search,
+   and the account button colored from the sidebar text. */
+html[data-theme="custom"] :is(.app-sidebar, .app-logo-cell, .app-drawer) {
+  border-color: var(--ui-sidebar-border);
+  background: var(--theme-sidebar);
+}
+
+html[data-theme="custom"] :is(.nav-section, .menu-back-icon, .menu-chevron) {
+  color: var(--color-nav-muted);
+}
+
+html[data-theme="custom"] .sidebar-collapsed .nav-section {
+  border-top-color: var(--ui-sidebar-border);
+}
+
+html[data-theme="custom"]:not([data-nav-items="flat"]) :is(.app-sidebar, .app-drawer) .menu-item:not(.menu-item-active) .menu-item-icon:not(.sidebar-search-icon),
+html[data-theme="custom"]:not([data-nav-items="flat"]) .sidebar-collapsed .sidebar-search .menu-item-icon {
+  border-color: color-mix(in oklab, var(--t-text) 15%, transparent);
+  background: color-mix(in oklab, var(--t-text) 5%, transparent);
+  color: var(--color-nav-text);
+  --button-depth-color: color-mix(in oklab, var(--t-text) 12%, transparent);
+}
+
+html[data-theme="custom"]:not([data-nav-items="flat"]) :is(.app-sidebar, .app-drawer) .menu-item:not(.menu-item-active):hover .menu-item-icon:not(.sidebar-search-icon),
+html[data-theme="custom"]:not([data-nav-items="flat"]) .sidebar-collapsed .sidebar-search:hover .menu-item-icon {
+  border-color: color-mix(in oklab, var(--t-text) 20%, transparent);
+  background: color-mix(in oklab, var(--t-text) 9%, transparent);
+  color: var(--color-nav-active);
+}
+
+/* The current page is the accent tile on a light or a dark sidebar. */
+html[data-theme="custom"]:not([data-nav-items="flat"]) :is(.app-sidebar, .app-drawer) .menu-item.menu-item-active .menu-item-icon:not(.sidebar-search-icon) {
+  color: var(--ui-accent-fg);
+  border-color: color-mix(in oklab, var(--theme-bright) 75%, white);
+  background: linear-gradient(180deg, var(--ui-accent-top), var(--ui-accent-bottom));
+  --button-depth-color: var(--ui-accent-edge);
+}
+
+/* Flat: the current page uses the Selected color. */
+html[data-theme="custom"][data-nav-items="flat"] :is(.app-sidebar, .app-drawer) .menu-item:not(.sidebar-toggle, .menu-back, .sidebar-search):hover {
+  background: color-mix(in oklab, var(--t-text) 6%, transparent);
+}
+
+html[data-theme="custom"][data-nav-items="flat"] :is(.app-sidebar, .app-drawer) .menu-item.menu-item-active,
+html[data-theme="custom"][data-nav-items="flat"] :is(.app-sidebar, .app-drawer) .menu-item.menu-item-active:hover {
+  background: var(--theme-selected);
+  color: var(--theme-selected-text);
+}
+
+html[data-theme="custom"] :is(.app-sidebar:not(.sidebar-collapsed), .app-drawer) .menu-item.sidebar-search {
+  background: color-mix(in oklab, var(--t-text) 6%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--t-text) 10%, transparent);
+}
+
+html[data-theme="custom"] :is(.app-sidebar:not(.sidebar-collapsed), .app-drawer) .menu-item.sidebar-search:hover {
+  background: color-mix(in oklab, var(--t-text) 10%, transparent);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .sidebar-search kbd {
+  border-color: color-mix(in oklab, var(--t-text) 14%, transparent);
+  background: color-mix(in oklab, var(--t-text) 8%, transparent);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .menu-item:is(.menu-back, .sidebar-toggle):hover {
+  background: color-mix(in oklab, var(--t-text) 6%, transparent);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .button.profile-trigger:not(:disabled) {
+  --button-depth-color: color-mix(in oklab, var(--t-text) 12%, transparent);
+  border-color: color-mix(in oklab, var(--t-text) 10%, transparent);
+  background: color-mix(in oklab, var(--t-text) 5%, transparent);
+  color: var(--color-nav-text);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .button.profile-trigger:not(:disabled):is(:hover, [aria-expanded="true"]) {
+  border-color: color-mix(in oklab, var(--t-text) 16%, transparent);
+  background: color-mix(in oklab, var(--t-text) 8%, transparent);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .profile-trigger .profile-chevron {
+  color: var(--color-nav-muted);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .profile-avatar {
+  background: color-mix(in oklab, var(--t-text) 12%, transparent);
+  color: var(--t-text);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .profile-menu-panel {
+  border-color: var(--ui-menu-border);
+  background: var(--ui-menu-bg);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .profile-menu-panel .listbox-option:hover {
+  background: var(--ui-hover);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) :is(.profile-menu-name, .profile-menu-email) {
+  color: var(--ui-fg);
+}
+
+html[data-theme="custom"] :is(.app-sidebar, .app-drawer) .profile-menu-divider {
+  background: var(--ui-divider);
 }

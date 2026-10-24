@@ -112,6 +112,7 @@ function SiteDetail({ siteId, site }: { siteId: string; site?: InsightSite }) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={site?.name ?? "Site"}
+        keepTitle
         description={site ? `${site.domain} · no cookies, no stored IP addresses` : "Loading site..."}
         actions={
           <Select
@@ -400,7 +401,7 @@ export function VisitorPage() {
   const activity = detail.data?.activity ?? [];
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Visitor" description={visitor ? `Hash ${visitor.id}` : "Loading..."} />
+      <PageHeader keepTitle title="Visitor" description={visitor ? `Hash ${visitor.id}` : "Loading..."} />
       <ErrorText error={detail.error} />
       <LayerCard title="Details">
         <StatGrid className="xl:grid-cols-4">

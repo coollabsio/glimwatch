@@ -10,16 +10,29 @@
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script>
+      // Applies the saved appearance (src/lib/theme.ts) before the first paint.
       (function () {
-        var theme = localStorage.getItem("haruvo-theme") || localStorage.getItem("status-theme");
-        if (theme !== "light") document.documentElement.classList.add("dark");
-        var meta = document.querySelector('meta[name="theme-color"]');
-        if (!meta) {
-          meta = document.createElement("meta");
-          meta.setAttribute("name", "theme-color");
-          document.head.appendChild(meta);
+        var a = {};
+        try { a = JSON.parse(localStorage.getItem("haruvo-appearance")) || {}; } catch (e) {}
+        var root = document.documentElement;
+        var theme = a.theme || localStorage.getItem("haruvo-theme") || "dark";
+        var vars = theme === "custom" ? a.vars : null;
+        var dark;
+        if (vars) {
+          for (var name in vars) root.style.setProperty(name, vars[name]);
+          dark = vars["--theme-light"] === "0";
+        } else {
+          dark = theme !== "light" && (theme !== "system" || matchMedia("(prefers-color-scheme: dark)").matches);
         }
-        meta.setAttribute("content", theme === "light" ? "#ffffff" : "#0a0a0a");
+        root.classList.toggle("dark", dark);
+        root.dataset.theme = vars ? "custom" : dark ? "dark" : "light";
+        root.dataset.navStyle = a.navStyle === "floating" ? "floating" : "default";
+        root.dataset.navItems = a.navItems === "flat" ? "flat" : "3d";
+        root.dataset.pageWidth = a.pageWidth === "full" ? "full" : "centered";
+        var meta = document.createElement("meta");
+        meta.setAttribute("name", "theme-color");
+        meta.setAttribute("content", vars ? vars["--theme-bg"] : dark ? "#0a0a0a" : "#ffffff");
+        document.head.appendChild(meta);
       })();
     </script>
   </head>

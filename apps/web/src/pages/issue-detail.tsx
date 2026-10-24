@@ -73,6 +73,7 @@ export function IssueDetailPage() {
         </nav>
         <PageHeader
           title={parts.type}
+          keepTitle
           description={parts.message || undefined}
           actions={
             <>

@@ -206,6 +206,7 @@ export function MonitorDetailPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={monitor.name}
+        keepTitle
         description={label(monitor)}
         actions={
           <>

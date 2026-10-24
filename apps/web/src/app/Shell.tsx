@@ -181,7 +181,6 @@ export function Shell() {
   );
   const shownId = pinned === "root" ? null : (pinned ?? routeProduct?.id ?? null);
   const shown = products.find((product) => product.id === shownId) ?? null;
-  const section = [dashboard, ...products.flatMap(productLinks), ...manage].find((link) => linkActive(location.pathname, link));
 
   useEffect(() => {
     setPinned(null);
@@ -210,7 +209,7 @@ export function Shell() {
         }}
       >
         <span className="flex min-w-0 items-center gap-2.5">
-          <Search className="menu-item-icon" />
+          <Search className="menu-item-icon sidebar-search-icon" />
           <span className="menu-item-label">Search</span>
         </span>
         <kbd>{modKeyLabel}</kbd>
@@ -242,7 +241,7 @@ export function Shell() {
   );
 
   return (
-    <div className="min-h-svh text-[var(--color-fg)]">
+    <div className={cn("app-shell min-h-svh text-[var(--color-fg)]", collapsed && "is-collapsed")}>
       <header className={cn("app-topbar fixed inset-x-0 top-0 z-40 hidden h-12 items-center lg:flex", scrolled && "is-scrolled")}>
         <div
           className={cn(
@@ -258,9 +257,7 @@ export function Shell() {
             <Wordmark version={version} />
           )}
         </div>
-        <div className="app-topbar-main flex h-full min-w-0 flex-1 items-center px-4">
-          <div className="truncate text-[13px] font-medium text-[var(--color-fg-dim)]">{section?.label ?? "Dashboard"}</div>
-        </div>
+        <div className="app-topbar-main h-full min-w-0 flex-1" />
       </header>
 
       <div className="mobile-topbar sticky top-0 z-40 flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:hidden">
@@ -347,11 +344,11 @@ export function Shell() {
 
       <main
         className={cn(
-          "min-h-svh bg-[var(--ui-canvas)] px-5 py-6 transition-[margin] duration-200 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10",
+          "app-main min-h-svh bg-[var(--ui-canvas)] px-5 py-6 transition-[margin] duration-200 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10",
           collapsed ? "lg:ml-16" : "lg:ml-56",
         )}
       >
-        <div className="mx-auto w-full max-w-[1400px]">
+        <div className="app-content mx-auto w-full max-w-[1400px]">
           <Outlet />
         </div>
       </main>

@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { Button, LayerCard, PageHeader } from "@/components/ui";
 import { api, type Meta, type User } from "@/lib/api";
-import { useTheme } from "@/lib/theme";
+import { useAppearance } from "@/lib/theme";
 
 export function SettingsPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: () => api<User>("/api/auth/me") });
   const meta = useQuery({ queryKey: ["meta"], queryFn: () => api<Meta>("/api/meta") });
-  const [theme, setTheme] = useTheme();
+  const appearance = useAppearance();
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -30,15 +31,18 @@ export function SettingsPage() {
       </LayerCard>
       <LayerCard
         title="Appearance"
-        description="Dark first. Both modes use the blue accent."
+        description="Theme, page width, navigation, and style in this browser."
         actions={
-          <Button type="button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            {theme === "dark" ? "Switch to light" : "Switch to dark"}
-          </Button>
+          <Link to="/settings/appearance">
+            <Button type="button">Customize</Button>
+          </Link>
         }
       >
-        <dl className="grid gap-4 sm:grid-cols-2">
-          <Item label="Theme">{theme === "dark" ? "Dark" : "Light"}</Item>
+        <dl className="grid gap-4 sm:grid-cols-4">
+          <Item label="Theme"><span className="capitalize">{appearance.theme}</span></Item>
+          <Item label="Page width">{appearance.pageWidth === "full" ? "Full width" : "Centered"}</Item>
+          <Item label="Navigation"><span className="capitalize">{appearance.navStyle}</span></Item>
+          <Item label="Style">{appearance.navItems === "flat" ? "Flat" : "3D"}</Item>
         </dl>
       </LayerCard>
     </div>

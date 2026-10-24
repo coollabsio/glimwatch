@@ -156,7 +156,7 @@ export function LinkDetailPage() {
   const item = link.data;
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title={item ? `/${item.slug}` : "Link"} description={item ? `${item.destination} · ${window.location.origin}/go/${item.slug}` : "Loading..."} />
+      <PageHeader keepTitle title={item ? `/${item.slug}` : "Link"} description={item ? `${item.destination} · ${window.location.origin}/go/${item.slug}` : "Loading..."} />
       <ErrorText error={link.error ?? overview.error} />
       <LayerCard title="Summary" description="Last 30 days.">
         <div className="grid gap-6 sm:grid-cols-2">

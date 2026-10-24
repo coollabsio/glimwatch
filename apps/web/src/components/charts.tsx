@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Bar, Check, InsightRow } from "@/lib/api";
+import { chartTime } from "@/lib/theme";
 
 const barColor: Record<string, string> = {
   up: "bg-[var(--ui-success)]",
@@ -45,7 +46,7 @@ export function LatencyChart({ checks }: { checks: Check[] }) {
   const coords = points.map((point, index) => {
     const x = pad + (index / (points.length - 1)) * (width - pad * 2);
     const y = height - pad - (point.latency_ms / max) * (height - pad * 2);
-    return { x, y, failed: point.status === "failure" };
+    return { x, y, failed: point.status === "failure", title: `${chartTime(point.checked_at)}\n${point.latency_ms} ms` };
   });
   const line = coords.map((point) => `${point.x},${point.y}`).join(" ");
   const area = `${pad},${height - pad} ${line} ${width - pad},${height - pad}`;
@@ -70,7 +71,9 @@ export function LatencyChart({ checks }: { checks: Check[] }) {
           cy={point.y}
           r={point.failed ? 3.5 : 2.2}
           fill={point.failed ? "var(--ui-error)" : "var(--ui-accent)"}
-        />
+        >
+          <title>{point.title}</title>
+        </circle>
       ))}
       <text x={pad} y={pad + 10} fill="var(--ui-fg-faint)" className="text-[11px]">
         {Math.round(max)} ms

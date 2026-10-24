@@ -142,6 +142,7 @@ export function IncidentDetailPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title={incident.title}
+        keepTitle
         description={`Opened ${formatTime(incident.started_at)}${incident.auto ? " by the scheduler" : ""}`}
         actions={<Button variant="danger" onClick={() => remove.mutate()}>Delete</Button>}
       />
