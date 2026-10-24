@@ -19,10 +19,13 @@ export function ProfileMenu({
   user,
   onLogout,
   onNavigate,
+  compact = false,
 }: {
   user?: User;
   onLogout: () => void;
   onNavigate?: () => void;
+  /** Avatar-only trigger with the menu opening down, for the mobile top bar. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
@@ -58,7 +61,7 @@ export function ProfileMenu({
   }, [open]);
 
   return (
-    <div className="profile-menu" ref={root}>
+    <div className={cn("profile-menu", compact && "is-compact")} ref={root}>
       <button
         type="button"
         className="button profile-trigger"

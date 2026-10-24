@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
-import { ArrowRight, Search } from "reicon-react";
+import { ArrowRight, Search4 as Search } from "reicon-react";
 import { manage, products } from "@/app/nav";
 import {
   api,
@@ -110,7 +110,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       <button type="button" className="command-palette-backdrop" aria-label="Close search" onClick={onClose} />
       <div className="command-palette">
         <div className="command-palette-header">
-          <Search className="size-4 shrink-0 text-[var(--ui-fg-faint)]" aria-hidden="true" />
+          <Search className="command-palette-search-icon size-4 shrink-0 text-[var(--ui-fg-faint)]" aria-hidden="true" />
           <input
             ref={input}
             className="command-palette-input"

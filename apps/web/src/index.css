@@ -42,12 +42,14 @@
   --ui-fg-dim: oklch(40% 0 0);
   --ui-fg-faint: oklch(50% 0 0);
 
-  /* Accent and status (blue) */
-  --ui-accent: oklch(54.6% 0.245 262.88);
-  --ui-accent-top: oklch(58.34% 0.2187 262.9);
-  --ui-accent-bottom: oklch(50% 0.2329 264.4);
-  --ui-accent-edge: oklch(42.4% 0.199 265.64);
+  /* Accent and status: one blue in both themes (Coolify purple scale, mapped
+     to blue). Light text and icons on dark use --ui-accent-light. */
+  --ui-accent: #2563eb;
+  --ui-accent-top: #3171f5;
+  --ui-accent-bottom: #1d50d6;
+  --ui-accent-edge: #1a3fa6;
   --ui-accent-fg: #ffffff;
+  --ui-accent-light: #2563eb;
   --ui-success: oklch(48% 0.135 149.58);
   --ui-warning: oklch(50% 0.105 80);
   --ui-error: oklch(52% 0.2 27.33);
@@ -64,9 +66,10 @@
 }
 
 .dark {
-  /* Surfaces (dark: near-black with a faint blue tint, hue 265) */
-  --ui-canvas: oklch(14.6% 0.018 265);
-  --ui-panel: oklch(19.2% 0.03 265);
+  /* Surfaces (dark: pure neutral dark gray). Only the command palette
+     carries the blue tint. */
+  --ui-canvas: #0a0a0a;
+  --ui-panel: #121212;
   --ui-card-bg: rgb(255 255 255 / 6%);
   --ui-card-border: rgb(255 255 255 / 8%);
   --ui-well-bg: rgb(0 0 0 / 34%);
@@ -74,9 +77,9 @@
   --ui-well-shadow: 0 1px 2px rgb(0 0 0 / 25%);
   --ui-control-bg: rgb(255 255 255 / 3%);
   --ui-control-border: rgb(255 255 255 / 8%);
-  --ui-menu-bg: oklch(25.2% 0.018 265);
-  --ui-menu-border: oklch(32% 0.012 265);
-  --ui-hover: oklch(29.31% 0.018 265);
+  --ui-menu-bg: oklch(25.2% 0 0);
+  --ui-menu-border: oklch(36% 0 0);
+  --ui-hover: oklch(29.31% 0 0);
   --ui-divider: rgb(255 255 255 / 7%);
   --ui-chrome-border: rgb(255 255 255 / 4%);
 
@@ -85,9 +88,15 @@
   --ui-fg-dim: oklch(76.99% 0 0);
   --ui-fg-faint: oklch(65% 0 0);
 
-  /* Accent and status: a lighter blue reads on dark surfaces. Primary
-     buttons keep the light-mode blue gradient. */
-  --ui-accent: oklch(70.7% 0.165 254.62);
+  /* Accent stays blue. Yellow is the warning color, not the accent. */
+  --ui-accent-light: #93b4ff;
+  /* Sidebar and logo cell: blue-black with a brand wash (Coolify #120e1a,
+     Orbit's pink-black, here at the blue hue 265). */
+  --ui-sidebar: oklch(17% 0.018 265);
+  --ui-sidebar-border: oklch(74% 0.15 265 / 10%);
+  --ui-sidebar-tint: oklch(74% 0.15 265);
+  --ui-sidebar-tint-fg: oklch(82% 0.09 265);
+  --ui-sidebar-wash: color-mix(in oklab, var(--ui-accent) 9%, transparent);
   --ui-success: oklch(72.27% 0.192 149.58);
   --ui-warning: oklch(88.13% 0.1507 91.7);
   --ui-error: oklch(66% 0.2 27.33);
@@ -385,6 +394,14 @@ textarea.input {
   box-shadow: var(--ui-card-shadow);
 }
 
+/* Dark top-level card: the panel color. A nested card stays translucent. */
+.dark .layer-card {
+  background: var(--ui-panel);
+}
+
+.dark .layer-card .layer-card {
+  background: var(--ui-card-bg);
+}
 
 .layer-card > header {
   display: flex;
@@ -449,7 +466,7 @@ textarea.input {
 }
 
 .dark .cool-table thead th {
-  background: rgb(255 255 255 / 2%);
+  background: var(--ui-panel);
 }
 
 .cool-table tbody tr:first-child td {
@@ -605,8 +622,10 @@ textarea.input {
 }
 
 .dark .menu-item-icon {
-  border-color: rgb(255 255 255 / 9%);
-  background: rgb(255 255 255 / 4%);
+  border-color: color-mix(in oklab, var(--ui-sidebar-tint) 13%, transparent);
+  background: color-mix(in oklab, var(--ui-accent) 7%, transparent);
+  color: var(--ui-sidebar-tint-fg);
+  --button-depth-color: rgb(255 255 255 / 0.05);
 }
 
 .menu-item:hover .menu-item-icon {
@@ -621,20 +640,29 @@ textarea.input {
   box-shadow: none;
 }
 
-.dark .menu-item:hover .menu-item-icon,
-.dark .menu-item.menu-item-active .menu-item-icon {
-  border-color: oklch(100% 0 0 / 0.18);
-  background: oklch(100% 0 0 / 0.08);
+.dark .menu-item:hover .menu-item-icon {
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(255 255 255 / 0.06);
+  color: #fff;
 }
 
-/* Listed after the hover rules, with dark and light selectors, so the accent
-   border wins on hover and in dark mode. */
+/* Listed after the hover rules so the active tile wins. Light: a white tile
+   with an accent glyph and edge. Dark: the accent gradient tile. No glow:
+   the row clips it. */
 .menu-item.menu-item-active .menu-item-icon,
-.menu-item.menu-item-active:hover .menu-item-icon,
-.dark .menu-item.menu-item-active .menu-item-icon {
+.menu-item.menu-item-active:hover .menu-item-icon {
   color: var(--ui-accent);
   border-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
+  background: #fff;
   --button-depth-color: color-mix(in oklab, var(--ui-accent) 45%, transparent);
+}
+
+.dark .menu-item.menu-item-active .menu-item-icon,
+.dark .menu-item.menu-item-active:hover .menu-item-icon {
+  color: #fff;
+  border-color: #5b8dff;
+  background: linear-gradient(180deg, var(--ui-accent-top), var(--ui-accent-bottom));
+  --button-depth-color: var(--ui-accent-edge);
 }
 
 
@@ -649,6 +677,156 @@ textarea.input {
   font-weight: 500;
   color: var(--color-nav-muted);
   user-select: none;
+}
+
+.dark .nav-section {
+  font-family: var(--ui-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--ui-sidebar-tint) 55%, transparent);
+}
+
+/* App chrome. Light: the sidebar is the canvas and the top bar is white.
+   Dark: the top bar is the canvas; the sidebar and logo cell are a flat
+   neutral one step above it, with a faint neutral right edge. Only the
+   current item's tile uses the accent. */
+.app-topbar {
+  background: var(--ui-panel);
+  transition: background-color 150ms;
+}
+
+.dark .app-topbar {
+  background: var(--ui-canvas);
+}
+
+/* The scroll hairline sits under the content part only. The logo cell has
+   no bottom border, except in the collapsed sidebar. */
+.app-topbar-main {
+  border-bottom: 1px solid transparent;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.app-topbar.is-scrolled .app-topbar-main {
+  border-bottom-color: var(--ui-chrome-border);
+}
+
+.dark .app-topbar.is-scrolled .app-topbar-main {
+  border-bottom-color: var(--ui-sidebar-border);
+}
+
+.app-topbar.is-scrolled .app-topbar-main {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+.dark .app-topbar.is-scrolled .app-topbar-main {
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+}
+
+.dark .app-topbar.is-scrolled {
+  background: rgb(10 10 10 / 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.app-sidebar,
+.app-drawer {
+  --color-nav-text: oklch(43.86% 0 0);
+  --color-nav-muted: oklch(51.03% 0 0);
+  --color-nav-active: oklch(20.46% 0 0);
+}
+
+.dark .app-sidebar,
+.dark .app-drawer {
+  --color-nav-text: oklch(80% 0.02 265);
+  --color-nav-muted: oklch(58% 0.04 265);
+  --color-nav-active: oklch(96.12% 0 0);
+}
+
+.app-sidebar,
+.app-logo-cell {
+  border-right: 1px solid var(--ui-chrome-border);
+  background: var(--ui-canvas);
+}
+
+/* The nav wash starts at 9% and fades out; the logo cell has a flat 9%
+   wash, so the two read as one surface. */
+.dark .app-sidebar {
+  border-right-color: var(--ui-sidebar-border);
+  background: linear-gradient(180deg, var(--ui-sidebar-wash), transparent 520px), var(--ui-sidebar);
+}
+
+.dark .app-logo-cell {
+  border-right-color: var(--ui-sidebar-border);
+  background: linear-gradient(var(--ui-sidebar-wash), var(--ui-sidebar-wash)), var(--ui-sidebar);
+}
+
+/* Collapsed: a bottom border lines the cell up with the top bar edge. */
+.app-logo-cell.is-collapsed {
+  border-bottom: 1px solid var(--ui-chrome-border);
+}
+
+.dark .app-logo-cell.is-collapsed {
+  border-bottom-color: var(--ui-sidebar-border);
+}
+
+/* Mobile top bar (below 1024px): translucent panel, small blur, faint edge. */
+.mobile-topbar {
+  border-bottom: 1px solid rgb(229 229 229 / 0.6);
+  background: color-mix(in srgb, var(--ui-panel) 95%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.dark .mobile-topbar {
+  border-bottom-color: rgb(255 255 255 / 0.06);
+}
+
+.mobile-logo-tile {
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: oklch(97% 0 0);
+}
+
+.dark .mobile-logo-tile {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.icon-button.mobile-drawer-toggle {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+/* Mobile drawer: the sidebar surface, opened from the right. */
+.app-drawer {
+  border-left: 1px solid var(--ui-chrome-border);
+  background: var(--ui-canvas);
+}
+
+.dark .app-drawer {
+  border-left-color: var(--ui-sidebar-border);
+  background: linear-gradient(180deg, var(--ui-sidebar-wash), transparent 520px), var(--ui-sidebar);
+}
+
+.app-drawer-brand,
+.app-drawer-footer {
+  border-color: var(--ui-chrome-border);
+}
+
+.dark .app-drawer-brand,
+.dark .app-drawer-footer {
+  border-color: var(--ui-sidebar-border);
+}
+
+.app-drawer-brand {
+  border-bottom-width: 1px;
+}
+
+.app-drawer-footer {
+  border-top-width: 1px;
 }
 
 .auth-shell {
@@ -821,7 +999,7 @@ textarea.input {
 .button.profile-trigger {
   width: 100%;
   justify-content: flex-start;
-  gap: 0.5rem;
+  gap: 0.375rem;
   border-radius: 0.5rem;
   padding: 0 0.5rem;
   text-transform: none;
@@ -835,11 +1013,48 @@ textarea.input {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: var(--ui-hover);
+  background: oklch(92.2% 0 0);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
+  color: #404040;
+}
+
+.dark .profile-avatar {
+  background: rgb(255 255 255 / 0.1);
   color: var(--ui-fg);
+}
+
+/* Dark account button in the sidebar: the brand tint (Orbit, Coolify). */
+.dark :is(.app-sidebar, .app-drawer) .button.profile-trigger:not(:disabled) {
+  --button-depth-color: color-mix(in oklab, var(--ui-accent) 35%, transparent);
+  border-color: color-mix(in oklab, var(--ui-sidebar-tint) 24%, transparent);
+  background: color-mix(in oklab, var(--ui-accent) 14%, transparent);
+  color: oklch(95% 0.02 265);
+}
+
+.dark :is(.app-sidebar, .app-drawer) .button.profile-trigger:not(:disabled):hover {
+  border-color: color-mix(in oklab, var(--ui-sidebar-tint) 34%, transparent);
+  background: color-mix(in oklab, var(--ui-accent) 18%, transparent);
+}
+
+.dark :is(.app-sidebar, .app-drawer) .button.profile-trigger[aria-expanded="true"] {
+  border-color: var(--ui-accent);
+  background: color-mix(in oklab, var(--ui-accent) 18%, transparent);
+}
+
+.dark :is(.app-sidebar, .app-drawer) .profile-trigger .profile-chevron {
+  color: var(--ui-sidebar-tint);
+}
+
+/* Dark account menu opened from the sidebar: the same brand tint. */
+.dark :is(.app-sidebar, .app-drawer) .profile-menu-panel {
+  border-color: color-mix(in oklab, var(--ui-sidebar-tint) 22%, transparent);
+  background: color-mix(in oklab, var(--ui-accent) 10%, oklch(20.02% 0 0));
+}
+
+.dark :is(.app-sidebar, .app-drawer) .profile-menu-panel :is(.listbox-option, .profile-choice):hover {
+  background: color-mix(in oklab, var(--ui-sidebar-tint) 10%, transparent);
 }
 
 
@@ -941,7 +1156,11 @@ textarea.input {
 .profile-menu-divider {
   height: 1px;
   margin: 0.25rem 0;
-  background: var(--ui-divider);
+  background: oklch(92.2% 0 0);
+}
+
+.dark .profile-menu-divider {
+  background: rgb(255 255 255 / 0.07);
 }
 
 
@@ -1063,6 +1282,12 @@ button.menu-item {
 
 .dark .menu-chevron {
   color: var(--ui-fg-faint);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.dark .menu-item:is(:hover, :focus-visible, .menu-item-active) .menu-chevron {
+  opacity: 1;
 }
 
 .menu-back-icon {
@@ -1072,7 +1297,11 @@ button.menu-item {
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  color: var(--color-nav-muted);
+  color: var(--ui-accent);
+}
+
+.dark .menu-back-icon {
+  color: var(--ui-fg-dim);
 }
 
 .menu-back-label {
@@ -1088,7 +1317,7 @@ button.menu-item {
 }
 
 .menu-item.menu-back:hover {
-  background: rgb(0 0 0 / 0.04);
+  background: oklch(97% 0 0);
 }
 
 .dark .menu-item.menu-back:hover {
@@ -1149,7 +1378,7 @@ button.menu-item {
 }
 
 .dark .data-table th {
-  background: rgb(255 255 255 / 2%);
+  background: var(--ui-panel);
 }
 
 .data-table td {
@@ -1173,7 +1402,7 @@ button.menu-item {
   flex-shrink: 0;
   justify-content: center;
   padding: 0;
-  color: var(--color-nav-muted);
+  color: var(--color-nav-text);
 }
 
 .menu-item.sidebar-toggle:hover {
@@ -1188,6 +1417,7 @@ button.menu-item {
 .sidebar-toggle-icon {
   width: 18px;
   height: 18px;
+  opacity: 0.9;
 }
 
 /* Collapsed rail: keep icons at their expanded position, hide the text. */
@@ -1205,22 +1435,50 @@ button.menu-item {
   display: none;
 }
 
+.sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+  padding-right: 0.3125rem;
+  padding-left: 0.3125rem;
+}
+
+.sidebar-collapsed .menu-item.menu-back {
+  justify-content: center;
+  padding: 0;
+}
+
 .sidebar-collapsed .nav-section {
   height: 0;
   overflow: hidden;
-  margin: 0.5rem 0.25rem;
+  margin: 0.5rem 0.625rem !important;
   padding: 0;
-  border-top: 1px solid var(--coollabs-hairline);
+  border-top: 1px solid oklch(92.2% 0 0);
 }
 
-.sidebar-collapsed .profile-menu {
+.dark .sidebar-collapsed .nav-section {
+  border-top-color: var(--ui-sidebar-border);
+}
+
+.sidebar-collapsed .profile-menu,
+.profile-menu.is-compact {
   flex: none;
 }
 
-.sidebar-collapsed .button.profile-trigger {
+.sidebar-collapsed .button.profile-trigger,
+.profile-menu.is-compact .button.profile-trigger {
   width: 2rem;
   justify-content: center;
   padding: 0;
+}
+
+.profile-menu.is-compact :is(.profile-trigger-name, .profile-chevron:not(.profile-menu-panel *)) {
+  display: none;
+}
+
+.profile-menu.is-compact .profile-menu-panel {
+  top: calc(100% + 4px);
+  right: 0;
+  bottom: auto;
+  left: auto;
+  transform-origin: top right;
 }
 
 /* Command palette (Coolify global search): search row, results in an inset
@@ -1258,6 +1516,25 @@ button.menu-item {
   animation: command-palette-in 150ms var(--ui-ease-out);
 }
 
+/* Dark palette: a light brand tint on the shell and the results body. */
+.dark .command-palette {
+  border-color: rgb(147 180 255 / 0.22);
+  background: color-mix(in oklab, var(--ui-accent) 10%, var(--ui-menu-bg));
+}
+
+.dark .command-palette-body {
+  border-color: rgb(147 180 255 / 0.12);
+  background: color-mix(in oklab, var(--ui-accent) 6%, rgb(0 0 0 / 34%));
+}
+
+.dark .command-palette-search-icon {
+  color: var(--ui-accent-light);
+}
+
+.dark .command-palette-input::placeholder {
+  color: rgb(147 180 255 / 0.55);
+}
+
 @keyframes command-palette-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.98); }
 }
@@ -1286,8 +1563,7 @@ button.menu-item {
 }
 
 .command-palette-kbd,
-.command-palette-footer kbd,
-.sidebar-search kbd {
+.command-palette-footer kbd {
   display: inline-flex;
   height: 1.25rem;
   align-items: center;
@@ -1344,6 +1620,10 @@ button.menu-item {
   background: color-mix(in oklab, var(--ui-accent) 12%, transparent);
 }
 
+.dark .command-palette-item.is-active {
+  background: color-mix(in oklab, var(--ui-accent) 22%, transparent);
+}
+
 .command-palette-item.is-active::before {
   position: absolute;
   top: 6px;
@@ -1391,26 +1671,135 @@ button.menu-item {
   gap: 0.25rem;
 }
 
-/* Sidebar search trigger (Coolify: a filled nav row with the key hint). */
+/* Sidebar search trigger (Coolify: a filled 32px row with a bare 16px icon
+   and the key hint; Orbit's 8px radius). In the collapsed rail it is a tile
+   like the others. */
 .menu-item.sidebar-search {
+  height: 2rem;
   justify-content: space-between;
-  padding-right: 0.5rem;
   border-radius: 8px;
-  background: var(--ui-control-bg);
-  box-shadow: inset 0 0 0 1px var(--ui-control-border);
+  padding-right: 0.375rem;
+  padding-left: 0.625rem;
+  background: oklch(97% 0 0);
   color: var(--ui-fg-faint);
 }
 
 .menu-item.sidebar-search:hover {
-  background: var(--ui-hover);
-  color: var(--ui-fg);
+  background: oklch(92.2% 0 0);
+  color: var(--ui-fg-faint);
+}
+
+.dark .menu-item.sidebar-search {
+  background: color-mix(in oklab, var(--ui-sidebar-tint) 6%, transparent);
+  box-shadow: inset 0 0 0 1px var(--ui-sidebar-border);
+}
+
+.dark .menu-item.sidebar-search:hover {
+  background: color-mix(in oklab, var(--ui-sidebar-tint) 10%, transparent);
+}
+
+.menu-item.sidebar-search:focus-visible {
+  outline: 1px solid var(--ui-accent);
+}
+
+.sidebar-search .menu-item-icon,
+.sidebar-search:is(:hover, :active, :focus-visible) .menu-item-icon {
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  outline: none;
+  opacity: 0.9;
+}
+
+.sidebar-search kbd {
+  display: inline-flex;
+  min-width: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid oklch(87% 0 0);
+  border-radius: 8px;
+  background: oklch(92.2% 0 0);
+  padding: 0.125rem 0.375rem;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1rem;
+  color: var(--ui-fg-faint);
+}
+
+.dark .sidebar-search kbd {
+  border-color: color-mix(in oklab, var(--ui-sidebar-tint) 18%, transparent);
+  background: rgb(255 255 255 / 0.06);
 }
 
 .sidebar-collapsed .sidebar-search kbd {
   display: none;
 }
 
-.sidebar-collapsed .menu-item.sidebar-search {
+.sidebar-collapsed .sidebar-search-wrap {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.sidebar-collapsed .menu-item.sidebar-search,
+.sidebar-collapsed .menu-item.sidebar-search:hover {
+  height: 2.25rem;
+  justify-content: flex-start;
+  padding-left: 0.3125rem;
   background: transparent;
   box-shadow: none;
+}
+
+.sidebar-collapsed .sidebar-search .menu-item-icon {
+  box-sizing: content-box;
+  padding: 0.375rem;
+  border: 1px solid rgb(0 0 0 / 9%);
+  background: #fafafa;
+  box-shadow: 0 2px 0 var(--button-depth-color);
+  opacity: 1;
+}
+
+.sidebar-collapsed .sidebar-search:hover .menu-item-icon {
+  transform: translateY(-1px);
+  border-color: oklch(0% 0 0 / 0.18);
+  background: #fff;
+  box-shadow: 0 3px 0 var(--button-depth-color);
+}
+
+.dark .sidebar-collapsed .sidebar-search .menu-item-icon {
+  border-color: color-mix(in oklab, var(--ui-sidebar-tint) 13%, transparent);
+  background: color-mix(in oklab, var(--ui-accent) 7%, transparent);
+  color: var(--ui-sidebar-tint-fg);
+}
+
+.dark .sidebar-collapsed .sidebar-search:hover .menu-item-icon {
+  border-color: rgb(255 255 255 / 0.14);
+  background: rgb(255 255 255 / 0.06);
+  color: #fff;
+}
+
+/* Collapsed rail tooltip (Coolify: fixed, right of the hovered row). */
+.sidebar-tooltip {
+  position: fixed;
+  z-index: 10000;
+  transform: translateY(-50%);
+  border: 1px solid #404040;
+  border-radius: 8px;
+  background: #171717;
+  padding: 0.25rem 0.5rem;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1rem;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--ui-menu-shadow);
+}
+
+.dark .sidebar-tooltip {
+  border-color: rgb(255 255 255 / 0.1);
+  background: oklch(25.2% 0 0);
 }

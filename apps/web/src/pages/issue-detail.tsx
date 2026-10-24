@@ -263,7 +263,7 @@ export function IssueDetailPage() {
               <Detail label="Release">{data.release || "-"}</Detail>
               <Detail label="Culprit">{data.culprit || "-"}</Detail>
               <Detail label="Project">
-                <span className="text-[var(--ui-accent)]">
+                <span className="text-[var(--ui-accent-light)]">
                   <Link to={`/error-projects/${data.projectId}`}>
                     {data.projectName}
                   </Link>

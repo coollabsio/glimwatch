@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { Search } from "reicon-react";
+import { Search4 as Search } from "reicon-react";
 import { LatencyChart, UptimeBars } from "@/components/charts";
 import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge, Textarea } from "@/components/ui";
 import { ApiError, api, type Assertion, listAgents, type Monitor } from "@/lib/api";

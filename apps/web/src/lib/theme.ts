@@ -11,7 +11,7 @@ export function currentTheme(): ThemeMode {
 export function applyTheme(mode: ThemeMode) {
   document.documentElement.classList.toggle("dark", mode === "dark");
   localStorage.setItem("haruvo-theme", mode);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", mode === "dark" ? "#101010" : "#ffffff");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", mode === "dark" ? "#0a0a0a" : "#ffffff");
   window.dispatchEvent(new Event(EVENT));
 }
 
