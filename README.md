@@ -113,7 +113,13 @@ docker build -t haruvo:local .
 docker run --rm -p 8080:8080 -v haruvo-data:/var/lib/haruvo haruvo:local
 ```
 
-The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/haruvo`, and uses `haruvo healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service.
+Pushes to `main` publish `ghcr.io/coollabsio/haruvo` (`linux/amd64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab.
+
+```bash
+docker pull ghcr.io/coollabsio/haruvo:latest
+```
+
+The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/haruvo`, and uses `haruvo healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service. Set `HARUVO_IMAGE=ghcr.io/coollabsio/haruvo:latest` to point that file at the published image.
 
 ## Agents
 
