@@ -377,10 +377,17 @@ mod tests {
         );
     }
 
+    /// `Config::from_env` reads process globals. These two tests must not overlap.
+    fn lock_process_env() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        LOCK.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     #[test]
     fn rejects_sqlite_database_urls() {
-        // SAFETY: this test is the only writer of the variable, and it restores nothing
-        // because the process is the test binary. Other tests do not read DATABASE_URL.
+        let _env = lock_process_env();
+        // SAFETY: the lock above is the only other writer of these variables.
         unsafe {
             std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
             std::env::remove_var("STATIXO_DATABASE_URL");
@@ -396,6 +403,7 @@ mod tests {
 
     #[test]
     fn legacy_database_urls_still_select_postgres() {
+        let _env = lock_process_env();
         unsafe {
             std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
