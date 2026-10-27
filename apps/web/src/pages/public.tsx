@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router";
-import { Logo } from "@/app/Shell";
 import { UptimeBars } from "@/components/charts";
 import { Button, Empty, LayerCard, StatusBadge } from "@/components/ui";
 import { api, type PublicPage } from "@/lib/api";
 import { formatTime, percent, stateLabel } from "@/lib/utils";
+
+/** Public product page. The repo is the published home; there is no separate marketing site. */
+const HARUVO_PRODUCT_URL = "https://github.com/coollabsio/haruvo";
 
 type Tone = "neutral" | "success" | "warning" | "error" | "info";
 
@@ -51,13 +53,9 @@ export function PublicStatusPage() {
     <div className="min-h-svh bg-[var(--ui-canvas)] text-[var(--ui-fg)]">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-12 sm:py-16">
         <header className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Logo className="size-8 shrink-0" />
-            <div className="min-w-0">
-              <div className="text-[11px] font-medium text-[var(--ui-fg-faint)]">Haruvo</div>
-              <h1 className="text-[24px] font-semibold leading-8 tracking-tight">{page.title}</h1>
-              {page.description ? <p className="mt-1 text-[13px] text-[var(--ui-fg-faint)]">{page.description}</p> : null}
-            </div>
+          <div className="min-w-0">
+            <h1 className="text-[24px] font-semibold leading-8 tracking-tight">{page.title}</h1>
+            {page.description ? <p className="mt-1 text-[13px] text-[var(--ui-fg-faint)]">{page.description}</p> : null}
           </div>
           {page.homepage_url ? (
             <a className="shrink-0" href={page.homepage_url}><Button type="button">Homepage</Button></a>
@@ -137,7 +135,11 @@ export function PublicStatusPage() {
             </ul>
           )}
         </LayerCard>
-        <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">Powered by Haruvo</footer>
+        <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">
+          <a href={HARUVO_PRODUCT_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--ui-fg)]">
+            Powered by Haruvo
+          </a>
+        </footer>
       </div>
     </div>
   );
