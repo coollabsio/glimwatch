@@ -18,24 +18,24 @@ COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY apps/server/ apps/server/
 COPY --from=web /src/apps/web/dist/ apps/web/dist/
-RUN cargo build --locked --release -p haruvo-server
+RUN cargo build --locked --release -p statixo-server
 
 FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --uid 65532 --user-group --create-home --home-dir /var/lib/haruvo haruvo \
-    && mkdir -p /var/lib/haruvo \
-    && chown -R 65532:65532 /var/lib/haruvo
-COPY --from=server /src/target/release/haruvo /haruvo
-ENV HARUVO_ENV=production \
-    HARUVO_BIND=0.0.0.0 \
-    HARUVO_PORT=8080 \
-    HARUVO_DATABASE_PATH=/var/lib/haruvo/haruvo.sqlite \
-    HARUVO_PUBLIC_ORIGIN=http://127.0.0.1:8080
+    && useradd --uid 65532 --user-group --create-home --home-dir /var/lib/statixo statixo \
+    && mkdir -p /var/lib/statixo \
+    && chown -R 65532:65532 /var/lib/statixo
+COPY --from=server /src/target/release/statixo /statixo
+ENV STATIXO_ENV=production \
+    STATIXO_BIND=0.0.0.0 \
+    STATIXO_PORT=8080 \
+    STATIXO_DATABASE_PATH=/var/lib/statixo/statixo.sqlite \
+    STATIXO_PUBLIC_ORIGIN=http://127.0.0.1:8080
 USER 65532:65532
-VOLUME ["/var/lib/haruvo"]
+VOLUME ["/var/lib/statixo"]
 EXPOSE 8080
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD ["/haruvo", "healthcheck"]
-ENTRYPOINT ["/haruvo"]
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD ["/statixo", "healthcheck"]
+ENTRYPOINT ["/statixo"]
 CMD ["serve"]

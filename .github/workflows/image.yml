@@ -17,6 +17,9 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
+  # The GitHub repository stays coollabsio/haruvo. This publishes a new
+  # GHCR package; it does not rename ghcr.io/coollabsio/haruvo.
+  IMAGE: ghcr.io/${{ github.repository_owner }}/statixo
 
 jobs:
   build-push:
@@ -53,7 +56,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}
+          images: ${{ env.IMAGE }}
           flavor: |
             latest=false
           tags: |
@@ -92,7 +95,7 @@ jobs:
 
       - name: Create and publish multi-arch manifest
         env:
-          IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}
+          IMAGE: ${{ env.IMAGE }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail

@@ -5,15 +5,15 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use flate2::Compression;
 use flate2::write::{DeflateEncoder, GzEncoder};
-use haruvo_platform::TimestampMillis;
-use haruvo_server::{boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
+use statixo_platform::TimestampMillis;
+use statixo_server::{boot, initialize_setup_token, router, testing_config};
 use tower::ServiceExt;
 
 async fn app() -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("haruvo.sqlite");
+    let path = dir.path().join("statixo.sqlite");
     let _keep = Box::leak(Box::new(dir));
     let state = boot(testing_config(path)).await.unwrap();
     let token = initialize_setup_token(&state.db, TimestampMillis::now())
@@ -49,11 +49,7 @@ async fn call(
         .get("access-control-allow-origin")
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
-    let cookie = headers
-        .get("set-cookie")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(str::to_owned);
+    let cookie = session_cookie(&headers);
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     let json = if bytes.is_empty() {
         Value::Null
@@ -62,6 +58,21 @@ async fn call(
     };
     let _ = allow;
     (status, json, cookie.or(allow))
+}
+
+fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
+    let pairs: Vec<&str> = headers
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(|value| value.split(';').next())
+        .collect();
+    pairs
+        .iter()
+        .copied()
+        .find(|value| value.starts_with("statixo_session="))
+        .or_else(|| pairs.first().copied())
+        .map(str::to_owned)
 }
 
 fn envelope(event_json: &str) -> Vec<u8> {
@@ -83,7 +94,7 @@ fn envelope(event_json: &str) -> Vec<u8> {
 }
 
 fn hex_id() -> String {
-    haruvo_platform::Id::new().to_string().replace('-', "")
+    statixo_platform::Id::new().to_string().replace('-', "")
 }
 
 fn sample() -> Value {
@@ -119,7 +130,7 @@ fn sample() -> Value {
 }
 
 async fn exercise(app: Router, setup_token: Option<String>) {
-    let email = format!("errors-{}@coollabs.io", haruvo_platform::Id::new());
+    let email = format!("errors-{}@coollabs.io", statixo_platform::Id::new());
     let (path, body) = if let Some(token) = setup_token {
         (
             "/api/setup/complete",
@@ -328,7 +339,8 @@ async fn sqlite_ingest_groups_events() {
 
 #[tokio::test]
 async fn postgres_ingest_groups_events() {
-    let Some(url) = std::env::var("HARUVO_APP_POSTGRES_URL")
+    let Some(url) = std::env::var("STATIXO_APP_POSTGRES_URL")
+        .or_else(|_| std::env::var("HARUVO_APP_POSTGRES_URL"))
         .or_else(|_| std::env::var("STATUS_APP_POSTGRES_URL"))
         .ok()
         .filter(|url| url.starts_with("postgres"))

@@ -6,7 +6,7 @@ require __DIR__ . '/vendor/autoload.php';
 
 $dsn = getenv('SENTRY_DSN') ?: ($argv[1] ?? '');
 if ($dsn === '') {
-    fwrite(STDERR, "Set SENTRY_DSN to the project DSN from the Haruvo UI.\n");
+    fwrite(STDERR, "Set SENTRY_DSN to the project DSN from the Statixo UI.\n");
     exit(1);
 }
 

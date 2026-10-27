@@ -5,7 +5,7 @@ import { LayerCard, PageHeader } from "@/components/ui";
 export function HomePage() {
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Dashboard" description="Every Haruvo product in one workspace." />
+      <PageHeader title="Dashboard" description="Every Statixo product in one workspace." />
       <div className="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3">
         {products.map((product) => (
           <LayerCard key={product.id} title={product.label} description={product.description}>

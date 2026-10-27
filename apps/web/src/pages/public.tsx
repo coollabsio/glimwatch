@@ -54,7 +54,7 @@ export function PublicStatusPage() {
           <div className="flex min-w-0 items-center gap-3">
             <Logo className="size-8 shrink-0" />
             <div className="min-w-0">
-              <div className="text-[11px] font-medium text-[var(--ui-fg-faint)]">Haruvo</div>
+              <div className="text-[11px] font-medium text-[var(--ui-fg-faint)]">Statixo</div>
               <h1 className="text-[24px] font-semibold leading-8 tracking-tight">{page.title}</h1>
               {page.description ? <p className="mt-1 text-[13px] text-[var(--ui-fg-faint)]">{page.description}</p> : null}
             </div>
@@ -137,7 +137,9 @@ export function PublicStatusPage() {
             </ul>
           )}
         </LayerCard>
-        <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">Powered by Haruvo</footer>
+        <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">
+          <a href="https://statixo.io" className="hover:text-[var(--ui-fg-dim)]">Powered by Statixo</a>
+        </footer>
       </div>
     </div>
   );

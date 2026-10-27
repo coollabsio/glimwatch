@@ -3,12 +3,13 @@
 //! A fresh database gets a single opaque token (hash stored, 30 minute lifetime).
 //! Completing setup creates the owner, marks `installation_state` initialized, and
 //! deletes every setup token. Setup cannot run again. Public registration stays closed
-//! unless `HARUVO_OPEN_SIGNUP` is set after that.
+//! unless `STATIXO_OPEN_SIGNUP` is set after that (`HARUVO_OPEN_SIGNUP` and
+//! `STATUS_OPEN_SIGNUP` are still accepted).
 
 use std::ops::DerefMut;
 
-use haruvo_platform::{Database, Id, TimestampMillis, generate_token, hash_token};
 use sqlx::{Any, Row, Transaction};
+use statixo_platform::{Database, Id, TimestampMillis, generate_token, hash_token};
 use thiserror::Error;
 
 use crate::repo::{self, User};
@@ -249,7 +250,7 @@ async fn ensure_state(tx: &mut Transaction<'_, Any>) -> Result<(), sqlx::Error> 
 }
 
 async fn lock_state(tx: &mut Transaction<'_, Any>, db: &Database) -> Result<(), sqlx::Error> {
-    if db.backend() == haruvo_platform::Backend::Postgres {
+    if db.backend() == statixo_platform::Backend::Postgres {
         sqlx::query("SELECT initialized FROM installation_state WHERE id = 1 FOR UPDATE")
             .fetch_one(tx.deref_mut())
             .await?;

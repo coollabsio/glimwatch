@@ -2,7 +2,7 @@
 //!
 //! Orbit holds `<database>.lock` for the life of a SQLite process, so `setup-token`
 //! cannot run beside the server. Postgres uses a shared advisory lock instead and
-//! allows the command while the server is up. Haruvo does the same split: this file
+//! allows the command while the server is up. Statixo does the same split: this file
 //! lock is SQLite-only.
 
 use std::fs::{File, OpenOptions, TryLockError};
@@ -41,7 +41,7 @@ pub fn lock_sqlite(database_path: &Path) -> Result<Guard, String> {
     match file.try_lock() {
         Ok(()) => Ok(Guard { _file: file }),
         Err(TryLockError::WouldBlock) => Err(format!(
-            "database is already owned by another Haruvo process: {}. On SQLite, stop Haruvo before `setup-token rotate` or starting another server",
+            "database is already owned by another Statixo process: {}. On SQLite, stop Statixo before `setup-token rotate` or starting another server",
             database_path.display()
         )),
         Err(TryLockError::Error(error)) => Err(format!(
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn second_sqlite_lock_fails_until_the_first_is_dropped() {
         let path = std::env::temp_dir().join(format!(
-            "haruvo-lock-{}-{}.sqlite",
+            "statixo-lock-{}-{}.sqlite",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

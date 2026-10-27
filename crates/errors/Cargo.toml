@@ -1,5 +1,5 @@
 [package]
-name = "haruvo-errors"
+name = "statixo-errors"
 edition.workspace = true
 version.workspace = true
 license.workspace = true

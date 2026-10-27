@@ -7,11 +7,11 @@
   "ports": [
     {
       "port": 43123,
-      "label": "Haruvo web (Vite)"
+      "label": "Statixo web (Vite)"
     },
     {
       "port": 43124,
-      "label": "Haruvo API"
+      "label": "Statixo API"
     }
   ]
 }

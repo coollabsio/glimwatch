@@ -1,6 +1,6 @@
-//! Demo error project and a few grouped events for `haruvo seed`.
-use haruvo_errors::normalize_event;
+//! Demo error project and a few grouped events for `statixo seed`.
 use serde_json::{Value, json};
+use statixo_errors::normalize_event;
 
 use super::store;
 use crate::error::AppError;

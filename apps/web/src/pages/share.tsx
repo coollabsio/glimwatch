@@ -26,7 +26,7 @@ export function SharePage() {
     <div className="min-h-svh bg-[var(--ui-canvas)] text-[var(--ui-fg)]">
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-12 sm:py-16">
         <header>
-          <div className="text-[11px] font-medium text-[var(--ui-fg-faint)]">Haruvo</div>
+          <div className="text-[11px] font-medium text-[var(--ui-fg-faint)]">Statixo</div>
           <h1 className="text-[24px] font-semibold leading-8 tracking-tight">{data?.name ?? "Shared analytics"}</h1>
           {data?.subtitle ? <p className="mt-1 text-[13px] text-[var(--ui-fg-faint)]">{data.subtitle}</p> : null}
         </header>
@@ -61,7 +61,9 @@ export function SharePage() {
             </table>
           )}
         </LayerCard>
-        <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">Powered by Haruvo</footer>
+        <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">
+          <a href="https://statixo.io" className="hover:text-[var(--ui-fg-dim)]">Powered by Statixo</a>
+        </footer>
       </div>
     </div>
   );

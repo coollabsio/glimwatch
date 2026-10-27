@@ -1,12 +1,12 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use haruvo_platform::TimestampMillis;
-use haruvo_server::{
-    SetupError, boot, initialize_setup_token, rotate_setup_token, router, testing_config,
-};
 use http_body_util::BodyExt;
 use serde_json::Value;
+use statixo_platform::TimestampMillis;
+use statixo_server::{
+    SetupError, boot, initialize_setup_token, rotate_setup_token, router, testing_config,
+};
 use tower::ServiceExt;
 
 async fn started(open_signup: bool) -> (Router, String) {
@@ -53,12 +53,7 @@ async fn call(
         .await
         .unwrap();
     let status = response.status();
-    let cookie = response
-        .headers()
-        .get("set-cookie")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(str::to_owned);
+    let cookie = session_cookie(response.headers());
     let bytes = response.into_body().collect().await.unwrap().to_bytes();
     let json = if bytes.is_empty() {
         Value::Null
@@ -254,4 +249,47 @@ async fn rotate_issues_a_new_unused_token_and_refuses_after_setup() {
 
     let error = rotate_setup_token(&db, now).await.unwrap_err();
     assert!(matches!(error, SetupError::AlreadyComplete));
+}
+
+#[tokio::test]
+async fn legacy_session_cookies_still_authenticate() {
+    let (app, token) = started(false).await;
+    let (status, _, cookie) = call(
+        &app,
+        "POST",
+        "/api/setup/complete",
+        Some(owner_body(&token)),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let cookie = cookie.expect("session cookie");
+    assert!(cookie.starts_with("statixo_session="), "{cookie}");
+    let value = cookie.split_once('=').unwrap().1;
+    for name in ["haruvo_session", "status_session"] {
+        let (status, me, _) = call(
+            &app,
+            "GET",
+            "/api/auth/me",
+            None,
+            Some(&format!("{name}={value}")),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{name} {me}");
+    }
+}
+
+fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
+    let pairs: Vec<&str> = headers
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(|value| value.split(';').next())
+        .collect();
+    pairs
+        .iter()
+        .copied()
+        .find(|value| value.starts_with("statixo_session="))
+        .or_else(|| pairs.first().copied())
+        .map(str::to_owned)
 }
