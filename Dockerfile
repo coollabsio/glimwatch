@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.7
-FROM oven/bun:1 AS web
+# Frontend assets are architecture-independent. Build them on the host
+# platform so the arm64 image does not run Bun under QEMU.
+FROM --platform=$BUILDPLATFORM oven/bun:1 AS web
 WORKDIR /src/apps/web
 COPY apps/web/package.json apps/web/bun.lock ./
 RUN bun install --frozen-lockfile

@@ -113,7 +113,7 @@ docker build -t haruvo:local .
 docker run --rm -p 8080:8080 -v haruvo-data:/var/lib/haruvo haruvo:local
 ```
 
-Pushes to `main` publish `ghcr.io/coollabsio/haruvo` (`linux/amd64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab.
+Pushes to `main` publish `ghcr.io/coollabsio/haruvo` (`linux/amd64` and `linux/arm64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab.
 
 ```bash
 docker pull ghcr.io/coollabsio/haruvo:latest
