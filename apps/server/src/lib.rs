@@ -11,6 +11,7 @@ mod engine;
 mod error;
 mod errors;
 mod insights;
+mod instance_settings;
 mod migrations;
 mod notify;
 mod ownership;
@@ -25,6 +26,7 @@ mod static_assets;
 
 pub use cli::run;
 pub use errors::seed_demo as seed_errors;
+pub use instance_settings::permit_signup;
 pub use routes::router;
 pub use seed::{DEMO_EMAIL, DEMO_PASSWORD};
 pub use setup::{SetupError, initialize_setup_token, is_complete, rotate_setup_token, setup_url};

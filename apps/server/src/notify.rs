@@ -68,16 +68,16 @@ async fn send(
     let (subject, text) = plain(payload);
     match channel.provider.as_str() {
         "email" => {
-            let Some(smtp) = &state.config.smtp else {
+            let Some(smtp) = effective_smtp(state).await else {
                 return Ok(SendOutcome::Skipped(
-                    "SMTP is not configured. Set STATIXO_SMTP_HOST and STATIXO_SMTP_FROM. HARUVO_SMTP_* and STATUS_SMTP_* still work.".to_owned(),
+                    "SMTP is not configured. Save a mail server in Settings, or set STATIXO_SMTP_HOST and STATIXO_SMTP_FROM. HARUVO_SMTP_* and STATUS_SMTP_* still work.".to_owned(),
                 ));
             };
             let to = config
                 .get("to")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "email channel is missing a recipient".to_owned())?;
-            send_email(smtp, to, &subject, &text).await?;
+            send_email(&smtp, to, &subject, &text).await?;
             Ok(SendOutcome::Sent)
         }
         "webhook" => {
@@ -138,6 +138,19 @@ async fn post_json(state: &AppState, url: &str, body: serde_json::Value) -> Resu
         Ok(())
     } else {
         Err(format!("endpoint returned HTTP {}", response.status()))
+    }
+}
+
+async fn effective_smtp(state: &AppState) -> Option<statixo_platform::SmtpConfig> {
+    match crate::instance_settings::load(&state.db).await {
+        Ok(settings) => settings
+            .smtp
+            .map(statixo_platform::SmtpConfig::from)
+            .or_else(|| state.config.smtp.clone()),
+        Err(error) => {
+            tracing::error!(%error, "loading instance mail server");
+            state.config.smtp.clone()
+        }
     }
 }
 

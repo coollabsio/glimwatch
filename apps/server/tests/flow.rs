@@ -6,7 +6,9 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use statixo_platform::TimestampMillis;
-use statixo_server::{DEMO_PASSWORD, boot, initialize_setup_token, router, testing_config};
+use statixo_server::{
+    DEMO_PASSWORD, boot, initialize_setup_token, permit_signup, router, testing_config,
+};
 use tower::ServiceExt;
 
 async fn app() -> (Router, Option<String>) {
@@ -335,6 +337,9 @@ async fn postgres_accepts_the_same_api() {
         .await
         .unwrap()
         .map(|issued| issued.token);
+    if token.is_none() {
+        permit_signup(&state.db).await.unwrap();
+    }
     let app = router(state);
     let email = format!("pg-{}@coollabs.io", statixo_platform::Id::new());
     let (status, user, _) = if let Some(token) = token {

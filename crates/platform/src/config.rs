@@ -108,6 +108,9 @@ impl Config {
             }
             config.database_url = Some(url);
         }
+        // Parsed so an existing environment still boots. Registration is the
+        // instance setting in the database, not this flag. STATIXO_OPEN_SIGNUP,
+        // HARUVO_OPEN_SIGNUP, and STATUS_OPEN_SIGNUP are ignored.
         if let Some(signup) = compat(OPEN_SIGNUP) {
             config.open_signup = parse_bool(&signup).ok_or(ConfigError::Invalid {
                 name: OPEN_SIGNUP,

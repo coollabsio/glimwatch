@@ -3,8 +3,7 @@
 //! A fresh database gets a single opaque token (hash stored, 30 minute lifetime).
 //! Completing setup creates the owner, marks `installation_state` initialized, and
 //! deletes every setup token. Setup cannot run again. Public registration stays closed
-//! unless `STATIXO_OPEN_SIGNUP` is set after that (`HARUVO_OPEN_SIGNUP` and
-//! `STATUS_OPEN_SIGNUP` are still accepted).
+//! until the root user opens it in Settings, and only after a mail server is saved.
 
 use std::ops::DerefMut;
 

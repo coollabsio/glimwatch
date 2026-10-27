@@ -210,6 +210,46 @@ pub async fn user_by_email(db: &Database, email: &str) -> Result<Option<User>, s
     row.as_ref().map(map_user).transpose()
 }
 
+#[derive(Clone, Debug)]
+pub struct Account {
+    pub id: Id,
+    pub email: String,
+    pub display_name: String,
+    pub role: String,
+}
+
+pub async fn list_accounts(db: &Database) -> Result<Vec<Account>, sqlx::Error> {
+    let rows =
+        sqlx::query("SELECT id, email, display_name, role FROM users ORDER BY created_at, id")
+            .fetch_all(db.pool())
+            .await?;
+    rows.iter()
+        .map(|row| {
+            Ok(Account {
+                id: parse_id(row, "id")?,
+                email: row.try_get("email")?,
+                display_name: row.try_get("display_name")?,
+                role: row.try_get("role")?,
+            })
+        })
+        .collect()
+}
+
+pub async fn set_user_role(
+    db: &Database,
+    id: Id,
+    role: &str,
+    now: TimestampMillis,
+) -> Result<bool, sqlx::Error> {
+    let updated = sqlx::query("UPDATE users SET role = $1, updated_at = $2 WHERE id = $3")
+        .bind(role)
+        .bind(now.as_millis())
+        .bind(id.to_string())
+        .execute(db.pool())
+        .await?;
+    Ok(updated.rows_affected() == 1)
+}
+
 pub async fn insert_user(
     db: &Database,
     id: Id,

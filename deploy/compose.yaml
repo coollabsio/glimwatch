@@ -16,7 +16,7 @@ services:
       # To keep a Haruvo volume mounted elsewhere, set this to that file.
       STATIXO_DATABASE_PATH: /var/lib/statixo/statixo.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
-      # STATIXO_OPEN_SIGNUP: "true"
+      # The root user opens it in Settings after SMTP is configured.
       # Switch the same binary to Postgres by setting this and starting the db service.
       # STATIXO_DB_PASSWORD comes from the environment. Do not commit a password.
       # STATIXO_DATABASE_URL: postgres://statixo:${STATIXO_DB_PASSWORD}@db:5432/statixo
