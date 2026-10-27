@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
-# Frontend assets are architecture-independent. Build them on the host
-# platform so the arm64 image does not run Bun under QEMU.
+# UI assets are architecture-independent. Build them on BUILDPLATFORM so
+# a cross-build does not emulate Bun. CI builds amd64 and arm64 on native
+# runners, where this stage is native too.
 FROM --platform=$BUILDPLATFORM oven/bun:1 AS web
 WORKDIR /src/apps/web
 COPY apps/web/package.json apps/web/bun.lock ./
