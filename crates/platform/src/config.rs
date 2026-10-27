@@ -411,6 +411,7 @@ mod tests {
             std::env::remove_var("HARUVO_DATABASE_URL");
             std::env::remove_var("DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
+            // STATIXO_* is not an alias. This URL must not select Postgres.
             std::env::set_var(
                 "STATIXO_DATABASE_URL",
                 "postgres://statixo:secret@127.0.0.1:1/statixo",
