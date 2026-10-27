@@ -22,6 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: arm64
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -48,9 +53,9 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
-          # Plain linux/amd64 manifest, not an attestation index.
+          # Plain multi-arch manifest (linux/amd64 + linux/arm64), not an attestation index.
           provenance: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
