@@ -1,11 +1,11 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
-use serde_json::Value;
-use statixo_domain::{
+use haruvo_domain::{
     Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
     JobType, MonitorState, PageBanner, summarize,
 };
-use statixo_platform::{Id, TimestampMillis};
+use haruvo_platform::{Id, TimestampMillis};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::repo::{
     self, Audit, Channel, CheckRow, Component, DailyRow, Delivery, Incident, IncidentUpdate,
@@ -185,7 +185,7 @@ fn average(sum: i64, count: i64) -> Option<i64> {
     if count <= 0 { None } else { Some(sum / count) }
 }
 
-fn bar(bucket: statixo_domain::DayBucket) -> BarResponse {
+fn bar(bucket: haruvo_domain::DayBucket) -> BarResponse {
     BarResponse {
         day: day_label(bucket.day),
         status: bucket.status.as_str().to_owned(),

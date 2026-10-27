@@ -250,7 +250,7 @@ export function Shell() {
           )}
         >
           {collapsed ? (
-            <NavLink to="/" title="Statixo">
+            <NavLink to="/" title="Haruvo">
               <Logo className="size-5" />
             </NavLink>
           ) : (
@@ -265,7 +265,7 @@ export function Shell() {
           <span className="mobile-logo-tile">
             <Logo className="size-[18px]" />
           </span>
-          <span className="truncate">Statixo</span>
+          <span className="truncate">Haruvo</span>
         </NavLink>
         <div className="flex shrink-0 items-center gap-1">
           <ProfileMenu user={me.data} onLogout={() => void logout()} compact />
@@ -364,7 +364,7 @@ export function Shell() {
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 352 352" className={cn("size-6 shrink-0", className)} role="img" aria-label="Statixo">
+    <svg viewBox="0 0 352 352" className={cn("size-6 shrink-0", className)} role="img" aria-label="Haruvo">
       <path d="M0 0h64v128h192V0h64v320h-64V192H64v128H0Z" transform="translate(32 32)" fill="#1e3a8a" />
       <path d="M0 0h64v128h192V0h64v320h-64V192H64v128H0Z" fill="#2b7fff" />
     </svg>
@@ -375,7 +375,7 @@ function Wordmark({ version, onClick }: { version: string; onClick?: () => void 
   return (
     <span className="flex min-w-0 items-baseline gap-1.5">
       <NavLink to="/" onClick={onClick} className="text-[15px] font-semibold tracking-tight text-[var(--ui-fg)]">
-        Statixo
+        Haruvo
       </NavLink>
       <span className="truncate text-[10.5px] font-medium text-[var(--ui-fg-faint)]">v{version}</span>
     </span>

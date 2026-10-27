@@ -16,13 +16,13 @@ export type Appearance = {
   chartTimes: "local" | "utc";
 };
 
-const KEY = "statixo-appearance";
-const EVENT = "statixo-appearance";
+const KEY = "haruvo-appearance";
+const EVENT = "haruvo-appearance";
 const customKeys = ["sidebar", "selected", "accent", "background"] as const;
 
 export const customThemePresets: { name: string; theme: CustomTheme | null; swatch?: CustomTheme }[] = [
   // The built-in Dark theme, not a custom theme. Its colors start the fields when you edit it.
-  { name: "Statixo", theme: null, swatch: { sidebar: "#111a2e", selected: "#1c1c1c", accent: "#2563eb", background: "#0a0a0a" } },
+  { name: "Haruvo", theme: null, swatch: { sidebar: "#111a2e", selected: "#1c1c1c", accent: "#2563eb", background: "#0a0a0a" } },
   { name: "Midnight", theme: { sidebar: "#0f172a", selected: "#2e4a7d", accent: "#f2458f", background: "#1a2338" } },
   { name: "Forest", theme: { sidebar: "#12342b", selected: "#2c6e57", accent: "#f4b860", background: "#1b2a25" } },
   { name: "Ember", theme: { sidebar: "#3b1410", selected: "#8f2d1f", accent: "#ffb86b", background: "#241816" } },
@@ -78,7 +78,7 @@ export function parseCustomTheme(code: string): CustomTheme | null {
 function read(): Appearance {
   let saved: Partial<Appearance> = {};
   try {
-    const raw = localStorage.getItem(KEY) ?? localStorage.getItem("haruvo-appearance");
+    const raw = localStorage.getItem(KEY) ?? localStorage.getItem("statixo-appearance");
     saved = JSON.parse(raw ?? "{}") ?? {};
   } catch {
     // A broken entry falls back to the defaults.
@@ -137,7 +137,7 @@ export function setAppearance(patch: Partial<Appearance>) {
   const vars = apply(current);
   localStorage.setItem(KEY, JSON.stringify({ ...current, vars }));
   localStorage.removeItem("haruvo-theme");
-  localStorage.removeItem("haruvo-appearance");
+  localStorage.removeItem("statixo-appearance");
   window.dispatchEvent(new Event(EVENT));
 }
 

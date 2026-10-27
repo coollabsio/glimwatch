@@ -42,7 +42,7 @@ export function IssuesPage() {
   const [saved, setSaved] = useState<SavedView[]>([]);
 
   useEffect(() => {
-    const raw = localStorage.getItem("statixo-error-views") ?? localStorage.getItem("haruvo-error-views");
+    const raw = localStorage.getItem("haruvo-error-views") ?? localStorage.getItem("statixo-error-views");
     if (raw) setSaved(JSON.parse(raw) as SavedView[]);
   }, []);
 
@@ -88,8 +88,8 @@ export function IssuesPage() {
     if (!name) return;
     const next = [...saved.filter((view) => view.name !== name), { name, status, projectId, environment, range, q, sort }];
     setSaved(next);
-    localStorage.setItem("statixo-error-views", JSON.stringify(next));
-    localStorage.removeItem("haruvo-error-views");
+    localStorage.setItem("haruvo-error-views", JSON.stringify(next));
+    localStorage.removeItem("statixo-error-views");
     setSaveName("");
     setSaveOpen(false);
   }

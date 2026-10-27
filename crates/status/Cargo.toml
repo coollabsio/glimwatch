@@ -1,11 +1,11 @@
 [package]
-name = "statixo-domain"
+name = "haruvo-domain"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [dependencies]
-statixo-platform = { path = "../platform" }
+haruvo-platform = { path = "../platform" }
 hmac.workspace = true
 serde.workspace = true
 serde_json.workspace = true

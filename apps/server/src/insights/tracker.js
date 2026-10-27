@@ -29,7 +29,7 @@
   const reportFailure = () => {
     if (failureReported) return
     failureReported = true
-    console.info('[Statixo] Analytics was disabled automatically because tracking is blocked by the browser or a privacy tool.')
+    console.info('[Haruvo] Analytics was disabled automatically because tracking is blocked by the browser or a privacy tool.')
   }
   const payload = () => ({ site, url: currentUrl, referrer: currentRef || null, title: document.title, hostname: location.hostname, screen, language: navigator.language })
   const send = (type, extra) => {
@@ -159,7 +159,7 @@
   initPerformance()
   send('pageview')
   const track = (name, data) => send(name, { data })
-  window.statixoEvent = track
   window.haruvoEvent = track
+  window.statixoEvent = track
   window.beaconEvent = track
 })()

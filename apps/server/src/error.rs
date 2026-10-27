@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use statixo_platform::Problem;
+use haruvo_platform::Problem;
 
 #[derive(Debug)]
 pub enum AppError {
@@ -12,7 +12,7 @@ pub enum AppError {
     Forbidden(&'static str),
     NotFound,
     Busy,
-    /// The Statixo host has no network, so a failed check proves nothing.
+    /// The Haruvo host has no network, so a failed check proves nothing.
     Offline,
     Conflict(String),
     InvalidSetupToken,
@@ -69,7 +69,7 @@ impl IntoResponse for AppError {
         let problem = match self {
             Self::Unauthorized => Problem::unauthorized(),
             Self::InvalidLogin => Problem {
-                type_uri: "https://statixo.io/problems/invalid-login".to_owned(),
+                type_uri: "https://haruvo.io/problems/invalid-login".to_owned(),
                 title: "Sign-in failed".to_owned(),
                 status: 401,
                 code: "invalid_login".to_owned(),
@@ -77,7 +77,7 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::Forbidden(detail) => Problem {
-                type_uri: "https://statixo.io/problems/forbidden".to_owned(),
+                type_uri: "https://haruvo.io/problems/forbidden".to_owned(),
                 title: "Forbidden".to_owned(),
                 status: 403,
                 code: "forbidden".to_owned(),
@@ -86,7 +86,7 @@ impl IntoResponse for AppError {
             },
             Self::NotFound => Problem::not_found(),
             Self::TooManyRequests => Problem {
-                type_uri: "https://statixo.io/problems/too-many-requests".to_owned(),
+                type_uri: "https://haruvo.io/problems/too-many-requests".to_owned(),
                 title: "Too many requests".to_owned(),
                 status: 429,
                 code: "too_many_requests".to_owned(),
@@ -95,16 +95,16 @@ impl IntoResponse for AppError {
             },
             Self::Busy => Problem::conflict("A check is already running for this monitor."),
             Self::Offline => Problem {
-                type_uri: "https://statixo.io/problems/host-offline".to_owned(),
-                title: "Statixo host has no network".to_owned(),
+                type_uri: "https://haruvo.io/problems/host-offline".to_owned(),
+                title: "Haruvo host has no network".to_owned(),
                 status: 503,
                 code: "host_offline".to_owned(),
-                detail: "The check failed, but Statixo cannot reach any connectivity target either. The result was not recorded.".to_owned(),
+                detail: "The check failed, but Haruvo cannot reach any connectivity target either. The result was not recorded.".to_owned(),
                 fields: None,
             },
             Self::Conflict(detail) => Problem::conflict(detail),
             Self::InvalidSetupToken => Problem {
-                type_uri: "https://statixo.io/problems/invalid-setup-token".to_owned(),
+                type_uri: "https://haruvo.io/problems/invalid-setup-token".to_owned(),
                 title: "Invalid setup token".to_owned(),
                 status: 401,
                 code: "invalid_setup_token".to_owned(),
@@ -112,7 +112,7 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::SetupUnavailable => Problem {
-                type_uri: "https://statixo.io/problems/setup-unavailable".to_owned(),
+                type_uri: "https://haruvo.io/problems/setup-unavailable".to_owned(),
                 title: "Setup unavailable".to_owned(),
                 status: 409,
                 code: "setup_unavailable".to_owned(),
@@ -120,15 +120,15 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::RegistrationClosed => Problem {
-                type_uri: "https://statixo.io/problems/registration-closed".to_owned(),
+                type_uri: "https://haruvo.io/problems/registration-closed".to_owned(),
                 title: "Registration is closed".to_owned(),
                 status: 403,
                 code: "registration_closed".to_owned(),
-                detail: "This Statixo does not accept public sign-up.".to_owned(),
+                detail: "This Haruvo does not accept public sign-up.".to_owned(),
                 fields: None,
             },
             Self::EmailNotConfigured => Problem {
-                type_uri: "https://statixo.io/problems/email-not-configured".to_owned(),
+                type_uri: "https://haruvo.io/problems/email-not-configured".to_owned(),
                 title: "Email is not configured".to_owned(),
                 status: 409,
                 code: "email_not_configured".to_owned(),
@@ -136,7 +136,7 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::BadRequest(detail) => Problem {
-                type_uri: "https://statixo.io/problems/bad-request".to_owned(),
+                type_uri: "https://haruvo.io/problems/bad-request".to_owned(),
                 title: "Bad request".to_owned(),
                 status: 400,
                 code: "bad_request".to_owned(),

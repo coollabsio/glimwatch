@@ -21,8 +21,8 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     env:
-      STATIXO_TEST_POSTGRES_URL: postgres://status:status@127.0.0.1:5432/status_platform
-      STATIXO_APP_POSTGRES_URL: postgres://status:status@127.0.0.1:5432/status_app
+      HARUVO_TEST_POSTGRES_URL: postgres://status:status@127.0.0.1:5432/status_platform
+      HARUVO_APP_POSTGRES_URL: postgres://status:status@127.0.0.1:5432/status_app
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.99.1

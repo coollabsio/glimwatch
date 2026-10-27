@@ -334,7 +334,7 @@ function EventsPanel({ siteId, query }: { siteId: string; query: string }) {
   });
   const rows = events.data?.rows ?? [];
   return (
-    <LayerCard title="Custom events" description={`${events.data?.total ?? 0} events in this range. Call statixoEvent(name, data) from the tracker.`} flush>
+    <LayerCard title="Custom events" description={`${events.data?.total ?? 0} events in this range. Call haruvoEvent(name, data) from the tracker.`} flush>
       {events.error ? <div className="px-4 pt-3"><ErrorText error={events.error} /></div> : null}
       {rows.length === 0 ? <CardEmpty title="No events yet" body="Events you send from the tracker show up here." /> : (
         <table className="cool-table">
@@ -466,7 +466,7 @@ function TrackerPanel({ site }: { site: InsightSite }) {
       <LayerCard title="Tracker" description="Paste this before </body>. It sets no cookies.">
         <pre className={cn(code, "overflow-x-auto p-3 text-[var(--ui-fg)]")}>{snippet}</pre>
         <p className="mt-4 mb-1.5 text-[11px] font-medium text-[var(--ui-fg-faint)]">Custom events</p>
-        <pre className={cn(code, "overflow-x-auto p-3 text-[var(--ui-fg)]")}>{`statixoEvent("signup", { plan: "hobby" })`}</pre>
+        <pre className={cn(code, "overflow-x-auto p-3 text-[var(--ui-fg)]")}>{`haruvoEvent("signup", { plan: "hobby" })`}</pre>
       </LayerCard>
       <LayerCard title="Public dashboard" description="Share aggregate numbers without a login.">
         <form className="space-y-4" onSubmit={(event: FormEvent) => { event.preventDefault(); save.mutate(); }}>

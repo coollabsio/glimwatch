@@ -1,12 +1,12 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use http_body_util::BodyExt;
-use serde_json::Value;
-use statixo_platform::TimestampMillis;
-use statixo_server::{
+use haruvo_platform::TimestampMillis;
+use haruvo_server::{
     SetupError, boot, initialize_setup_token, rotate_setup_token, router, testing_config,
 };
+use http_body_util::BodyExt;
+use serde_json::Value;
 use tower::ServiceExt;
 
 async fn started(open_signup: bool) -> (Router, String) {
@@ -270,9 +270,9 @@ async fn legacy_session_cookies_still_authenticate() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
     let cookie = cookie.expect("session cookie");
-    assert!(cookie.starts_with("statixo_session="), "{cookie}");
+    assert!(cookie.starts_with("haruvo_session="), "{cookie}");
     let value = cookie.split_once('=').unwrap().1;
-    for name in ["haruvo_session", "status_session"] {
+    for name in ["statixo_session", "status_session"] {
         let (status, me, _) = call(
             &app,
             "GET",
@@ -295,7 +295,7 @@ fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
     pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("statixo_session="))
+        .find(|value| value.starts_with("haruvo_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned)
 }

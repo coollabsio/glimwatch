@@ -734,7 +734,7 @@ mod tests {
             serde_json::json!({
                 "filename": "main.rs",
                 "abs_path": "/workspace/examples/rust/src/main.rs",
-                "function": "statixo_rust_example::main",
+                "function": "haruvo_rust_example::main",
                 "lineno": 40,
                 "in_app": true
             })
@@ -766,18 +766,18 @@ mod tests {
         assert_eq!(with_stack.fingerprint, thread_only.fingerprint);
         assert_eq!(
             with_stack.culprit.as_deref(),
-            Some("statixo_rust_example::main")
+            Some("haruvo_rust_example::main")
         );
         assert_eq!(
             thread_only.culprit.as_deref(),
-            Some("statixo_rust_example::main")
+            Some("haruvo_rust_example::main")
         );
         assert!(
             with_stack.exceptions[0]
                 .frames
                 .iter()
                 .any(
-                    |frame| frame.function.as_deref() == Some("statixo_rust_example::main")
+                    |frame| frame.function.as_deref() == Some("haruvo_rust_example::main")
                         && frame.in_app
                 )
         );
@@ -792,7 +792,7 @@ mod tests {
         let panic_frame = |closure: &str| {
             serde_json::json!({
                 "filename": "main.rs",
-                "function": format!("statixo_rust_example::main::{{closure#{closure}}}"),
+                "function": format!("haruvo_rust_example::main::{{closure#{closure}}}"),
                 "lineno": 43,
                 "in_app": true
             })

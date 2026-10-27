@@ -3,12 +3,12 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use http_body_util::BodyExt;
-use serde_json::Value;
-use statixo_platform::TimestampMillis;
-use statixo_server::{
+use haruvo_platform::TimestampMillis;
+use haruvo_server::{
     DEMO_PASSWORD, boot, initialize_setup_token, permit_signup, router, testing_config,
 };
+use http_body_util::BodyExt;
+use serde_json::Value;
 use tower::ServiceExt;
 
 async fn app() -> (Router, Option<String>) {
@@ -99,7 +99,7 @@ fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
     pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("statixo_session="))
+        .find(|value| value.starts_with("haruvo_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned)
 }
@@ -231,8 +231,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
     assert_eq!(public["components"].as_array().unwrap().len(), 2);
     assert!(!public["incidents"].as_array().unwrap().is_empty());
 
-    let starts = statixo_platform::TimestampMillis::now();
-    let ends = statixo_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
+    let starts = haruvo_platform::TimestampMillis::now();
+    let ends = haruvo_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
     let (status, maintenance, _) = call(
         &app,
         "POST",
@@ -322,8 +322,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
 
 #[tokio::test]
 async fn postgres_accepts_the_same_api() {
-    let Some(url) = std::env::var("STATIXO_APP_POSTGRES_URL")
-        .or_else(|_| std::env::var("HARUVO_APP_POSTGRES_URL"))
+    let Some(url) = std::env::var("HARUVO_APP_POSTGRES_URL")
+        .or_else(|_| std::env::var("STATIXO_APP_POSTGRES_URL"))
         .or_else(|_| std::env::var("STATUS_APP_POSTGRES_URL"))
         .ok()
         .filter(|url| !url.is_empty())
@@ -341,7 +341,7 @@ async fn postgres_accepts_the_same_api() {
         permit_signup(&state.db).await.unwrap();
     }
     let app = router(state);
-    let email = format!("pg-{}@coollabs.io", statixo_platform::Id::new());
+    let email = format!("pg-{}@coollabs.io", haruvo_platform::Id::new());
     let (status, user, _) = if let Some(token) = token {
         call(
             &app,

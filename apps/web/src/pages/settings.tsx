@@ -21,7 +21,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title="Settings" description="This Statixo install and the signed-in operator." />
+      <PageHeader title="Settings" description="This Haruvo install and the signed-in operator." />
       <LayerCard title="Account" description="The operator signed in to this browser.">
         <dl className="grid gap-4 sm:grid-cols-3">
           <Item label="Name">{me.data?.display_name ?? "…"}</Item>
@@ -154,7 +154,7 @@ function EmailForm({ settings }: { settings?: InstanceSettings }) {
           </p>
         ) : (
           <p className="text-xs text-[var(--ui-fg-faint)]">
-            Saved here, or with STATIXO_SMTP_HOST and STATIXO_SMTP_FROM. HARUVO_SMTP_* and STATUS_SMTP_* still work. Clearing the saved server closes registration.
+            Saved here, or with HARUVO_SMTP_HOST and HARUVO_SMTP_FROM. STATIXO_SMTP_* and STATUS_SMTP_* still work. Clearing the saved server closes registration.
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">

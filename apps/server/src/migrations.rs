@@ -1,4 +1,4 @@
-use statixo_platform::{Migration, MigrationRunner};
+use haruvo_platform::{Migration, MigrationRunner};
 
 pub fn runner() -> MigrationRunner {
     MigrationRunner::new(

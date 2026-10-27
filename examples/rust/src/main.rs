@@ -15,7 +15,7 @@ impl Error for ExampleError {}
 
 fn main() {
     let dsn = std::env::var("SENTRY_DSN").unwrap_or_else(|_| {
-        eprintln!("Set SENTRY_DSN to the project DSN from the Statixo UI.");
+        eprintln!("Set SENTRY_DSN to the project DSN from the Haruvo UI.");
         std::process::exit(1);
     });
 

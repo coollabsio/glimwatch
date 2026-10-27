@@ -1,5 +1,5 @@
-use statixo_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
-use statixo_platform::{Id, TimestampMillis};
+use haruvo_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
+use haruvo_platform::{Id, TimestampMillis};
 
 use crate::error::AppError;
 use crate::repo::{self, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page};

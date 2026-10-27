@@ -1,4 +1,4 @@
-use statixo_platform::{
+use haruvo_platform::{
     Config, Database, DatabaseConfig, EnvironmentMode, PasswordError, PasswordService,
 };
 use std::collections::HashSet;
@@ -43,7 +43,7 @@ impl HttpClients {
 fn client(policy: reqwest::redirect::Policy) -> Result<reqwest::Client, reqwest::Error> {
     reqwest::Client::builder()
         .redirect(policy)
-        .user_agent(concat!("Statixo/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("Haruvo/", env!("CARGO_PKG_VERSION")))
         .build()
 }
 
@@ -96,7 +96,7 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
     Ok(AppState {
         db: database,
         http: HttpClients::new()?,
-        scheduler_id: statixo_platform::Id::new().to_string(),
+        scheduler_id: haruvo_platform::Id::new().to_string(),
         inflight: Inflight::default(),
         connectivity: Connectivity::new(config.connectivity_targets.clone()),
         passwords,
@@ -152,9 +152,9 @@ pub fn testing_config(path: PathBuf) -> Config {
 #[derive(Debug, Error)]
 pub enum BootError {
     #[error(transparent)]
-    Database(#[from] statixo_platform::DatabaseError),
+    Database(#[from] haruvo_platform::DatabaseError),
     #[error(transparent)]
-    Migration(#[from] statixo_platform::MigrationError),
+    Migration(#[from] haruvo_platform::MigrationError),
     #[error(transparent)]
     Password(#[from] PasswordError),
     #[error("http client: {0}")]
