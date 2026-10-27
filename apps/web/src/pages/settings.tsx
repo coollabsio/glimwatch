@@ -154,7 +154,7 @@ function EmailForm({ settings }: { settings?: InstanceSettings }) {
           </p>
         ) : (
           <p className="text-xs text-[var(--ui-fg-faint)]">
-            Saved here, or with HARUVO_SMTP_HOST and HARUVO_SMTP_FROM. STATIXO_SMTP_* and STATUS_SMTP_* still work. Clearing the saved server closes registration.
+            Saved here, or with HARUVO_SMTP_HOST and HARUVO_SMTP_FROM. STATUS_SMTP_* still works. Clearing the saved server closes registration.
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">

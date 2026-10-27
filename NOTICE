@@ -26,5 +26,5 @@ SOFTWARE.
 
 The tracker source in this repository is apps/server/src/insights/tracker.js.
 IP geolocation databases are optional and are not bundled. DB-IP Lite, when
-you supply it through HARUVO_GEOIP_PATH (STATIXO_GEOIP_PATH and STATUS_GEOIP_PATH still work), is a separate work from DB-IP
+you supply it through HARUVO_GEOIP_PATH (STATUS_GEOIP_PATH still works), is a separate work from DB-IP
 (https://db-ip.com) and is not covered by the MIT notice above.

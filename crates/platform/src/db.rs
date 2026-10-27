@@ -409,7 +409,6 @@ CREATE TABLE widgets (
     #[tokio::test]
     async fn postgres_migrations_when_configured() {
         let url = match std::env::var("HARUVO_TEST_POSTGRES_URL")
-            .or_else(|_| std::env::var("STATIXO_TEST_POSTGRES_URL"))
             .or_else(|_| std::env::var("STATUS_TEST_POSTGRES_URL"))
         {
             Ok(url) if url.starts_with("postgres") => url,
