@@ -1,10 +1,10 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use haruvo_platform::{SmtpConfig, TimestampMillis};
+use haruvo_server::{boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::Value;
-use statixo_platform::{SmtpConfig, TimestampMillis};
-use statixo_server::{boot, initialize_setup_token, router, testing_config};
 use tower::ServiceExt;
 
 async fn started(env_smtp: bool) -> (Router, String) {
@@ -69,7 +69,7 @@ async fn call(
     let cookie = pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("statixo_session="))
+        .find(|value| value.starts_with("haruvo_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned);
     let bytes = response.into_body().collect().await.unwrap().to_bytes();

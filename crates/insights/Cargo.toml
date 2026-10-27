@@ -1,9 +1,9 @@
 [package]
-name = "statixo-insights"
+name = "haruvo-insights"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
-description = "Cookieless web analytics and link-shortener rules for Statixo"
+description = "Cookieless web analytics and link-shortener rules for Haruvo"
 
 [dependencies]
 serde.workspace = true

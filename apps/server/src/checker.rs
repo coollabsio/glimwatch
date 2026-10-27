@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
+use haruvo_domain::{HeaderPair, JobType, Probe, parse_tcp_target};
 use sqlx::Connection;
 use sqlx::mysql::{MySqlConnectOptions, MySqlConnection};
 use sqlx::postgres::{PgConnectOptions, PgConnection};
-use statixo_domain::{HeaderPair, JobType, Probe, parse_tcp_target};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 

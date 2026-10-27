@@ -44,7 +44,7 @@ export function IncidentsPage() {
         actions={<Button variant="primary" onClick={() => setOpen(true)}>Report incident</Button>}
       />
       {(query.data?.length ?? 0) === 0 && !query.isLoading ? (
-        <Empty title="No incidents" body="When a monitor crosses its failure threshold, Statixo files one. You can also write one by hand." />
+        <Empty title="No incidents" body="When a monitor crosses its failure threshold, Haruvo files one. You can also write one by hand." />
       ) : (
         <LayerCard title="All incidents" description={query.data ? `${query.data.length} total` : undefined} flush>
           <div className="flex flex-wrap items-center gap-2 border-b border-[var(--ui-divider)] p-2">

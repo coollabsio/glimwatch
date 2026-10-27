@@ -5,23 +5,23 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-const ENV: &str = "STATIXO_ENV";
-const BIND: &str = "STATIXO_BIND";
-const PORT: &str = "STATIXO_PORT";
-const ORIGIN: &str = "STATIXO_PUBLIC_ORIGIN";
-const DATABASE_PATH: &str = "STATIXO_DATABASE_PATH";
-const DATABASE_URL: &str = "STATIXO_DATABASE_URL";
+const ENV: &str = "HARUVO_ENV";
+const BIND: &str = "HARUVO_BIND";
+const PORT: &str = "HARUVO_PORT";
+const ORIGIN: &str = "HARUVO_PUBLIC_ORIGIN";
+const DATABASE_PATH: &str = "HARUVO_DATABASE_PATH";
+const DATABASE_URL: &str = "HARUVO_DATABASE_URL";
 const DATABASE_URL_ALIAS: &str = "DATABASE_URL";
-const OPEN_SIGNUP: &str = "STATIXO_OPEN_SIGNUP";
-const SMTP_HOST: &str = "STATIXO_SMTP_HOST";
-const SMTP_PORT: &str = "STATIXO_SMTP_PORT";
-const SMTP_USERNAME: &str = "STATIXO_SMTP_USERNAME";
-const SMTP_PASSWORD: &str = "STATIXO_SMTP_PASSWORD";
-const SMTP_FROM: &str = "STATIXO_SMTP_FROM";
-const ARGON_MEMORY: &str = "STATIXO_ARGON_MEMORY_KIB";
-const CONNECTIVITY_TARGETS: &str = "STATIXO_CONNECTIVITY_TARGETS";
-const PROXY_HOPS: &str = "STATIXO_PROXY_HOPS";
-const GEOIP_PATH: &str = "STATIXO_GEOIP_PATH";
+const OPEN_SIGNUP: &str = "HARUVO_OPEN_SIGNUP";
+const SMTP_HOST: &str = "HARUVO_SMTP_HOST";
+const SMTP_PORT: &str = "HARUVO_SMTP_PORT";
+const SMTP_USERNAME: &str = "HARUVO_SMTP_USERNAME";
+const SMTP_PASSWORD: &str = "HARUVO_SMTP_PASSWORD";
+const SMTP_FROM: &str = "HARUVO_SMTP_FROM";
+const ARGON_MEMORY: &str = "HARUVO_ARGON_MEMORY_KIB";
+const CONNECTIVITY_TARGETS: &str = "HARUVO_CONNECTIVITY_TARGETS";
+const PROXY_HOPS: &str = "HARUVO_PROXY_HOPS";
+const GEOIP_PATH: &str = "HARUVO_GEOIP_PATH";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -34,10 +34,10 @@ pub struct Config {
     pub open_signup: bool,
     pub smtp: Option<SmtpConfig>,
     pub argon_memory_kib: u32,
-    /// `host:port` targets that prove the Statixo host itself has network.
+    /// `host:port` targets that prove the Haruvo host itself has network.
     /// Empty disables the check.
     pub connectivity_targets: Vec<String>,
-    /// Trusted reverse proxies in front of Statixo. `0` means the socket address is the client.
+    /// Trusted reverse proxies in front of Haruvo. `0` means the socket address is the client.
     pub proxy_hops: usize,
     /// Optional MaxMind or DB-IP city database (`.mmdb`) for analytics geolocation.
     pub geoip_path: Option<PathBuf>,
@@ -51,7 +51,7 @@ impl Config {
             bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 43123,
             public_origin: "http://127.0.0.1:43123".to_owned(),
-            database_path: PathBuf::from("data/statixo.sqlite"),
+            database_path: PathBuf::from("data/haruvo.sqlite"),
             database_url: None,
             open_signup: false,
             smtp: None,
@@ -109,8 +109,8 @@ impl Config {
             config.database_url = Some(url);
         }
         // Parsed so an existing environment still boots. Registration is the
-        // instance setting in the database, not this flag. STATIXO_OPEN_SIGNUP,
-        // HARUVO_OPEN_SIGNUP, and STATUS_OPEN_SIGNUP are ignored.
+        // instance setting in the database, not this flag. HARUVO_OPEN_SIGNUP,
+        // STATIXO_OPEN_SIGNUP, and STATUS_OPEN_SIGNUP are ignored.
         if let Some(signup) = compat(OPEN_SIGNUP) {
             config.open_signup = parse_bool(&signup).ok_or(ConfigError::Invalid {
                 name: OPEN_SIGNUP,
@@ -215,7 +215,7 @@ pub enum ConfigError {
     #[error("missing {0}")]
     Missing(&'static str),
     #[error(
-        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set STATIXO_DATABASE_PATH to move the file (HARUVO_DATABASE_PATH and STATUS_DATABASE_PATH still work)"
+        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set HARUVO_DATABASE_PATH to move the file (STATIXO_DATABASE_PATH and STATUS_DATABASE_PATH still work)"
     )]
     DatabaseUrl,
 }
@@ -227,18 +227,18 @@ fn optional(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// Reads `STATIXO_*` first, then `HARUVO_*`, then the older `STATUS_*` name.
+/// Reads `HARUVO_*` first, then `STATIXO_*`, then the older `STATUS_*` name.
 fn compat(name: &str) -> Option<String> {
     optional(name).or_else(|| {
-        let rest = name.strip_prefix("STATIXO_")?;
-        optional(&format!("HARUVO_{rest}")).or_else(|| optional(&format!("STATUS_{rest}")))
+        let rest = name.strip_prefix("HARUVO_")?;
+        optional(&format!("STATIXO_{rest}")).or_else(|| optional(&format!("STATUS_{rest}")))
     })
 }
 
-const STOCK_SQLITE_PATHS: &[&str] = &["data/statixo.sqlite", "/var/lib/statixo/statixo.sqlite"];
+const STOCK_SQLITE_PATHS: &[&str] = &["data/haruvo.sqlite", "/var/lib/haruvo/haruvo.sqlite"];
 
 /// Uses an explicit path as given. The stock defaults keep an existing
-/// `haruvo.sqlite` or `status.sqlite` when the new file is not there yet.
+/// `statixo.sqlite` or `status.sqlite` when `haruvo.sqlite` is not there yet.
 fn resolve_sqlite_path(explicit: Option<String>) -> PathBuf {
     let chosen = explicit
         .as_deref()
@@ -267,17 +267,18 @@ fn legacy_sqlite_candidates(chosen: &Path) -> Vec<PathBuf> {
     if let Some(parent) = chosen.parent()
         && !parent.as_os_str().is_empty()
     {
-        for name in ["haruvo.sqlite", "status.sqlite"] {
+        for name in ["statixo.sqlite", "status.sqlite"] {
             paths.push(parent.join(name));
         }
     }
     for candidate in [
-        "data/haruvo.sqlite",
+        "data/statixo.sqlite",
         "data/status.sqlite",
-        "/var/lib/haruvo/haruvo.sqlite",
-        "/var/lib/haruvo/status.sqlite",
-        "/var/lib/statixo/haruvo.sqlite",
+        "/var/lib/statixo/statixo.sqlite",
         "/var/lib/statixo/status.sqlite",
+        "/var/lib/statixo/haruvo.sqlite",
+        "/var/lib/haruvo/statixo.sqlite",
+        "/var/lib/haruvo/status.sqlite",
     ] {
         paths.push(PathBuf::from(candidate));
     }
@@ -393,8 +394,8 @@ mod tests {
         // SAFETY: the lock above is the only other writer of these variables.
         unsafe {
             std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
-            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
+            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
         let error = Config::from_env().unwrap_err();
@@ -408,8 +409,8 @@ mod tests {
     fn legacy_database_urls_still_select_postgres() {
         let _env = lock_process_env();
         unsafe {
-            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
+            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("DATABASE_URL");
             std::env::set_var(
                 "STATUS_DATABASE_URL",
@@ -423,48 +424,49 @@ mod tests {
         );
         unsafe {
             std::env::set_var(
-                "HARUVO_DATABASE_URL",
-                "postgres://haruvo:secret@127.0.0.1:1/haruvo",
+                "STATIXO_DATABASE_URL",
+                "postgres://statixo:secret@127.0.0.1:1/statixo",
             );
         }
-        let haruvo = Config::from_env().unwrap();
+        let statixo = Config::from_env().unwrap();
         assert_eq!(
-            haruvo.database_url.as_deref(),
-            Some("postgres://haruvo:secret@127.0.0.1:1/haruvo")
+            statixo.database_url.as_deref(),
+            Some("postgres://statixo:secret@127.0.0.1:1/statixo")
         );
         unsafe {
             std::env::set_var(
-                "STATIXO_DATABASE_URL",
-                "postgres://statixo:secret@127.0.0.1:1/statixo",
+                "HARUVO_DATABASE_URL",
+                "postgres://haruvo:secret@127.0.0.1:1/haruvo",
             );
         }
         let preferred = Config::from_env().unwrap();
         assert_eq!(
             preferred.database_url.as_deref(),
-            Some("postgres://statixo:secret@127.0.0.1:1/statixo")
+            Some("postgres://haruvo:secret@127.0.0.1:1/haruvo")
         );
         unsafe {
-            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
+            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
     }
 
     #[test]
     fn stock_sqlite_paths_prefer_older_files_and_custom_paths_stay() {
-        assert!(is_stock_sqlite_path("data/statixo.sqlite"));
-        assert!(is_stock_sqlite_path("/var/lib/statixo/statixo.sqlite"));
+        assert!(is_stock_sqlite_path("data/haruvo.sqlite"));
+        assert!(is_stock_sqlite_path("/var/lib/haruvo/haruvo.sqlite"));
         assert!(!is_stock_sqlite_path("/tmp/custom.sqlite"));
-        let candidates = legacy_sqlite_candidates(Path::new("data/statixo.sqlite"));
-        assert_eq!(candidates[0], PathBuf::from("data/haruvo.sqlite"));
+        assert!(!is_stock_sqlite_path("data/statixo.sqlite"));
+        let candidates = legacy_sqlite_candidates(Path::new("data/haruvo.sqlite"));
+        assert_eq!(candidates[0], PathBuf::from("data/statixo.sqlite"));
         assert_eq!(candidates[1], PathBuf::from("data/status.sqlite"));
         assert!(
             candidates
                 .iter()
-                .any(|path| path == Path::new("/var/lib/haruvo/haruvo.sqlite"))
+                .any(|path| path == Path::new("/var/lib/statixo/statixo.sqlite"))
         );
         let custom = std::env::temp_dir().join(format!(
-            "statixo-missing-{}-{}.sqlite",
+            "haruvo-missing-{}-{}.sqlite",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

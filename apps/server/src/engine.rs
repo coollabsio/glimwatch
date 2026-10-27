@@ -1,12 +1,12 @@
 use std::ops::DerefMut;
 
-use serde::{Deserialize, Serialize};
-use sqlx::Row;
-use statixo_domain::{
+use haruvo_domain::{
     CheckStatus, IncidentImpact, IncidentStatus, NotificationEvent, NotificationPayload,
     PayloadCheck, PayloadIncident, PayloadMonitor, Probe, Rules, apply_outcome, judge,
 };
-use statixo_platform::{Id, TimestampMillis};
+use haruvo_platform::{Id, TimestampMillis};
+use serde::{Deserialize, Serialize};
+use sqlx::Row;
 
 use crate::checker::{self, Job};
 use crate::error::AppError;
@@ -163,7 +163,7 @@ async fn record(
             let incident_id = Id::new();
             let detail = error.unwrap_or_else(|| "The check failed.".to_owned());
             let message = format!(
-                "Statixo recorded {} consecutive failed checks for {}. {detail}",
+                "Haruvo recorded {} consecutive failed checks for {}. {detail}",
                 transition.consecutive_failures, monitor.url
             );
             let incident = Incident {

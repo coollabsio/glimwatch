@@ -1,9 +1,9 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum_extra::extract::cookie::CookieJar;
+use haruvo_errors::normalize_event;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use statixo_errors::normalize_event;
 
 use super::store::{self, EventSummary, IssueRow, Project};
 use crate::error::AppError;

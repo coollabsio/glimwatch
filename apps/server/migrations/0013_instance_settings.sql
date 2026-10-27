@@ -1,6 +1,6 @@
 -- Instance settings the root user changes in Settings: open registration and the
 -- mail server required before registration can open. One row, id = 1.
--- Registration starts closed. STATIXO_OPEN_SIGNUP, HARUVO_OPEN_SIGNUP, and
+-- Registration starts closed. HARUVO_OPEN_SIGNUP, STATIXO_OPEN_SIGNUP, and
 -- STATUS_OPEN_SIGNUP do not open it.
 
 CREATE TABLE instance_settings (

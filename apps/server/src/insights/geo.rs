@@ -1,8 +1,8 @@
 use std::net::IpAddr;
 
 use axum::http::HeaderMap;
+use haruvo_insights::clip;
 use maxminddb::{Reader, geoip2};
-use statixo_insights::clip;
 
 #[derive(Clone, Debug, Default)]
 pub struct Place {

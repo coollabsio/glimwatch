@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const dsn = process.env.SENTRY_DSN;
 if (!dsn) {
-  console.error("Set SENTRY_DSN to the project DSN from the Statixo UI.");
+  console.error("Set SENTRY_DSN to the project DSN from the Haruvo UI.");
   process.exit(1);
 }
 
@@ -21,10 +21,10 @@ const page = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Statixo browser example</title>
+  <title>Haruvo browser example</title>
 </head>
 <body>
-  <h1>Statixo browser example</h1>
+  <h1>Haruvo browser example</h1>
   <p>This page uses the official @sentry/browser SDK.</p>
   <button id="capture" type="button">Capture error</button>
   <button id="throw" type="button">Throw error</button>

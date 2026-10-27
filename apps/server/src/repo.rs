@@ -3,13 +3,13 @@
 
 use std::ops::DerefMut;
 
-use serde::de::DeserializeOwned;
-use sqlx::{Any, Row, Transaction};
-use statixo_domain::{
+use haruvo_domain::{
     Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
     JobType, MonitorState,
 };
-use statixo_platform::{Database, Id, ParseIdError, TimestampMillis};
+use haruvo_platform::{Database, Id, ParseIdError, TimestampMillis};
+use serde::de::DeserializeOwned;
+use sqlx::{Any, Row, Transaction};
 
 const MONITOR_COLUMNS: &str = "\
 id, name, description, job_type, url, method, headers_json, body, timeout_ms, interval_seconds, \

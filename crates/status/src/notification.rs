@@ -68,7 +68,8 @@ pub struct PayloadIncident {
 }
 
 /// Hex-encoded HMAC-SHA256 of the raw body. Webhooks send this as
-/// `X-Statixo-Signature: sha256=<hex>` and also as `X-Status-Signature`.
+/// `X-Haruvo-Signature: sha256=<hex>`, and also as `X-Statixo-Signature`
+/// and `X-Status-Signature`.
 #[must_use]
 pub fn sign_body(secret: &str, body: &[u8]) -> String {
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC accepts any key");

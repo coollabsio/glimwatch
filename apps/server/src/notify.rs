@@ -1,8 +1,8 @@
 use std::time::Duration;
 
+use haruvo_domain::{NotificationPayload, sign_body};
+use haruvo_platform::{Id, TimestampMillis};
 use serde_json::Value;
-use statixo_domain::{NotificationPayload, sign_body};
-use statixo_platform::{Id, TimestampMillis};
 
 use crate::repo::{self, Channel};
 use crate::state::AppState;
@@ -70,7 +70,7 @@ async fn send(
         "email" => {
             let Some(smtp) = effective_smtp(state).await else {
                 return Ok(SendOutcome::Skipped(
-                    "SMTP is not configured. Save a mail server in Settings, or set STATIXO_SMTP_HOST and STATIXO_SMTP_FROM. HARUVO_SMTP_* and STATUS_SMTP_* still work.".to_owned(),
+                    "SMTP is not configured. Save a mail server in Settings, or set HARUVO_SMTP_HOST and HARUVO_SMTP_FROM. STATIXO_SMTP_* and STATUS_SMTP_* still work.".to_owned(),
                 ));
             };
             let to = config
@@ -95,8 +95,8 @@ async fn send(
                     let signature = sign_body(secret, &body);
                     let header = format!("sha256={signature}");
                     request = request
-                        .header("x-statixo-signature", header.clone())
                         .header("x-haruvo-signature", header.clone())
+                        .header("x-statixo-signature", header.clone())
                         .header("x-status-signature", header);
                 }
             }
@@ -141,11 +141,11 @@ async fn post_json(state: &AppState, url: &str, body: serde_json::Value) -> Resu
     }
 }
 
-async fn effective_smtp(state: &AppState) -> Option<statixo_platform::SmtpConfig> {
+async fn effective_smtp(state: &AppState) -> Option<haruvo_platform::SmtpConfig> {
     match crate::instance_settings::load(&state.db).await {
         Ok(settings) => settings
             .smtp
-            .map(statixo_platform::SmtpConfig::from)
+            .map(haruvo_platform::SmtpConfig::from)
             .or_else(|| state.config.smtp.clone()),
         Err(error) => {
             tracing::error!(%error, "loading instance mail server");
@@ -155,7 +155,7 @@ async fn effective_smtp(state: &AppState) -> Option<statixo_platform::SmtpConfig
 }
 
 async fn send_email(
-    smtp: &statixo_platform::SmtpConfig,
+    smtp: &haruvo_platform::SmtpConfig,
     to: &str,
     subject: &str,
     text: &str,
@@ -205,13 +205,13 @@ pub fn plain(payload: &NotificationPayload) -> (String, String) {
         .monitor
         .as_ref()
         .map(|monitor| monitor.name.as_str())
-        .unwrap_or("Statixo");
+        .unwrap_or("Haruvo");
     let subject = match payload.event.as_str() {
-        "monitor.down" => format!("[Statixo] {name} is down"),
-        "monitor.recovered" => format!("[Statixo] {name} recovered"),
-        "incident.updated" => format!("[Statixo] Incident update: {name}"),
-        "notification.test" => format!("[Statixo] Test notification for {name}"),
-        _ => format!("[Statixo] {name}"),
+        "monitor.down" => format!("[Haruvo] {name} is down"),
+        "monitor.recovered" => format!("[Haruvo] {name} recovered"),
+        "incident.updated" => format!("[Haruvo] Incident update: {name}"),
+        "notification.test" => format!("[Haruvo] Test notification for {name}"),
+        _ => format!("[Haruvo] {name}"),
     };
     let mut lines = vec![subject.clone(), String::new()];
     if let Some(monitor) = &payload.monitor {
