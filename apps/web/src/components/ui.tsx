@@ -35,6 +35,30 @@ export function Button({
   );
 }
 
+export function Switch({
+  checked,
+  disabled,
+  onCheckedChange,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  "aria-label": string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-label={ariaLabel}
+      aria-checked={checked}
+      disabled={disabled}
+      className={cn("switch", checked && "is-on")}
+      onClick={() => onCheckedChange(!checked)}
+    />
+  );
+}
+
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn("input", props.className)} />;
 }

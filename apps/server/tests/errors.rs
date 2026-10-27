@@ -6,7 +6,7 @@ use axum::http::{Request, StatusCode};
 use flate2::Compression;
 use flate2::write::{DeflateEncoder, GzEncoder};
 use haruvo_platform::TimestampMillis;
-use haruvo_server::{boot, initialize_setup_token, router, testing_config};
+use haruvo_server::{boot, initialize_setup_token, permit_signup, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -344,5 +344,8 @@ async fn postgres_ingest_groups_events() {
         .await
         .unwrap()
         .map(|issued| issued.token);
+    if token.is_none() {
+        permit_signup(&state.db).await.unwrap();
+    }
     exercise(router(state), token).await;
 }

@@ -9,9 +9,10 @@ function initial(name: string, email: string) {
   return source.charAt(0).toUpperCase();
 }
 
-function roleLabel(role: string) {
-  if (!role) return "";
-  return role.charAt(0).toUpperCase() + role.slice(1);
+function roleLabel(user?: User) {
+  if (!user?.role) return "";
+  if (user.root) return "Root";
+  return user.role.charAt(0).toUpperCase() + user.role.slice(1);
 }
 
 export function ProfileMenu({
@@ -31,7 +32,7 @@ export function ProfileMenu({
   const panelId = useId();
   const name = user?.display_name || "Account";
   const email = user?.email ?? "";
-  const role = roleLabel(user?.role ?? "");
+  const role = roleLabel(user);
 
   function close() {
     setOpen(false);

@@ -5,7 +5,7 @@ use axum::Router;
 use axum::extract::{Path, State};
 use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, StatusCode};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use haruvo_domain::{
     Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput,
@@ -21,6 +21,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::engine;
 use crate::error::AppError;
+use crate::instance_settings::{self, SmtpInput};
 use crate::notify;
 use crate::present::{self, Stats};
 use crate::repo::{
@@ -45,6 +46,11 @@ pub fn router(state: AppState) -> Router {
         .route("/setup/complete", post(setup_complete))
         .route("/auth/logout", post(logout))
         .route("/auth/me", get(me))
+        .route("/admin/settings", get(admin_settings))
+        .route("/admin/settings/registration", put(set_registration))
+        .route("/admin/settings/smtp", put(save_smtp).delete(delete_smtp))
+        .route("/admin/users", get(admin_users))
+        .route("/admin/users/{id}/admin", put(set_installation_admin))
         .route("/overview", get(overview))
         .route("/monitors", get(list_monitors).post(create_monitor))
         .route(
@@ -105,6 +111,7 @@ async fn ready(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
 
 async fn meta(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let setup_complete = setup::is_complete(&state.db).await?;
+    let settings = instance_settings::load(&state.db).await?;
     let demo = if state.config.environment.as_str() == "development" && setup_complete {
         json!({ "email": DEMO_EMAIL, "password": DEMO_PASSWORD })
     } else {
@@ -112,7 +119,7 @@ async fn meta(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     };
     Ok(Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "signup_open": state.config.open_signup && setup_complete,
+        "signup_open": settings.signup_open(state.config.smtp.is_some(), setup_complete),
         "setup_complete": setup_complete,
         "database": state.config.backend_name(),
         "public_origin": state.config.public_origin,
@@ -140,9 +147,11 @@ async fn register(
     if let Err(error) = state.passwords.validate(&body.password) {
         return Err(password_field(error));
     }
-    // The first account is created only with the setup token. Open sign-up, when
-    // an operator turns it on, applies after setup and never instead of it.
-    if !state.config.open_signup || !setup::is_complete(&state.db).await? {
+    // The first account is created only with the setup token. Later accounts need
+    // the root user to open registration after a mail server is saved.
+    let settings = instance_settings::load(&state.db).await?;
+    let setup_complete = setup::is_complete(&state.db).await?;
+    if !settings.signup_open(state.config.smtp.is_some(), setup_complete) {
         return Err(AppError::RegistrationClosed);
     }
     let count = repo::count_users(&state.db).await?;
@@ -184,7 +193,7 @@ async fn register(
         now,
     )
     .await;
-    Ok((jar, Json(present::UserResponse::from(&user))))
+    Ok((jar, Json(user_response(&state, &user).await?)))
 }
 
 async fn setup_status(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
@@ -246,7 +255,7 @@ async fn setup_complete(
     Ok((
         StatusCode::CREATED,
         jar,
-        Json(present::UserResponse::from(&completed.user)),
+        Json(user_response(&state, &completed.user).await?),
     ))
 }
 
@@ -276,7 +285,7 @@ async fn login(
         now,
     )
     .await;
-    Ok((jar, Json(present::UserResponse::from(&user))))
+    Ok((jar, Json(user_response(&state, &user).await?)))
 }
 
 async fn logout(
@@ -300,7 +309,270 @@ async fn me(
     jar: CookieJar,
 ) -> Result<Json<present::UserResponse>, AppError> {
     let user = require_user(&state, &jar).await?;
-    Ok(Json(present::UserResponse::from(&user)))
+    Ok(Json(user_response(&state, &user).await?))
+}
+
+async fn admin_settings(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> Result<Json<Value>, AppError> {
+    require_root(&state, &jar).await?;
+    Ok(Json(settings_body(&state).await?))
+}
+
+#[derive(Deserialize)]
+struct RegistrationBody {
+    open: bool,
+}
+
+async fn set_registration(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(body): Json<RegistrationBody>,
+) -> Result<Json<Value>, AppError> {
+    let actor = require_root(&state, &jar).await?;
+    let now = TimestampMillis::now();
+    instance_settings::set_registration_open(
+        &state.db,
+        body.open,
+        state.config.smtp.is_some(),
+        now,
+    )
+    .await
+    .map_err(|error| match error {
+        instance_settings::InstanceError::EmailNotConfigured => AppError::EmailNotConfigured,
+        instance_settings::InstanceError::Database(error) => AppError::from(error),
+    })?;
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(actor.id),
+        if body.open {
+            "instance.registration_opened"
+        } else {
+            "instance.registration_closed"
+        },
+        "installation",
+        None,
+        now,
+    )
+    .await;
+    Ok(Json(settings_body(&state).await?))
+}
+
+#[derive(Deserialize)]
+struct SmtpBody {
+    host: String,
+    port: Option<i64>,
+    username: Option<String>,
+    password: Option<String>,
+    from: String,
+}
+
+async fn save_smtp(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(body): Json<SmtpBody>,
+) -> Result<Json<Value>, AppError> {
+    let actor = require_root(&state, &jar).await?;
+    let input = smtp_input(&body)?;
+    let now = TimestampMillis::now();
+    instance_settings::save_smtp(&state.db, input, now).await?;
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(actor.id),
+        "instance.smtp_updated",
+        "installation",
+        None,
+        now,
+    )
+    .await;
+    Ok(Json(settings_body(&state).await?))
+}
+
+async fn delete_smtp(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> Result<Json<Value>, AppError> {
+    let actor = require_root(&state, &jar).await?;
+    let now = TimestampMillis::now();
+    instance_settings::clear_smtp(&state.db, now).await?;
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(actor.id),
+        "instance.smtp_removed",
+        "installation",
+        None,
+        now,
+    )
+    .await;
+    Ok(Json(settings_body(&state).await?))
+}
+
+async fn admin_users(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> Result<Json<Value>, AppError> {
+    require_installation_admin(&state, &jar).await?;
+    let root_id = instance_settings::root_user_id(&state.db).await?;
+    let accounts = repo::list_accounts(&state.db).await?;
+    let users = accounts
+        .iter()
+        .map(|account| account_body(account, root_id))
+        .collect::<Vec<_>>();
+    Ok(Json(json!(users)))
+}
+
+#[derive(Deserialize)]
+struct AdminBody {
+    admin: bool,
+}
+
+async fn set_installation_admin(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<Id>,
+    Json(body): Json<AdminBody>,
+) -> Result<Json<Value>, AppError> {
+    let actor = require_root(&state, &jar).await?;
+    let root_id = instance_settings::root_user_id(&state.db).await?;
+    if root_id == Some(id) {
+        return Err(AppError::Conflict(
+            "The root user stays an installation admin.".into(),
+        ));
+    }
+    let now = TimestampMillis::now();
+    let role = if body.admin { "admin" } else { "member" };
+    let updated = repo::set_user_role(&state.db, id, role, now).await?;
+    if !updated {
+        return Err(AppError::NotFound);
+    }
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(actor.id),
+        if body.admin {
+            "instance.admin_granted"
+        } else {
+            "instance.admin_revoked"
+        },
+        "user",
+        Some(&id.to_string()),
+        now,
+    )
+    .await;
+    let accounts = repo::list_accounts(&state.db).await?;
+    let account = accounts
+        .iter()
+        .find(|account| account.id == id)
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(account_body(account, root_id)))
+}
+
+async fn settings_body(state: &AppState) -> Result<Value, AppError> {
+    let settings = instance_settings::load(&state.db).await?;
+    let env_smtp = state.config.smtp.is_some();
+    Ok(json!({
+        "registration_open": settings.registration_open,
+        "smtp_ready": settings.smtp_ready(env_smtp),
+        "smtp": smtp_body(&settings, state.config.smtp.as_ref()),
+        "root_user": settings.root_user.as_ref().map(|user| json!({
+            "id": user.id,
+            "email": user.email,
+            "display_name": user.display_name,
+        })),
+        "initialized": settings.initialized,
+        "version": env!("CARGO_PKG_VERSION"),
+        "database": state.config.backend_name(),
+    }))
+}
+
+fn smtp_body(
+    settings: &instance_settings::InstanceView,
+    env: Option<&haruvo_platform::SmtpConfig>,
+) -> Value {
+    if let Some(smtp) = &settings.smtp {
+        return json!({
+            "host": smtp.host,
+            "port": smtp.port,
+            "username": smtp.username,
+            "from": smtp.from,
+            "has_password": smtp.password.is_some(),
+            "source": "saved",
+        });
+    }
+    env.map(|smtp| {
+        json!({
+            "host": smtp.host,
+            "port": smtp.port,
+            "username": smtp.username,
+            "from": smtp.from,
+            "has_password": smtp.password.is_some(),
+            "source": "environment",
+        })
+    })
+    .unwrap_or(Value::Null)
+}
+
+fn account_body(account: &repo::Account, root_id: Option<Id>) -> Value {
+    let root = root_id == Some(account.id);
+    json!({
+        "id": account.id,
+        "email": account.email,
+        "display_name": account.display_name,
+        "role": account.role,
+        "root": root,
+        "installation_admin": root || account.role == "owner" || account.role == "admin",
+    })
+}
+
+fn smtp_input(body: &SmtpBody) -> Result<SmtpInput, AppError> {
+    let host = body.host.trim();
+    if host.is_empty()
+        || host.len() > 253
+        || host.contains(char::is_whitespace)
+        || host.contains("://")
+    {
+        return Err(AppError::field("host", "Enter the mail server hostname."));
+    }
+    let port = match body.port {
+        None => 587,
+        Some(port) if (1..=65535).contains(&port) => u16::try_from(port).unwrap_or(587),
+        Some(_) => return Err(AppError::field("port", "Enter a port from 1 to 65535.")),
+    };
+    let from = body.from.trim();
+    if !valid_email(from) {
+        return Err(AppError::field("from", "Enter a valid From address."));
+    }
+    let username = body
+        .username
+        .as_deref()
+        .map(str::trim)
+        .filter(|username| !username.is_empty())
+        .map(str::to_owned);
+    if username
+        .as_ref()
+        .is_some_and(|username| username.len() > 200)
+    {
+        return Err(AppError::field("username", "Use at most 200 characters."));
+    }
+    let password = body
+        .password
+        .as_deref()
+        .map(str::trim)
+        .filter(|password| !password.is_empty())
+        .map(str::to_owned);
+    if password
+        .as_ref()
+        .is_some_and(|password| password.len() > 500)
+    {
+        return Err(AppError::field("password", "Use at most 500 characters."));
+    }
+    Ok(SmtpInput {
+        host: host.to_owned(),
+        port,
+        username,
+        password,
+        from: from.to_owned(),
+    })
 }
 
 async fn overview(State(state): State<AppState>, jar: CookieJar) -> Result<Json<Value>, AppError> {
@@ -1551,6 +1823,34 @@ async fn require_agent(state: &AppState, headers: &HeaderMap) -> Result<Agent, A
     repo::authenticate_agent(&state.db, &hash_token(token.trim()), TimestampMillis::now())
         .await?
         .ok_or(AppError::Unauthorized)
+}
+
+async fn user_response(state: &AppState, user: &User) -> Result<present::UserResponse, AppError> {
+    let root_id = instance_settings::root_user_id(&state.db).await?;
+    Ok(present::UserResponse::with_access(user, root_id))
+}
+
+async fn require_root(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
+    let user = require_user(state, jar).await?;
+    let root_id = instance_settings::root_user_id(&state.db).await?;
+    if root_id != Some(user.id) {
+        return Err(AppError::Forbidden(
+            "Only the root user can change instance settings.",
+        ));
+    }
+    Ok(user)
+}
+
+async fn require_installation_admin(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
+    let user = require_user(state, jar).await?;
+    let root_id = instance_settings::root_user_id(&state.db).await?;
+    let admin = root_id == Some(user.id) || user.role == "owner" || user.role == "admin";
+    if !admin {
+        return Err(AppError::Forbidden(
+            "Only an installation admin can view accounts.",
+        ));
+    }
+    Ok(user)
 }
 
 pub(crate) async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {

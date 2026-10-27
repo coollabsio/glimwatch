@@ -18,15 +18,23 @@ pub struct UserResponse {
     pub email: String,
     pub display_name: String,
     pub role: String,
+    /// The account created at setup. It cannot be demoted.
+    pub root: bool,
+    /// Root, or an account the root user promoted. Can view the user list.
+    pub installation_admin: bool,
 }
 
-impl From<&User> for UserResponse {
-    fn from(user: &User) -> Self {
+impl UserResponse {
+    #[must_use]
+    pub fn with_access(user: &User, root_user_id: Option<Id>) -> Self {
+        let root = root_user_id == Some(user.id);
         Self {
             id: user.id,
             email: user.email.clone(),
             display_name: user.display_name.clone(),
             role: user.role.clone(),
+            root,
+            installation_admin: root || user.role == "owner" || user.role == "admin",
         }
     }
 }

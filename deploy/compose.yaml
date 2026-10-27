@@ -13,7 +13,7 @@ services:
       HARUVO_PUBLIC_ORIGIN: ${HARUVO_PUBLIC_ORIGIN:-http://localhost:8080}
       HARUVO_DATABASE_PATH: /var/lib/haruvo/haruvo.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
-      # HARUVO_OPEN_SIGNUP: "true"
+      # The root user opens it in Settings after SMTP is configured.
       # Switch the same binary to Postgres by setting this and starting the db service.
       # HARUVO_DATABASE_URL: postgres://haruvo:haruvo@db:5432/haruvo
     volumes:

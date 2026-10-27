@@ -168,7 +168,7 @@ async fn setup_succeeds_once_and_public_signup_stays_closed() {
 }
 
 #[tokio::test]
-async fn open_signup_cannot_create_the_first_account() {
+async fn env_open_signup_does_not_open_registration() {
     let (app, token) = started(true).await;
     let (status, problem, _) = call(
         &app,
@@ -194,7 +194,7 @@ async fn open_signup_cannot_create_the_first_account() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
 
-    let (status, user, _) = call(
+    let (status, problem, _) = call(
         &app,
         "POST",
         "/api/auth/register",
@@ -206,8 +206,11 @@ async fn open_signup_cannot_create_the_first_account() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "{user}");
-    assert_eq!(user["role"], "member");
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "registration_closed");
+    let (status, meta, _) = call(&app, "GET", "/api/meta", None, None).await;
+    assert_eq!(status, StatusCode::OK, "{meta}");
+    assert_eq!(meta["signup_open"], false);
 }
 
 #[tokio::test]
