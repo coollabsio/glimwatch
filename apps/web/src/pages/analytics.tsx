@@ -124,22 +124,28 @@ function SiteDetail({ siteId, site }: { siteId: string; site?: InsightSite }) {
           />
         }
       />
-      <nav className="-mt-2 flex gap-1 overflow-x-auto border-b border-[var(--ui-divider)]" aria-label="Site sections">
-        {tabs.map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-current={item === tab ? "page" : undefined}
-            className={cn(
-              "-mb-px h-9 shrink-0 border-b-2 px-2.5 text-[13px] font-medium transition-colors",
-              item === tab ? "border-[var(--ui-accent)] text-[var(--ui-fg)]" : "border-transparent text-[var(--ui-fg-faint)] hover:text-[var(--ui-fg)]",
-            )}
-            onClick={() => setTab(item)}
-          >
-            {item}
-          </button>
-        ))}
-      </nav>
+      {/* The rule lives on the wrapper. The nav overlaps it by 1px so the
+          active underline covers that rule. Putting the overlap on the
+          buttons, inside overflow-x-auto, computes overflow-y to auto and
+          the extra pixel shows a scrollbar even when the tabs fit. */}
+      <div className="-mt-2 min-w-0 border-b border-[var(--ui-divider)]">
+        <nav className="-mb-px flex gap-1 overflow-x-auto overflow-y-hidden" aria-label="Site sections">
+          {tabs.map((item) => (
+            <button
+              key={item}
+              type="button"
+              aria-current={item === tab ? "page" : undefined}
+              className={cn(
+                "h-9 shrink-0 border-b-2 px-2.5 text-[13px] font-medium transition-colors",
+                item === tab ? "border-[var(--ui-accent)] text-[var(--ui-fg)]" : "border-transparent text-[var(--ui-fg-faint)] hover:text-[var(--ui-fg)]",
+              )}
+              onClick={() => setTab(item)}
+            >
+              {item}
+            </button>
+          ))}
+        </nav>
+      </div>
       {tab === "Overview" ? <OverviewPanel siteId={siteId} query={query} /> : null}
       {tab === "Realtime" ? <RealtimePanel siteId={siteId} /> : null}
       {tab === "Events" ? <EventsPanel siteId={siteId} query={query} /> : null}
