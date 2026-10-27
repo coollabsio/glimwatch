@@ -14,7 +14,7 @@ export function SettingsPage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title="Settings"
-        description="This Haruvo install, the signed-in operator, and the interface theme."
+        description="This Statixo install, the signed-in operator, and the interface theme."
       />
       <LayerCard title="Account" description="The operator signed in to this browser.">
         <dl className="grid gap-4 sm:grid-cols-3">

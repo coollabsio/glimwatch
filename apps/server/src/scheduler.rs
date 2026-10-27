@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use haruvo_platform::TimestampMillis;
+use statixo_platform::TimestampMillis;
 
 use crate::engine;
 use crate::error::AppError;

@@ -1,7 +1,7 @@
 //! Writes one analytics event and the daily aggregates it belongs to.
-use haruvo_insights::{DataValue, Incoming, VISIT_IDLE, day, visit_id};
-use haruvo_platform::{Database, Id};
 use sqlx::{Any, Transaction};
+use statixo_insights::{DataValue, Incoming, VISIT_IDLE, day, visit_id};
+use statixo_platform::{Database, Id};
 
 pub async fn record(db: &Database, event: Incoming) -> Result<(), sqlx::Error> {
     let mut tx = db.begin().await?;

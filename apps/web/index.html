@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Haruvo</title>
+    <title>Statixo</title>
     <meta
       name="description"
       content="Status pages, incidents, and uptime monitoring from coolLabs."
@@ -13,7 +13,7 @@
       // Applies the saved appearance (src/lib/theme.ts) before the first paint.
       (function () {
         var a = {};
-        try { a = JSON.parse(localStorage.getItem("haruvo-appearance")) || {}; } catch (e) {}
+        try { a = JSON.parse(localStorage.getItem("statixo-appearance") || localStorage.getItem("haruvo-appearance")) || {}; } catch (e) {}
         var root = document.documentElement;
         var theme = a.theme || localStorage.getItem("haruvo-theme") || "dark";
         var vars = theme === "custom" ? a.vars : null;

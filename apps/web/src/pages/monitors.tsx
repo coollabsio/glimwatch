@@ -353,7 +353,7 @@ function MonitorDialog({ open, onClose, monitor }: { open: boolean; onClose: () 
         onClose();
       }}
       title={monitor ? "Edit monitor" : "New monitor"}
-      description="Failures are counted until the threshold, then Haruvo opens an incident."
+      description="Failures are counted until the threshold, then Statixo opens an incident."
     >
       <form className="space-y-3" onSubmit={submit}>
         <Field label="Name" error={fields.name}>

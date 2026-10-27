@@ -1,15 +1,15 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use haruvo_platform::TimestampMillis;
-use haruvo_server::{boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
+use statixo_platform::TimestampMillis;
+use statixo_server::{boot, initialize_setup_token, router, testing_config};
 use tower::ServiceExt;
 
 async fn app() -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("haruvo.sqlite");
+    let path = dir.path().join("statixo.sqlite");
     let _keep = Box::leak(Box::new(dir));
     let state = boot(testing_config(path)).await.unwrap();
     let token = initialize_setup_token(&state.db, TimestampMillis::now())
@@ -50,11 +50,7 @@ async fn call(
         .unwrap();
     let status = response.status();
     let headers = response.headers().clone();
-    let cookie = headers
-        .get("set-cookie")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .map(str::to_owned);
+    let cookie = session_cookie(&headers);
     let location = headers
         .get("location")
         .and_then(|value| value.to_str().ok())
@@ -67,6 +63,21 @@ async fn call(
             .unwrap_or(Value::String(String::from_utf8_lossy(&bytes).into_owned()))
     };
     (status, json, cookie, location)
+}
+
+fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
+    let pairs: Vec<&str> = headers
+        .get_all("set-cookie")
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .filter_map(|value| value.split(';').next())
+        .collect();
+    pairs
+        .iter()
+        .copied()
+        .find(|value| value.starts_with("statixo_session="))
+        .or_else(|| pairs.first().copied())
+        .map(str::to_owned)
 }
 
 const BROWSER: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36";
@@ -99,7 +110,9 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
     assert_eq!(status, StatusCode::OK);
     let script = script.as_str().unwrap_or("");
     assert!(script.contains("/api/receive"), "{script}");
-    assert!(script.contains("haruvoEvent"));
+    assert!(script.contains("statixoEvent"), "{script}");
+    assert!(script.contains("haruvoEvent"), "{script}");
+    assert!(script.contains("beaconEvent"), "{script}");
 
     let (status, site, _, _) = call(
         &app,
@@ -183,7 +196,7 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
         &app,
         "POST",
         "/api/domains",
-        Some(json!({"hostname": "go.haruvo.test", "enabled": true})),
+        Some(json!({"hostname": "go.statixo.test", "enabled": true})),
         Some(&cookie),
         Some(BROWSER),
     )
@@ -223,7 +236,8 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
 
 #[tokio::test]
 async fn postgres_collects_a_pageview_when_configured() {
-    let Some(url) = std::env::var("HARUVO_APP_POSTGRES_URL")
+    let Some(url) = std::env::var("STATIXO_APP_POSTGRES_URL")
+        .or_else(|_| std::env::var("HARUVO_APP_POSTGRES_URL"))
         .or_else(|_| std::env::var("STATUS_APP_POSTGRES_URL"))
         .ok()
         .filter(|url| !url.is_empty())
@@ -240,7 +254,7 @@ async fn postgres_collects_a_pageview_when_configured() {
         .unwrap()
         .map(|issued| issued.token);
     let app = router(state);
-    let email = format!("insights-{}@coollabs.io", haruvo_platform::Id::new());
+    let email = format!("insights-{}@coollabs.io", statixo_platform::Id::new());
     let (status, _user, cookie, _) = if let Some(token) = token {
         call(
             &app,
@@ -277,7 +291,7 @@ async fn postgres_collects_a_pageview_when_configured() {
         &app,
         "POST",
         "/api/sites",
-        Some(json!({"name": "PG", "domain": "postgres.haruvo.test"})),
+        Some(json!({"name": "PG", "domain": "postgres.statixo.test"})),
         Some(&cookie),
         Some(BROWSER),
     )
@@ -290,7 +304,7 @@ async fn postgres_collects_a_pageview_when_configured() {
         Some(json!({
             "site": site["public_id"],
             "type": "pageview",
-            "url": "https://postgres.haruvo.test/ready"
+            "url": "https://postgres.statixo.test/ready"
         })),
         None,
         Some(BROWSER),

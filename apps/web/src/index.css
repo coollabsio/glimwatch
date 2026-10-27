@@ -105,7 +105,7 @@
   --ui-depth-color: rgb(255 255 255 / 0.08);
 }
 
-/* Older Haruvo token names, kept as aliases so page classes follow the sheet. */
+/* Older color token names, kept as aliases so page classes follow the sheet. */
 :root,
 .dark {
   --color-brand: var(--ui-accent-top);

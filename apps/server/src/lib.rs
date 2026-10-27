@@ -1,4 +1,4 @@
-//! Haruvo HTTP server, scheduler, and persistence.
+//! Statixo HTTP server, scheduler, and persistence.
 //!
 //! Mirrors Orbit's `apps/server`: a binary that migrates on boot, serves the
 //! API, and embeds the built React app. There is no realtime layer.

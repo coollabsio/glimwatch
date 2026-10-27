@@ -1,31 +1,35 @@
 services:
-  haruvo:
+  statixo:
     build:
       context: ..
-    image: ${HARUVO_IMAGE:-haruvo:local}
+    image: ${STATIXO_IMAGE:-statixo:local}
     restart: unless-stopped
     ports: ["8080:8080"]
     environment:
-      HARUVO_ENV: production
-      HARUVO_BIND: 0.0.0.0
-      HARUVO_PORT: 8080
+      STATIXO_ENV: production
+      STATIXO_BIND: 0.0.0.0
+      STATIXO_PORT: 8080
       # Used in the one-time Initial setup URL printed to stderr on a fresh database.
-      HARUVO_PUBLIC_ORIGIN: ${HARUVO_PUBLIC_ORIGIN:-http://localhost:8080}
-      HARUVO_DATABASE_PATH: /var/lib/haruvo/haruvo.sqlite
+      STATIXO_PUBLIC_ORIGIN: ${STATIXO_PUBLIC_ORIGIN:-http://localhost:8080}
+      # Stock path. If this file is missing and an older haruvo.sqlite or
+      # status.sqlite is visible (this directory or /var/lib/haruvo), that file is kept.
+      # To keep a Haruvo volume mounted elsewhere, set this to that file.
+      STATIXO_DATABASE_PATH: /var/lib/statixo/statixo.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
-      # HARUVO_OPEN_SIGNUP: "true"
+      # STATIXO_OPEN_SIGNUP: "true"
       # Switch the same binary to Postgres by setting this and starting the db service.
-      # HARUVO_DATABASE_URL: postgres://haruvo:haruvo@db:5432/haruvo
+      # STATIXO_DB_PASSWORD comes from the environment. Do not commit a password.
+      # STATIXO_DATABASE_URL: postgres://statixo:${STATIXO_DB_PASSWORD}@db:5432/statixo
     volumes:
-      - haruvo-data:/var/lib/haruvo
+      - statixo-data:/var/lib/statixo
   # db:
   #   image: postgres:16-alpine
   #   environment:
-  #     POSTGRES_USER: haruvo
-  #     POSTGRES_PASSWORD: haruvo
-  #     POSTGRES_DB: haruvo
+  #     POSTGRES_USER: statixo
+  #     POSTGRES_PASSWORD: ${STATIXO_DB_PASSWORD}
+  #     POSTGRES_DB: statixo
   #   volumes:
-  #     - haruvo-pg:/var/lib/postgresql/data
+  #     - statixo-pg:/var/lib/postgresql/data
 volumes:
-  haruvo-data:
-  # haruvo-pg:
+  statixo-data:
+  # statixo-pg:

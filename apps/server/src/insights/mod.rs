@@ -2,7 +2,7 @@
 //!
 //! The tracker wire format (`/data.js`, `POST /api/receive`) matches
 //! ShadowArcanist's Beacon so an existing snippet keeps working. Dashboard
-//! routes use Haruvo's session cookie.
+//! routes use Statixo's session cookie.
 
 mod geo;
 mod limit;
@@ -13,9 +13,9 @@ mod seed;
 use std::sync::Arc;
 use std::time::Duration;
 
-use haruvo_platform::{Config, Database, generate_token};
 use maxminddb::Reader;
 use sqlx::Row;
+use statixo_platform::{Config, Database, generate_token};
 
 pub use limit::RateLimiter;
 pub use routes::{api_routes, fallback, public_routes};

@@ -1,27 +1,27 @@
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use thiserror::Error;
 
-const ENV: &str = "HARUVO_ENV";
-const BIND: &str = "HARUVO_BIND";
-const PORT: &str = "HARUVO_PORT";
-const ORIGIN: &str = "HARUVO_PUBLIC_ORIGIN";
-const DATABASE_PATH: &str = "HARUVO_DATABASE_PATH";
-const DATABASE_URL: &str = "HARUVO_DATABASE_URL";
+const ENV: &str = "STATIXO_ENV";
+const BIND: &str = "STATIXO_BIND";
+const PORT: &str = "STATIXO_PORT";
+const ORIGIN: &str = "STATIXO_PUBLIC_ORIGIN";
+const DATABASE_PATH: &str = "STATIXO_DATABASE_PATH";
+const DATABASE_URL: &str = "STATIXO_DATABASE_URL";
 const DATABASE_URL_ALIAS: &str = "DATABASE_URL";
-const OPEN_SIGNUP: &str = "HARUVO_OPEN_SIGNUP";
-const SMTP_HOST: &str = "HARUVO_SMTP_HOST";
-const SMTP_PORT: &str = "HARUVO_SMTP_PORT";
-const SMTP_USERNAME: &str = "HARUVO_SMTP_USERNAME";
-const SMTP_PASSWORD: &str = "HARUVO_SMTP_PASSWORD";
-const SMTP_FROM: &str = "HARUVO_SMTP_FROM";
-const ARGON_MEMORY: &str = "HARUVO_ARGON_MEMORY_KIB";
-const CONNECTIVITY_TARGETS: &str = "HARUVO_CONNECTIVITY_TARGETS";
-const PROXY_HOPS: &str = "HARUVO_PROXY_HOPS";
-const GEOIP_PATH: &str = "HARUVO_GEOIP_PATH";
+const OPEN_SIGNUP: &str = "STATIXO_OPEN_SIGNUP";
+const SMTP_HOST: &str = "STATIXO_SMTP_HOST";
+const SMTP_PORT: &str = "STATIXO_SMTP_PORT";
+const SMTP_USERNAME: &str = "STATIXO_SMTP_USERNAME";
+const SMTP_PASSWORD: &str = "STATIXO_SMTP_PASSWORD";
+const SMTP_FROM: &str = "STATIXO_SMTP_FROM";
+const ARGON_MEMORY: &str = "STATIXO_ARGON_MEMORY_KIB";
+const CONNECTIVITY_TARGETS: &str = "STATIXO_CONNECTIVITY_TARGETS";
+const PROXY_HOPS: &str = "STATIXO_PROXY_HOPS";
+const GEOIP_PATH: &str = "STATIXO_GEOIP_PATH";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -34,10 +34,10 @@ pub struct Config {
     pub open_signup: bool,
     pub smtp: Option<SmtpConfig>,
     pub argon_memory_kib: u32,
-    /// `host:port` targets that prove the Haruvo host itself has network.
+    /// `host:port` targets that prove the Statixo host itself has network.
     /// Empty disables the check.
     pub connectivity_targets: Vec<String>,
-    /// Trusted reverse proxies in front of Haruvo. `0` means the socket address is the client.
+    /// Trusted reverse proxies in front of Statixo. `0` means the socket address is the client.
     pub proxy_hops: usize,
     /// Optional MaxMind or DB-IP city database (`.mmdb`) for analytics geolocation.
     pub geoip_path: Option<PathBuf>,
@@ -51,7 +51,7 @@ impl Config {
             bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 43123,
             public_origin: "http://127.0.0.1:43123".to_owned(),
-            database_path: PathBuf::from("data/haruvo.sqlite"),
+            database_path: PathBuf::from("data/statixo.sqlite"),
             database_url: None,
             open_signup: false,
             smtp: None,
@@ -101,14 +101,7 @@ impl Config {
             };
             format!("http://{host}:{}", config.port)
         });
-        if let Some(path) = compat(DATABASE_PATH) {
-            config.database_path = PathBuf::from(path);
-        } else {
-            let legacy = PathBuf::from("data/status.sqlite");
-            if !config.database_path.exists() && legacy.exists() {
-                config.database_path = legacy;
-            }
-        }
+        config.database_path = resolve_sqlite_path(compat(DATABASE_PATH));
         if let Some(url) = compat(DATABASE_URL).or_else(|| optional(DATABASE_URL_ALIAS)) {
             if !(url.starts_with("postgres://") || url.starts_with("postgresql://")) {
                 return Err(ConfigError::DatabaseUrl);
@@ -219,7 +212,7 @@ pub enum ConfigError {
     #[error("missing {0}")]
     Missing(&'static str),
     #[error(
-        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set HARUVO_DATABASE_PATH to move the file"
+        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set STATIXO_DATABASE_PATH to move the file (HARUVO_DATABASE_PATH and STATUS_DATABASE_PATH still work)"
     )]
     DatabaseUrl,
 }
@@ -231,12 +224,67 @@ fn optional(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// Reads `HARUVO_*` first, then the previous `STATUS_*` name.
+/// Reads `STATIXO_*` first, then `HARUVO_*`, then the older `STATUS_*` name.
 fn compat(name: &str) -> Option<String> {
     optional(name).or_else(|| {
-        name.strip_prefix("HARUVO_")
-            .and_then(|rest| optional(&format!("STATUS_{rest}")))
+        let rest = name.strip_prefix("STATIXO_")?;
+        optional(&format!("HARUVO_{rest}")).or_else(|| optional(&format!("STATUS_{rest}")))
     })
+}
+
+const STOCK_SQLITE_PATHS: &[&str] = &["data/statixo.sqlite", "/var/lib/statixo/statixo.sqlite"];
+
+/// Uses an explicit path as given. The stock defaults keep an existing
+/// `haruvo.sqlite` or `status.sqlite` when the new file is not there yet.
+fn resolve_sqlite_path(explicit: Option<String>) -> PathBuf {
+    let chosen = explicit
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(STOCK_SQLITE_PATHS[0]));
+    if chosen.exists()
+        || explicit
+            .as_deref()
+            .is_some_and(|path| !is_stock_sqlite_path(path))
+    {
+        return chosen;
+    }
+    legacy_sqlite_candidates(&chosen)
+        .into_iter()
+        .find(|path| path.exists())
+        .unwrap_or(chosen)
+}
+
+fn is_stock_sqlite_path(path: &str) -> bool {
+    let normalized = path.replace('\\', "/");
+    STOCK_SQLITE_PATHS.contains(&normalized.as_str())
+}
+
+fn legacy_sqlite_candidates(chosen: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(parent) = chosen.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        for name in ["haruvo.sqlite", "status.sqlite"] {
+            paths.push(parent.join(name));
+        }
+    }
+    for candidate in [
+        "data/haruvo.sqlite",
+        "data/status.sqlite",
+        "/var/lib/haruvo/haruvo.sqlite",
+        "/var/lib/haruvo/status.sqlite",
+        "/var/lib/statixo/haruvo.sqlite",
+        "/var/lib/statixo/status.sqlite",
+    ] {
+        paths.push(PathBuf::from(candidate));
+    }
+    let mut seen = Vec::new();
+    for path in paths {
+        if path != chosen && !seen.contains(&path) {
+            seen.push(path);
+        }
+    }
+    seen
 }
 
 fn parse_targets(value: &str) -> Option<Vec<String>> {
@@ -306,6 +354,8 @@ impl FromStr for EnvironmentMode {
 
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
+
     use super::*;
 
     #[test]
@@ -333,6 +383,7 @@ mod tests {
         // because the process is the test binary. Other tests do not read DATABASE_URL.
         unsafe {
             std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
+            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
@@ -344,8 +395,9 @@ mod tests {
     }
 
     #[test]
-    fn legacy_status_database_url_still_selects_postgres() {
+    fn legacy_database_urls_still_select_postgres() {
         unsafe {
+            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
             std::env::remove_var("DATABASE_URL");
             std::env::set_var(
@@ -353,9 +405,9 @@ mod tests {
                 "postgres://status:secret@127.0.0.1:1/status",
             );
         }
-        let config = Config::from_env().unwrap();
+        let status = Config::from_env().unwrap();
         assert_eq!(
-            config.database_url.as_deref(),
+            status.database_url.as_deref(),
             Some("postgres://status:secret@127.0.0.1:1/status")
         );
         unsafe {
@@ -364,14 +416,53 @@ mod tests {
                 "postgres://haruvo:secret@127.0.0.1:1/haruvo",
             );
         }
-        let preferred = Config::from_env().unwrap();
+        let haruvo = Config::from_env().unwrap();
         assert_eq!(
-            preferred.database_url.as_deref(),
+            haruvo.database_url.as_deref(),
             Some("postgres://haruvo:secret@127.0.0.1:1/haruvo")
         );
         unsafe {
+            std::env::set_var(
+                "STATIXO_DATABASE_URL",
+                "postgres://statixo:secret@127.0.0.1:1/statixo",
+            );
+        }
+        let preferred = Config::from_env().unwrap();
+        assert_eq!(
+            preferred.database_url.as_deref(),
+            Some("postgres://statixo:secret@127.0.0.1:1/statixo")
+        );
+        unsafe {
+            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("HARUVO_DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
+    }
+
+    #[test]
+    fn stock_sqlite_paths_prefer_older_files_and_custom_paths_stay() {
+        assert!(is_stock_sqlite_path("data/statixo.sqlite"));
+        assert!(is_stock_sqlite_path("/var/lib/statixo/statixo.sqlite"));
+        assert!(!is_stock_sqlite_path("/tmp/custom.sqlite"));
+        let candidates = legacy_sqlite_candidates(Path::new("data/statixo.sqlite"));
+        assert_eq!(candidates[0], PathBuf::from("data/haruvo.sqlite"));
+        assert_eq!(candidates[1], PathBuf::from("data/status.sqlite"));
+        assert!(
+            candidates
+                .iter()
+                .any(|path| path == Path::new("/var/lib/haruvo/haruvo.sqlite"))
+        );
+        let custom = std::env::temp_dir().join(format!(
+            "statixo-missing-{}-{}.sqlite",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert_eq!(
+            resolve_sqlite_path(Some(custom.display().to_string())),
+            custom
+        );
     }
 }

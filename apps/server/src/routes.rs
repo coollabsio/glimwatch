@@ -7,16 +7,16 @@ use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use haruvo_domain::{
+use serde::Deserialize;
+use serde_json::{Value, json};
+use statixo_domain::{
     Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput,
     MonitorState, NotificationEvent, NotificationPayload, OpenIncident, page_banner,
     resolved_at_after_update, validate_monitor, validate_slug,
 };
-use haruvo_platform::{
+use statixo_platform::{
     Id, PasswordError, TimestampMillis, generate_token, hash_token, normalize_email,
 };
-use serde::Deserialize;
-use serde_json::{Value, json};
 use tower_http::trace::TraceLayer;
 
 use crate::engine;
@@ -30,8 +30,13 @@ use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
 use crate::setup::{self, NewOwner};
 use crate::state::{self, AppState};
 
-const COOKIE: &str = "haruvo_session";
-const LEGACY_COOKIE: &str = "status_session";
+const COOKIE: &str = "statixo_session";
+/// Older session cookies. A later login replaces them with `statixo_session`.
+const LEGACY_COOKIES: &[&str] = &["haruvo_session", "status_session"];
+
+fn session_cookie_names() -> impl Iterator<Item = &'static str> {
+    std::iter::once(COOKIE).chain(LEGACY_COOKIES.iter().copied())
+}
 const DAY_MS: i64 = 86_400_000;
 
 pub fn router(state: AppState) -> Router {
@@ -283,16 +288,18 @@ async fn logout(
     State(state): State<AppState>,
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    for name in [COOKIE, LEGACY_COOKIE] {
+    for name in session_cookie_names() {
         if let Some(token) = jar.get(name).map(|cookie| cookie.value().to_owned()) {
             repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
         }
     }
-    let mut expired = Cookie::from(COOKIE);
-    expired.set_path("/");
-    let mut legacy = Cookie::from(LEGACY_COOKIE);
-    legacy.set_path("/");
-    Ok((jar.remove(expired).remove(legacy), StatusCode::NO_CONTENT))
+    let mut jar = jar;
+    for name in session_cookie_names() {
+        let mut expired = Cookie::from(name);
+        expired.set_path("/");
+        jar = jar.remove(expired);
+    }
+    Ok((jar, StatusCode::NO_CONTENT))
 }
 
 async fn me(
@@ -1154,7 +1161,7 @@ async fn test_channel(
         monitor: None,
         check: None,
         incident: None,
-        message: Some("This is a test notification from Haruvo.".to_owned()),
+        message: Some("This is a test notification from Statixo.".to_owned()),
     };
     notify::deliver(&state, &channel, &payload, None, None).await;
     Ok(Json(channel_view(&state, channel).await?))
@@ -1293,14 +1300,14 @@ async fn notify_incident(state: &AppState, incident: &Incident, message: &str) {
     let payload = NotificationPayload {
         event: NotificationEvent::IncidentUpdated.as_str().to_owned(),
         sent_at: TimestampMillis::now().to_string(),
-        monitor: monitor.map(|monitor| haruvo_domain::PayloadMonitor {
+        monitor: monitor.map(|monitor| statixo_domain::PayloadMonitor {
             id: monitor.id.to_string(),
             name: monitor.name,
             url: monitor.url,
             state: monitor.state,
         }),
         check: None,
-        incident: Some(haruvo_domain::PayloadIncident {
+        incident: Some(statixo_domain::PayloadIncident {
             id: incident.id.to_string(),
             title: incident.title.clone(),
             status: incident.status,
@@ -1554,10 +1561,8 @@ async fn require_agent(state: &AppState, headers: &HeaderMap) -> Result<Agent, A
 }
 
 pub(crate) async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
-    let Some(token) = jar
-        .get(COOKIE)
-        .or_else(|| jar.get(LEGACY_COOKIE))
-        .map(|cookie| cookie.value().to_owned())
+    let Some(token) = session_cookie_names()
+        .find_map(|name| jar.get(name).map(|cookie| cookie.value().to_owned()))
     else {
         return Err(AppError::Unauthorized);
     };
@@ -1595,9 +1600,13 @@ fn session_jar(state: &AppState, jar: CookieJar, token: String) -> CookieJar {
         .path("/")
         .secure(state.config.secure_cookies())
         .build();
-    let mut legacy = Cookie::from(LEGACY_COOKIE);
-    legacy.set_path("/");
-    jar.remove(legacy).add(cookie)
+    let mut jar = jar.add(cookie);
+    for name in LEGACY_COOKIES {
+        let mut legacy = Cookie::from(*name);
+        legacy.set_path("/");
+        jar = jar.remove(legacy);
+    }
+    jar
 }
 
 struct AccountFields {

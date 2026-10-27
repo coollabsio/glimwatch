@@ -100,7 +100,7 @@ export function AgentsPage() {
   );
 }
 
-const configPath = "/etc/status/agent.toml";
+const configPath = "/etc/statixo/agent.toml";
 
 const exampleConfig = `[[check]]
 name = "Main DB"
@@ -113,10 +113,10 @@ interval = 30`;
 
 function AgentToken({ agent, onDone }: { agent: CreatedAgent; onDone: () => void }) {
   const origin = window.location.origin;
-  const docker = `docker run -d --name status-agent --restart unless-stopped --no-healthcheck -e STATUS_AGENT_SERVER=${origin} -e STATUS_AGENT_TOKEN=${agent.token} -e STATUS_AGENT_CONFIG=${configPath} -e PG_PASSWORD=... -v ${configPath}:${configPath}:ro ghcr.io/coollabsio/status:latest agent`;
-  const binary = `PG_PASSWORD=... status agent --server ${origin} --token ${agent.token} --config ${configPath}`;
+  const docker = `docker run -d --name statixo-agent --restart unless-stopped --no-healthcheck -e STATIXO_AGENT_SERVER=${origin} -e STATIXO_AGENT_TOKEN=${agent.token} -e STATIXO_AGENT_CONFIG=${configPath} -e PG_PASSWORD=... -v ${configPath}:${configPath}:ro ghcr.io/coollabsio/statixo:latest agent`;
+  const binary = `PG_PASSWORD=... statixo agent --server ${origin} --token ${agent.token} --config ${configPath}`;
   return (
-    <LayerCard title={`${agent.name} is ready`} description="Copy the token now. Haruvo stores only its hash and cannot show it again." >
+    <LayerCard title={`${agent.name} is ready`} description="Copy the token now. Statixo stores only its hash and cannot show it again." >
       <div className="flex flex-col gap-4">
         <Snippet label="Token" value={agent.token} />
         <Snippet label={configPath} value={exampleConfig} multiline />
