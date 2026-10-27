@@ -1,10 +1,10 @@
 //! Settings of this Haruvo instance that the root user changes.
 //!
 //! Registration stays closed after setup. Opening it requires a mail server, either
-//! saved here or set with `HARUVO_SMTP_*` (`STATIXO_SMTP_*` and `STATUS_SMTP_*` still
-//! count). Clearing the saved server closes registration. The environment variables
-//! are not cleared by that action; they still count as a mail server until they are unset.
-//! `HARUVO_OPEN_SIGNUP`, `STATIXO_OPEN_SIGNUP`, and `STATUS_OPEN_SIGNUP` are ignored.
+//! saved here or set with `HARUVO_SMTP_*` (`STATUS_SMTP_*` still counts). Clearing the
+//! saved server closes registration. The environment variables are not cleared by that
+//! action; they still count as a mail server until they are unset.
+//! `HARUVO_OPEN_SIGNUP` and `STATUS_OPEN_SIGNUP` are ignored.
 
 use std::ops::DerefMut;
 
@@ -205,8 +205,7 @@ pub async fn save_smtp(
 }
 
 /// Removes the saved mail server and closes registration.
-/// Environment `HARUVO_SMTP_*` (and the older `STATIXO_SMTP_*` / `STATUS_SMTP_*` names)
-/// is left as it was.
+/// Environment `HARUVO_SMTP_*` (and the older `STATUS_SMTP_*` names) is left as it was.
 pub async fn clear_smtp(db: &Database, now: TimestampMillis) -> Result<(), sqlx::Error> {
     let mut tx = db.begin_immediate().await?;
     ensure_row_tx(&mut tx).await?;

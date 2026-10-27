@@ -70,7 +70,7 @@ async fn send(
         "email" => {
             let Some(smtp) = effective_smtp(state).await else {
                 return Ok(SendOutcome::Skipped(
-                    "SMTP is not configured. Save a mail server in Settings, or set HARUVO_SMTP_HOST and HARUVO_SMTP_FROM. STATIXO_SMTP_* and STATUS_SMTP_* still work.".to_owned(),
+                    "SMTP is not configured. Save a mail server in Settings, or set HARUVO_SMTP_HOST and HARUVO_SMTP_FROM. STATUS_SMTP_* still works.".to_owned(),
                 ));
             };
             let to = config

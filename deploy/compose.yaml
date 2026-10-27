@@ -14,7 +14,7 @@ services:
       # Stock path. If this file is missing and an older statixo.sqlite or
       # status.sqlite is visible (this directory, /var/lib/statixo, or /var/lib/haruvo),
       # that file is kept. To keep a volume mounted elsewhere, set this to that file.
-      # STATIXO_DATABASE_PATH and STATUS_DATABASE_PATH apply when this name is unset.
+      # STATUS_DATABASE_PATH applies when this name is unset.
       HARUVO_DATABASE_PATH: /var/lib/haruvo/haruvo.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
       # The root user opens it in Settings after SMTP is configured.

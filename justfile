@@ -21,7 +21,7 @@ dev:
     wait
 
 # Backend tests, including Postgres when HARUVO_TEST_POSTGRES_URL is set.
-# STATIXO_TEST_POSTGRES_URL and STATUS_TEST_POSTGRES_URL are still accepted.
+# STATUS_TEST_POSTGRES_URL is still accepted.
 test:
     cargo test --workspace
 

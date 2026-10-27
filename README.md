@@ -41,13 +41,13 @@ Open http://127.0.0.1:43123.
 
 `just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
-The database file is `data/haruvo.sqlite`. If that file is missing, Haruvo uses `data/statixo.sqlite` or `data/status.sqlite` when one of those older files is already there. The Docker default `/var/lib/haruvo/haruvo.sqlite` does the same for `statixo.sqlite` and `status.sqlite` in that directory and under `/var/lib/statixo`. A custom `HARUVO_DATABASE_PATH` (or a `STATIXO_` / `STATUS_` alias of it) is used as written. Migrations run on startup.
+The database file is `data/haruvo.sqlite`. If that file is missing, Haruvo uses `data/statixo.sqlite` or `data/status.sqlite` when one of those older files is already there. The Docker default `/var/lib/haruvo/haruvo.sqlite` does the same for `statixo.sqlite` and `status.sqlite` in that directory and under `/var/lib/statixo`. A custom `HARUVO_DATABASE_PATH` (or a `STATUS_` alias of it) is used as written. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
 ### Postgres
 
-Leave the SQLite path in place (it is unused for data) and set a URL. `STATIXO_DATABASE_URL`, `STATUS_DATABASE_URL`, and `DATABASE_URL` are accepted when `HARUVO_DATABASE_URL` is unset. `HARUVO_*` wins over `STATIXO_*`, which wins over `STATUS_*`.
+Leave the SQLite path in place (it is unused for data) and set a URL. `STATUS_DATABASE_URL` and `DATABASE_URL` are accepted when `HARUVO_DATABASE_URL` is unset. `HARUVO_*` wins over `STATUS_*`.
 
 ```bash
 export HARUVO_DATABASE_URL=postgres://haruvo:haruvo@127.0.0.1:5432/haruvo
@@ -87,9 +87,9 @@ haruvo setup-token rotate
 
 `setup-token init` prints a URL only when setup is unfinished and no unused token is stored. Rotation invalidates the previous unused token.
 
-The root user opens registration in Settings. It stays closed until a mail server is saved there, or `HARUVO_SMTP_HOST` and `HARUVO_SMTP_FROM` are set (`STATIXO_SMTP_*` and `STATUS_SMTP_*` still work), and the root user turns Open registration on. Clearing the saved mail server closes registration again. `HARUVO_OPEN_SIGNUP`, `STATIXO_OPEN_SIGNUP`, and `STATUS_OPEN_SIGNUP` are ignored. Haruvo does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
+The root user opens registration in Settings. It stays closed until a mail server is saved there, or `HARUVO_SMTP_HOST` and `HARUVO_SMTP_FROM` are set (`STATUS_SMTP_*` still works), and the root user turns Open registration on. Clearing the saved mail server closes registration again. `HARUVO_OPEN_SIGNUP` and `STATUS_OPEN_SIGNUP` are ignored. Haruvo does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
 
-Every `HARUVO_*` variable still accepts `STATIXO_*`, and then the older `STATUS_*` name, when the newer variable is unset. See [Migrating from Statixo](#migrating-from-statixo).
+Every `HARUVO_*` variable still accepts the older `STATUS_*` name when the `HARUVO_*` variable is unset. See [Migrating from Statixo](#migrating-from-statixo).
 
 When a check cannot connect (DNS, connect, or timeout error), Haruvo first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Haruvo host's own network. Haruvo then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
 
@@ -125,7 +125,7 @@ export HARUVO_TEST_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_p
 export HARUVO_APP_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_app
 ```
 
-Use two empty databases. The platform test resets its own schema. `STATIXO_TEST_POSTGRES_URL`, `STATIXO_APP_POSTGRES_URL`, `STATUS_TEST_POSTGRES_URL`, and `STATUS_APP_POSTGRES_URL` still work.
+Use two empty databases. The platform test resets its own schema. `STATUS_TEST_POSTGRES_URL` and `STATUS_APP_POSTGRES_URL` still work.
 
 ## Docker
 
@@ -196,7 +196,7 @@ The checks are in a config file on the agent host. The server cannot add or chan
    PG_PASSWORD=... haruvo agent --server https://status.example.com --token <token> --config /etc/haruvo/agent.toml
    ```
 
-   The command also reads `HARUVO_AGENT_SERVER`, `HARUVO_AGENT_TOKEN`, and `HARUVO_AGENT_CONFIG`. `STATIXO_AGENT_*` and `STATUS_AGENT_*` still work when the `HARUVO_` name is unset. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
+   The command also reads `HARUVO_AGENT_SERVER`, `HARUVO_AGENT_TOKEN`, and `HARUVO_AGENT_CONFIG`. `STATUS_AGENT_*` still works when the `HARUVO_` name is unset. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
 
 When the agent starts, it sends its list of checks to the server, without secrets. The server creates a monitor for each new check name, updates the monitors that already exist, and pauses the monitors of checks that are no longer in the file. History stays. To change a check, edit the file and restart the agent. The agent stops at once when the server rejects the token or the config, and it shows the reason.
 
@@ -253,7 +253,7 @@ Haruvo follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves 
 | `crates/platform` (config, db, auth, migrations) | `crates/platform` |
 | `crates/orbit` domain rules | `crates/status` |
 | `apps/web` Vite, React, Tailwind | `apps/web` |
-| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `HARUVO_DATABASE_URL` / `STATIXO_DATABASE_URL` / `DATABASE_URL` |
+| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `HARUVO_DATABASE_URL` / `STATUS_DATABASE_URL` / `DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
 | Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then the root user opens registration in Settings after SMTP |
@@ -281,20 +281,20 @@ Cookieless analytics and the link shortener reimplement [Beacon](https://github.
 
 ## Migrating from Statixo
 
-Haruvo is the product name again. Statixo installs, and older `STATUS_*` settings, keep working until you rename them.
+Haruvo is the product name again. Older `STATUS_*` settings keep working until you rename them. Rename Statixo environment variables to the `HARUVO_` prefix.
 
 | Current | Still accepted |
 | --- | --- |
-| `HARUVO_*` | `STATIXO_*` when `HARUVO_*` is unset, then `STATUS_*` when both are unset |
+| `HARUVO_*` | `STATUS_*` when `HARUVO_*` is unset |
 | `haruvo_session` cookie | `statixo_session`, then `status_session`, until the next login replaces them |
 | `window.haruvoEvent` | `window.statixoEvent` and `window.beaconEvent` |
 | `X-Haruvo-Signature` | `X-Statixo-Signature` and `X-Status-Signature` are sent with the same value |
 | `data/haruvo.sqlite`, `/var/lib/haruvo/haruvo.sqlite` | `statixo.sqlite`, then `status.sqlite`, in the same directory or under `/var/lib/statixo`, when the Haruvo file is absent and the path is a stock default |
 | Browser appearance and saved issue views | `statixo-appearance` and `statixo-error-views` are read once and stored under the `haruvo-` names. `haruvo-theme` is still read |
 
-`DATABASE_URL` is still an alias of the database URL, after `HARUVO_DATABASE_URL`, `STATIXO_DATABASE_URL`, and `STATUS_DATABASE_URL`.
+`DATABASE_URL` is still an alias of the database URL, after `HARUVO_DATABASE_URL` and `STATUS_DATABASE_URL`.
 
-The container image sets `HARUVO_ENV`, `HARUVO_BIND`, `HARUVO_PORT`, `HARUVO_DATABASE_PATH`, and `HARUVO_PUBLIC_ORIGIN`. Those win over a `STATIXO_*` or `STATUS_*` name of the same setting. Rename those five if you set them on the Statixo image. Other `STATIXO_*` names still apply when the `HARUVO_*` name is unset.
+The container image sets `HARUVO_ENV`, `HARUVO_BIND`, `HARUVO_PORT`, `HARUVO_DATABASE_PATH`, and `HARUVO_PUBLIC_ORIGIN`. Those win over a `STATUS_*` name of the same setting. Rename Statixo environment variables to those `HARUVO_` names.
 
 The stock database path still opens an existing file. If `/var/lib/haruvo/haruvo.sqlite` is missing, Haruvo uses `statixo.sqlite` or `status.sqlite` in that directory or under `/var/lib/statixo`. To point at a file directly:
 
@@ -310,7 +310,7 @@ docker run --rm -v statixo-data:/from -v haruvo-data:/to alpine \
   cp -a /from/statixo.sqlite /to/haruvo.sqlite
 ```
 
-Point Coolify at `ghcr.io/coollabsio/haruvo`. `HARUVO_IMAGE` is the compose override (`STATIXO_IMAGE` is no longer read). The source repository stays `https://github.com/coollabsio/haruvo`. The container workflow publishes `ghcr.io/coollabsio/haruvo` and leaves `ghcr.io/coollabsio/statixo` in place. API problem URLs use `https://haruvo.io/problems/...`. Existing browsers stay signed in: `statixo_session` and `status_session` are still accepted, and the next login writes `haruvo_session`.
+Point Coolify at `ghcr.io/coollabsio/haruvo`. `HARUVO_IMAGE` is the compose override. The source repository stays `https://github.com/coollabsio/haruvo`. The container workflow publishes `ghcr.io/coollabsio/haruvo` and leaves `ghcr.io/coollabsio/statixo` in place. API problem URLs use `https://haruvo.io/problems/...`. Existing browsers stay signed in: `statixo_session` and `status_session` are still accepted, and the next login writes `haruvo_session`.
 
 ## License
 

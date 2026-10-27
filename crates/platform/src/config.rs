@@ -109,8 +109,8 @@ impl Config {
             config.database_url = Some(url);
         }
         // Parsed so an existing environment still boots. Registration is the
-        // instance setting in the database, not this flag. HARUVO_OPEN_SIGNUP,
-        // STATIXO_OPEN_SIGNUP, and STATUS_OPEN_SIGNUP are ignored.
+        // instance setting in the database, not this flag. HARUVO_OPEN_SIGNUP
+        // and STATUS_OPEN_SIGNUP are ignored.
         if let Some(signup) = compat(OPEN_SIGNUP) {
             config.open_signup = parse_bool(&signup).ok_or(ConfigError::Invalid {
                 name: OPEN_SIGNUP,
@@ -215,7 +215,7 @@ pub enum ConfigError {
     #[error("missing {0}")]
     Missing(&'static str),
     #[error(
-        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set HARUVO_DATABASE_PATH to move the file (STATIXO_DATABASE_PATH and STATUS_DATABASE_PATH still work)"
+        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set HARUVO_DATABASE_PATH to move the file (STATUS_DATABASE_PATH still works)"
     )]
     DatabaseUrl,
 }
@@ -227,11 +227,11 @@ fn optional(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// Reads `HARUVO_*` first, then `STATIXO_*`, then the older `STATUS_*` name.
+/// Reads `HARUVO_*` first, then the older `STATUS_*` name.
 fn compat(name: &str) -> Option<String> {
     optional(name).or_else(|| {
         let rest = name.strip_prefix("HARUVO_")?;
-        optional(&format!("STATIXO_{rest}")).or_else(|| optional(&format!("STATUS_{rest}")))
+        optional(&format!("STATUS_{rest}"))
     })
 }
 
@@ -395,7 +395,6 @@ mod tests {
         unsafe {
             std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
             std::env::remove_var("HARUVO_DATABASE_URL");
-            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
         let error = Config::from_env().unwrap_err();
@@ -410,8 +409,16 @@ mod tests {
         let _env = lock_process_env();
         unsafe {
             std::env::remove_var("HARUVO_DATABASE_URL");
-            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("STATUS_DATABASE_URL");
+            std::env::set_var(
+                "STATIXO_DATABASE_URL",
+                "postgres://statixo:secret@127.0.0.1:1/statixo",
+            );
+        }
+        let ignored = Config::from_env().unwrap();
+        assert_eq!(ignored.database_url.as_deref(), None);
+        unsafe {
             std::env::set_var(
                 "STATUS_DATABASE_URL",
                 "postgres://status:secret@127.0.0.1:1/status",
@@ -421,17 +428,6 @@ mod tests {
         assert_eq!(
             status.database_url.as_deref(),
             Some("postgres://status:secret@127.0.0.1:1/status")
-        );
-        unsafe {
-            std::env::set_var(
-                "STATIXO_DATABASE_URL",
-                "postgres://statixo:secret@127.0.0.1:1/statixo",
-            );
-        }
-        let statixo = Config::from_env().unwrap();
-        assert_eq!(
-            statixo.database_url.as_deref(),
-            Some("postgres://statixo:secret@127.0.0.1:1/statixo")
         );
         unsafe {
             std::env::set_var(

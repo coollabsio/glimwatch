@@ -58,15 +58,15 @@ enum Command {
     /// Run the checks in a config file from this network and report them to a Haruvo server.
     Agent {
         /// Haruvo server URL, for example https://status.example.com.
-        /// `STATIXO_AGENT_SERVER` and `STATUS_AGENT_SERVER` are used when this is unset.
+        /// `STATUS_AGENT_SERVER` is used when this is unset.
         #[arg(long, env = "HARUVO_AGENT_SERVER")]
         server: String,
         /// Token shown once when the agent was created.
-        /// `STATIXO_AGENT_TOKEN` and `STATUS_AGENT_TOKEN` are used when this is unset.
+        /// `STATUS_AGENT_TOKEN` is used when this is unset.
         #[arg(long, env = "HARUVO_AGENT_TOKEN", hide_env_values = true)]
         token: String,
         /// TOML file with [[check]] entries.
-        /// `STATIXO_AGENT_CONFIG` and `STATUS_AGENT_CONFIG` are used when this is unset.
+        /// `STATUS_AGENT_CONFIG` is used when this is unset.
         #[arg(long, env = "HARUVO_AGENT_CONFIG")]
         config: PathBuf,
     },
@@ -77,7 +77,7 @@ enum SetupTokenCommand {
     /// Print a setup URL when setup is unfinished and no unused token is stored.
     Init {
         /// Public origin to put in the URL. Defaults to HARUVO_PUBLIC_ORIGIN.
-        /// `STATIXO_PUBLIC_ORIGIN` and `STATUS_PUBLIC_ORIGIN` still work.
+        /// `STATUS_PUBLIC_ORIGIN` still works.
         #[arg(long)]
         origin: Option<String>,
     },
@@ -85,7 +85,7 @@ enum SetupTokenCommand {
     /// On SQLite, stop Haruvo first. On Postgres, this can run while Haruvo is up.
     Rotate {
         /// Public origin to put in the URL. Defaults to HARUVO_PUBLIC_ORIGIN.
-        /// `STATIXO_PUBLIC_ORIGIN` and `STATUS_PUBLIC_ORIGIN` still work.
+        /// `STATUS_PUBLIC_ORIGIN` still works.
         #[arg(long)]
         origin: Option<String>,
     },
@@ -192,13 +192,10 @@ fn promote_legacy_agent_env() {
         if std::env::var_os(&primary).is_some() {
             continue;
         }
-        for prefix in ["STATIXO_", "STATUS_"] {
-            let legacy = format!("{prefix}{suffix}");
-            if let Some(value) = std::env::var_os(&legacy) {
-                // SAFETY: process startup, before other threads read these variables.
-                unsafe { std::env::set_var(&primary, value) };
-                break;
-            }
+        let legacy = format!("STATUS_{suffix}");
+        if let Some(value) = std::env::var_os(&legacy) {
+            // SAFETY: process startup, before other threads read these variables.
+            unsafe { std::env::set_var(&primary, value) };
         }
     }
 }
