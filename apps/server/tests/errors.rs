@@ -5,16 +5,22 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use flate2::Compression;
 use flate2::write::{DeflateEncoder, GzEncoder};
-use haruvo_server::{boot, router, testing_config};
+use haruvo_platform::TimestampMillis;
+use haruvo_server::{boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-async fn app() -> Router {
+async fn app() -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("haruvo.sqlite");
     let _keep = Box::leak(Box::new(dir));
-    router(boot(testing_config(path)).await.unwrap())
+    let state = boot(testing_config(path)).await.unwrap();
+    let token = initialize_setup_token(&state.db, TimestampMillis::now())
+        .await
+        .unwrap()
+        .map(|issued| issued.token);
+    (router(state), token)
 }
 
 async fn call(
@@ -112,20 +118,29 @@ fn sample() -> Value {
     })
 }
 
-async fn exercise(app: Router) {
+async fn exercise(app: Router, setup_token: Option<String>) {
     let email = format!("errors-{}@coollabs.io", haruvo_platform::Id::new());
+    let (path, body) = if let Some(token) = setup_token {
+        (
+            "/api/setup/complete",
+            json!({"token": token, "email": email, "password": "correct-horse-battery", "display_name": "Ada"}),
+        )
+    } else {
+        (
+            "/api/auth/register",
+            json!({"email": email, "password": "correct-horse-battery", "display_name": "Ada"}),
+        )
+    };
     let (status, _, cookie) = call(
         &app,
         "POST",
-        "/api/auth/register",
-        json!({"email": email, "password": "correct-horse-battery", "display_name": "Ada"})
-            .to_string()
-            .into_bytes(),
+        path,
+        body.to_string().into_bytes(),
         None,
         &[("content-type", "application/json")],
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert!(status.is_success(), "{status}");
     let cookie = cookie.unwrap();
 
     let (status, _, _) = call(&app, "GET", "/api/error-projects", Vec::new(), None, &[]).await;
@@ -307,7 +322,8 @@ async fn exercise(app: Router) {
 
 #[tokio::test]
 async fn sqlite_ingest_groups_events() {
-    exercise(app().await).await;
+    let (app, token) = app().await;
+    exercise(app, token).await;
 }
 
 #[tokio::test]
@@ -324,5 +340,9 @@ async fn postgres_ingest_groups_events() {
     ));
     config.database_url = Some(url);
     let state = boot(config).await.expect("postgres boot");
-    exercise(router(state)).await;
+    let token = initialize_setup_token(&state.db, TimestampMillis::now())
+        .await
+        .unwrap()
+        .map(|issued| issued.token);
+    exercise(router(state), token).await;
 }

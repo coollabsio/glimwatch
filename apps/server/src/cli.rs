@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use haruvo_platform::Config;
+use haruvo_platform::{Config, TimestampMillis};
 
 use crate::agent;
 use crate::connectivity::Connectivity;
+use crate::ownership;
 use crate::scheduler;
 use crate::seed;
+use crate::setup;
 use crate::state::{self, BootError};
 
 #[derive(Parser)]
@@ -45,6 +47,14 @@ enum Command {
     },
     /// Exit successfully when /api/health answers on the configured port.
     Healthcheck,
+    /// One-time setup URL for the first owner account.
+    SetupToken {
+        /// SQLite database file. Ignored when a Postgres URL is configured.
+        #[arg(long)]
+        database: Option<PathBuf>,
+        #[command(subcommand)]
+        command: SetupTokenCommand,
+    },
     /// Run the checks in a config file from this network and report them to a Haruvo server.
     Agent {
         /// Haruvo server URL, for example https://status.example.com.
@@ -59,6 +69,23 @@ enum Command {
     },
 }
 
+#[derive(Subcommand)]
+enum SetupTokenCommand {
+    /// Print a setup URL when setup is unfinished and no unused token is stored.
+    Init {
+        /// Public origin to put in the URL. Defaults to HARUVO_PUBLIC_ORIGIN.
+        #[arg(long)]
+        origin: Option<String>,
+    },
+    /// Replace the unused setup token. Refuses after setup is complete.
+    /// On SQLite, stop Haruvo first. On Postgres, this can run while Haruvo is up.
+    Rotate {
+        /// Public origin to put in the URL. Defaults to HARUVO_PUBLIC_ORIGIN.
+        #[arg(long)]
+        origin: Option<String>,
+    },
+}
+
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     promote_legacy_agent_env();
     let cli = Cli::parse();
@@ -68,8 +95,15 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     }) {
         Command::Serve { listen, database } => {
             let config = load(listen, database)?;
+            let _sqlite_owner = sqlite_owner(&config)?;
             let addr = config.listen_addr();
             let state = state::boot(config).await?;
+            if let Some(issued) =
+                setup::initialize_setup_token(&state.db, TimestampMillis::now()).await?
+            {
+                let url = setup::setup_url(&state.config.public_origin, &issued.token);
+                eprintln!("Initial setup URL: {url}");
+            }
             scheduler::spawn(state.clone());
             let listener = tokio::net::TcpListener::bind(addr).await?;
             let bound = listener.local_addr()?;
@@ -104,6 +138,32 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             let targets = Config::from_env()?.connectivity_targets;
             agent::run(&server, token, &config, Connectivity::new(targets)).await?;
         }
+        Command::SetupToken { database, command } => {
+            let config = load(None, database)?;
+            let _sqlite_owner = sqlite_owner(&config)?;
+            let origin = match &command {
+                SetupTokenCommand::Init { origin } | SetupTokenCommand::Rotate { origin } => {
+                    origin.clone()
+                }
+            };
+            let state = state::boot(config).await?;
+            let origin = origin.unwrap_or_else(|| state.config.public_origin.clone());
+            let now = TimestampMillis::now();
+            match command {
+                SetupTokenCommand::Init { .. } => {
+                    match setup::initialize_setup_token(&state.db, now).await? {
+                        Some(issued) => println!("{}", setup::setup_url(&origin, &issued.token)),
+                        None => {
+                            println!("setup token already exists or setup is complete");
+                        }
+                    }
+                }
+                SetupTokenCommand::Rotate { .. } => {
+                    let issued = setup::rotate_setup_token(&state.db, now).await?;
+                    println!("{}", setup::setup_url(&origin, &issued.token));
+                }
+            }
+        }
         Command::Healthcheck => {
             let config = Config::from_env()?;
             let url = format!("http://127.0.0.1:{}/api/health", config.port);
@@ -136,6 +196,17 @@ fn promote_legacy_agent_env() {
     }
 }
 
+/// SQLite is owned by one Haruvo process. Postgres stays unlocked so `setup-token`
+/// can run while the server is up, matching Orbit.
+fn sqlite_owner(config: &Config) -> Result<Option<ownership::Guard>, BootError> {
+    if config.database_url.is_some() {
+        return Ok(None);
+    }
+    ownership::lock_sqlite(&config.database_path)
+        .map(Some)
+        .map_err(BootError::Config)
+}
+
 fn load(listen: Option<SocketAddr>, database: Option<PathBuf>) -> Result<Config, BootError> {
     let mut config = Config::from_env().map_err(|error| BootError::Config(error.to_string()))?;
     if let Some(listen) = listen {
@@ -145,4 +216,28 @@ fn load(listen: Option<SocketAddr>, database: Option<PathBuf>) -> Result<Config,
         config.database_path = database;
     }
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_setup_token_rotate() {
+        let cli = Cli::try_parse_from([
+            "haruvo",
+            "setup-token",
+            "rotate",
+            "--origin",
+            "https://status.example.com",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(Command::SetupToken {
+                command: SetupTokenCommand::Rotate { .. },
+                ..
+            })
+        ));
+    }
 }

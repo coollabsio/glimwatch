@@ -9,8 +9,11 @@ services:
       HARUVO_ENV: production
       HARUVO_BIND: 0.0.0.0
       HARUVO_PORT: 8080
+      # Used in the one-time Initial setup URL printed to stderr on a fresh database.
       HARUVO_PUBLIC_ORIGIN: ${HARUVO_PUBLIC_ORIGIN:-http://localhost:8080}
       HARUVO_DATABASE_PATH: /var/lib/haruvo/haruvo.sqlite
+      # Public sign-up stays closed after the owner is created from that URL.
+      # HARUVO_OPEN_SIGNUP: "true"
       # Switch the same binary to Postgres by setting this and starting the db service.
       # HARUVO_DATABASE_URL: postgres://haruvo:haruvo@db:5432/haruvo
     volumes:

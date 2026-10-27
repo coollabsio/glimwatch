@@ -53,7 +53,7 @@ impl Config {
             public_origin: "http://127.0.0.1:43123".to_owned(),
             database_path: PathBuf::from("data/haruvo.sqlite"),
             database_url: None,
-            open_signup: true,
+            open_signup: false,
             smtp: None,
             argon_memory_kib: 19456,
             connectivity_targets: ["1.1.1.1:443", "8.8.8.8:443", "9.9.9.9:443"]

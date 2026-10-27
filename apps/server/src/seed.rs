@@ -28,6 +28,7 @@ pub async fn seed(state: &AppState) -> Result<bool, AppError> {
         now,
     )
     .await?;
+    crate::setup::mark_initialized(&state.db, user_id, now).await?;
 
     let origin = state.config.public_origin.trim_end_matches('/');
     let api = monitor(

@@ -202,6 +202,7 @@ export type PublicPage = {
 export type Meta = {
   version: string;
   signup_open: boolean;
+  setup_complete: boolean;
   database: string;
   public_origin: string;
   demo: { email: string; password: string } | null;

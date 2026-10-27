@@ -138,6 +138,9 @@ pub fn testing_config(path: PathBuf) -> Config {
         public_origin: "http://127.0.0.1".to_owned(),
         database_path: path,
         database_url: None,
+        // Tests create the owner with the setup token. Open sign-up here only
+        // covers a later account on a database that is already initialized
+        // (the shared Postgres test database, on a second run).
         open_signup: true,
         smtp: None,
         argon_memory_kib: 32,

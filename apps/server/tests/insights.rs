@@ -1,17 +1,22 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use haruvo_server::{boot, router, testing_config};
+use haruvo_platform::TimestampMillis;
+use haruvo_server::{boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-async fn app() -> Router {
+async fn app() -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("haruvo.sqlite");
     let _keep = Box::leak(Box::new(dir));
     let state = boot(testing_config(path)).await.unwrap();
-    router(state)
+    let token = initialize_setup_token(&state.db, TimestampMillis::now())
+        .await
+        .unwrap()
+        .map(|issued| issued.token);
+    (router(state), token)
 }
 
 async fn call(
@@ -67,12 +72,13 @@ async fn call(
 const BROWSER: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36";
 const BOT: &str = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
 
-async fn owner(app: &Router) -> String {
-    let (status, _body, cookie, _) = call(
+async fn owner(app: &Router, token: &str) -> String {
+    let (status, body, cookie, _) = call(
         app,
         "POST",
-        "/api/auth/register",
+        "/api/setup/complete",
         Some(json!({
+            "token": token,
             "email": "ada@coollabs.io",
             "password": "correct-horse-battery",
             "display_name": "Ada"
@@ -81,14 +87,14 @@ async fn owner(app: &Router) -> String {
         Some(BROWSER),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::CREATED, "{body}");
     cookie.unwrap()
 }
 
 #[tokio::test]
 async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
-    let app = app().await;
-    let cookie = owner(&app).await;
+    let (app, token) = app().await;
+    let cookie = owner(&app, token.as_deref().expect("setup token")).await;
     let (status, script, _, _) = call(&app, "GET", "/data.js", None, None, Some(BROWSER)).await;
     assert_eq!(status, StatusCode::OK);
     let script = script.as_str().unwrap_or("");
@@ -229,22 +235,43 @@ async fn postgres_collects_a_pageview_when_configured() {
     ));
     config.database_url = Some(url);
     let state = boot(config).await.expect("postgres boot");
+    let token = initialize_setup_token(&state.db, TimestampMillis::now())
+        .await
+        .unwrap()
+        .map(|issued| issued.token);
     let app = router(state);
     let email = format!("insights-{}@coollabs.io", haruvo_platform::Id::new());
-    let (status, _user, cookie, _) = call(
-        &app,
-        "POST",
-        "/api/auth/register",
-        Some(json!({
-            "email": email,
-            "password": "correct-horse-battery",
-            "display_name": "Postgres"
-        })),
-        None,
-        Some(BROWSER),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
+    let (status, _user, cookie, _) = if let Some(token) = token {
+        call(
+            &app,
+            "POST",
+            "/api/setup/complete",
+            Some(json!({
+                "token": token,
+                "email": email,
+                "password": "correct-horse-battery",
+                "display_name": "Postgres"
+            })),
+            None,
+            Some(BROWSER),
+        )
+        .await
+    } else {
+        call(
+            &app,
+            "POST",
+            "/api/auth/register",
+            Some(json!({
+                "email": email,
+                "password": "correct-horse-battery",
+                "display_name": "Postgres"
+            })),
+            None,
+            Some(BROWSER),
+        )
+        .await
+    };
+    assert!(status.is_success(), "{status}");
     let cookie = cookie.unwrap();
     let (status, site, _, _) = call(
         &app,

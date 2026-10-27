@@ -31,13 +31,13 @@ cargo run -p haruvo-server -- serve --listen 127.0.0.1:43123
 
 Open http://127.0.0.1:43123.
 
-`seed` creates a local demo and does nothing if an account already exists:
+`seed` creates a local demo and does nothing if an account already exists. It also marks setup complete, so a seeded database does not print a setup URL:
 
 - email `test@example.com`
 - password `password`
 - a coolLabs status page, a demo analytics site (`coolify.io`, public id `pub_coollabs_demo`), short links at `/go/coolify` and `/go/docs`, and demo error projects (`Checkout`, `API`) with sample events
 
-`just dev` runs `seed` before it starts the server.
+`just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
 The database file is `data/haruvo.sqlite`. If that file is missing and `data/status.sqlite` is already there, Haruvo keeps using the older file. Migrations run on startup.
 
@@ -66,7 +66,26 @@ export HARUVO_SMTP_FROM=status@example.com
 
 Webhook channels can set a secret. The body is posted as JSON with `X-Haruvo-Signature: sha256=<hmac-sha256>`. The previous `X-Status-Signature` header is sent as well.
 
-In production (`HARUVO_ENV=production`) sign-up closes after the first account. Set `HARUVO_OPEN_SIGNUP=true` to leave it open.
+### First-run setup
+
+A new database has no open sign-up. The login page does not offer "Create one". On first start the server prints one line to stderr (standard error, not the JSON logs):
+
+```text
+Initial setup URL: http://127.0.0.1:43123/setup?token=...
+```
+
+Open that URL and create the owner account. Do not keep a copy of the token. It expires after 30 minutes, and a later start does not print it again while it is still valid. After the owner exists, setup cannot run again and public registration stays closed.
+
+If the token is lost or expired before use, replace it. On SQLite, stop Haruvo first (the server owns the database file). On Postgres the command can run while Haruvo is up:
+
+```bash
+haruvo setup-token rotate
+# optional: haruvo setup-token rotate --origin https://status.example.com
+```
+
+`setup-token init` prints a URL only when setup is unfinished and no unused token is stored. Rotation invalidates the previous unused token.
+
+`HARUVO_OPEN_SIGNUP=true` allows further public accounts only after the owner exists. It does not replace the setup URL, and it is off by default in development and production. Haruvo does not email sign-up links.
 
 Every `HARUVO_*` variable still accepts the older `STATUS_*` name when the new one is unset.
 
@@ -120,6 +139,25 @@ docker pull ghcr.io/coollabsio/haruvo:latest
 ```
 
 The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/haruvo`, and uses `haruvo healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service. Set `HARUVO_IMAGE=ghcr.io/coollabsio/haruvo:latest` to point that file at the published image.
+
+On a fresh volume the container prints `Initial setup URL` to stderr. Read it from the container logs (`docker logs` or `docker compose logs haruvo`), open it in a browser, and create the owner. Set `HARUVO_PUBLIC_ORIGIN` to the URL you will open before the first start so the printed link uses that host. The token is not stored in the image.
+
+If you miss the URL, stop the container (required for the default SQLite volume; leave Haruvo running when `HARUVO_DATABASE_URL` is Postgres) and issue another:
+
+```bash
+docker stop <container>
+docker run --rm -v haruvo-data:/var/lib/haruvo \
+  -e HARUVO_PUBLIC_ORIGIN=https://status.example.com \
+  ghcr.io/coollabsio/haruvo:latest setup-token rotate
+```
+
+With Compose, from the repository root:
+
+```bash
+docker compose -f deploy/compose.yaml stop haruvo
+docker compose -f deploy/compose.yaml run --rm haruvo setup-token rotate
+docker compose -f deploy/compose.yaml start haruvo
+```
 
 ## Agents
 
@@ -216,6 +254,7 @@ Haruvo follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves 
 | SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `HARUVO_DATABASE_URL` / `DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
+| Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then no public sign-up |
 | `platform::jobs` worker | `scheduler`: a lease row plus the check loop |
 | `justfile`, multi-stage Dockerfile, `deploy/compose.yaml` | same roles |
 
