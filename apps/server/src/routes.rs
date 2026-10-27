@@ -27,6 +27,7 @@ use crate::repo::{
     self, Agent, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page, User,
 };
 use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
+use crate::setup::{self, NewOwner};
 use crate::state::{self, AppState};
 
 const COOKIE: &str = "haruvo_session";
@@ -40,6 +41,8 @@ pub fn router(state: AppState) -> Router {
         .route("/meta", get(meta))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
+        .route("/setup/status", get(setup_status))
+        .route("/setup/complete", post(setup_complete))
         .route("/auth/logout", post(logout))
         .route("/auth/me", get(me))
         .route("/overview", get(overview))
@@ -100,19 +103,21 @@ async fn ready(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     ))
 }
 
-async fn meta(State(state): State<AppState>) -> Json<Value> {
-    let demo = if state.config.environment.as_str() == "development" {
+async fn meta(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    let setup_complete = setup::is_complete(&state.db).await?;
+    let demo = if state.config.environment.as_str() == "development" && setup_complete {
         json!({ "email": DEMO_EMAIL, "password": DEMO_PASSWORD })
     } else {
         Value::Null
     };
-    Json(json!({
+    Ok(Json(json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "signup_open": state.config.open_signup,
+        "signup_open": state.config.open_signup && setup_complete,
+        "setup_complete": setup_complete,
         "database": state.config.backend_name(),
         "public_origin": state.config.public_origin,
         "demo": demo,
-    }))
+    })))
 }
 
 async fn api_missing() -> AppError {
@@ -131,40 +136,24 @@ async fn register(
     jar: CookieJar,
     Json(body): Json<AuthBody>,
 ) -> Result<(CookieJar, Json<present::UserResponse>), AppError> {
-    let email = body.email.trim();
-    let normalized = normalize_email(email);
-    if !valid_email(&normalized) {
-        return Err(AppError::field("email", "Enter a valid email address."));
-    }
+    let account = account_fields(&body.email, body.display_name)?;
     if let Err(error) = state.passwords.validate(&body.password) {
         return Err(password_field(error));
     }
-    let count = repo::count_users(&state.db).await?;
-    if count > 0 && !state.config.open_signup {
-        return Err(AppError::Forbidden(
-            "Sign-up is closed. Ask an owner for access.",
-        ));
+    // The first account is created only with the setup token. Open sign-up, when
+    // an operator turns it on, applies after setup and never instead of it.
+    if !state.config.open_signup || !setup::is_complete(&state.db).await? {
+        return Err(AppError::RegistrationClosed);
     }
-    if repo::user_by_email(&state.db, &normalized).await?.is_some() {
+    let count = repo::count_users(&state.db).await?;
+    if repo::user_by_email(&state.db, &account.normalized)
+        .await?
+        .is_some()
+    {
         return Err(AppError::Conflict(
             "An account with that email already exists.".into(),
         ));
     }
-    let display_name = body.display_name.unwrap_or_default().trim().to_owned();
-    let display_name = if display_name.is_empty() {
-        normalized
-            .split('@')
-            .next()
-            .unwrap_or("Operator")
-            .to_owned()
-    } else if display_name.chars().count() > 80 {
-        return Err(AppError::field(
-            "display_name",
-            "Use at most 80 characters.",
-        ));
-    } else {
-        display_name
-    };
     let hash = state::hash_password(&state.passwords, body.password)
         .await
         .map_err(password_field)?;
@@ -174,15 +163,15 @@ async fn register(
     repo::insert_user(
         &state.db,
         id,
-        email,
-        &normalized,
-        &display_name,
+        &account.email,
+        &account.normalized,
+        &account.display_name,
         &hash,
         role,
         now,
     )
     .await?;
-    let user = repo::user_by_email(&state.db, &normalized)
+    let user = repo::user_by_email(&state.db, &account.normalized)
         .await?
         .ok_or(AppError::Internal)?;
     let jar = issue_session(&state, jar, &user, now).await?;
@@ -196,6 +185,69 @@ async fn register(
     )
     .await;
     Ok((jar, Json(present::UserResponse::from(&user))))
+}
+
+async fn setup_status(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+    Ok(Json(json!({
+        "complete": setup::is_complete(&state.db).await?,
+    })))
+}
+
+#[derive(Deserialize)]
+struct SetupBody {
+    token: String,
+    email: String,
+    password: String,
+    display_name: Option<String>,
+}
+
+async fn setup_complete(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(body): Json<SetupBody>,
+) -> Result<(StatusCode, CookieJar, Json<present::UserResponse>), AppError> {
+    let now = TimestampMillis::now();
+    // A finished install refuses setup even when the body still carries the old token.
+    // A wrong or expired token, while setup is still open, is unauthorized.
+    if setup::is_complete(&state.db).await? {
+        return Err(AppError::SetupUnavailable);
+    }
+    if !setup::setup_token_valid(&state.db, &body.token, now).await? {
+        return Err(AppError::InvalidSetupToken);
+    }
+    let account = account_fields(&body.email, body.display_name)?;
+    if let Err(error) = state.passwords.validate(&body.password) {
+        return Err(password_field(error));
+    }
+    let password_hash = state::hash_password(&state.passwords, body.password)
+        .await
+        .map_err(password_field)?;
+    let completed = setup::complete_setup(
+        &state.db,
+        NewOwner {
+            token: body.token,
+            email: account.email,
+            normalized_email: account.normalized,
+            display_name: account.display_name,
+            password_hash,
+        },
+        TimestampMillis::now(),
+    )
+    .await
+    .map_err(|error| match error {
+        setup::SetupError::AlreadyComplete => AppError::SetupUnavailable,
+        setup::SetupError::InvalidToken => AppError::InvalidSetupToken,
+        setup::SetupError::EmailTaken => {
+            AppError::Conflict("An account with that email already exists.".into())
+        }
+        setup::SetupError::Database(error) => AppError::from(error),
+    })?;
+    let jar = session_jar(&state, jar, completed.session_token);
+    Ok((
+        StatusCode::CREATED,
+        jar,
+        Json(present::UserResponse::from(&completed.user)),
+    ))
 }
 
 async fn login(
@@ -1533,6 +1585,10 @@ async fn issue_session(
         absolute,
     )
     .await?;
+    Ok(session_jar(state, jar, token))
+}
+
+fn session_jar(state: &AppState, jar: CookieJar, token: String) -> CookieJar {
     let cookie = Cookie::build((COOKIE, token))
         .http_only(true)
         .same_site(SameSite::Lax)
@@ -1541,7 +1597,41 @@ async fn issue_session(
         .build();
     let mut legacy = Cookie::from(LEGACY_COOKIE);
     legacy.set_path("/");
-    Ok(jar.remove(legacy).add(cookie))
+    jar.remove(legacy).add(cookie)
+}
+
+struct AccountFields {
+    email: String,
+    normalized: String,
+    display_name: String,
+}
+
+fn account_fields(email: &str, display_name: Option<String>) -> Result<AccountFields, AppError> {
+    let email = email.trim();
+    let normalized = normalize_email(email);
+    if !valid_email(&normalized) {
+        return Err(AppError::field("email", "Enter a valid email address."));
+    }
+    let display_name = display_name.unwrap_or_default().trim().to_owned();
+    let display_name = if display_name.is_empty() {
+        normalized
+            .split('@')
+            .next()
+            .unwrap_or("Operator")
+            .to_owned()
+    } else if display_name.chars().count() > 80 {
+        return Err(AppError::field(
+            "display_name",
+            "Use at most 80 characters.",
+        ));
+    } else {
+        display_name
+    };
+    Ok(AccountFields {
+        email: email.to_owned(),
+        normalized,
+        display_name,
+    })
 }
 
 fn valid_email(email: &str) -> bool {

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { Shell } from "@/app/Shell";
 import { ApiError, api, type User } from "@/lib/api";
-import { LoginPage, RegisterPage } from "@/pages/auth";
+import { LoginPage, RegisterPage, SetupPage } from "@/pages/auth";
 import { AgentsPage } from "@/pages/agents";
 import { AnalyticsPage, VisitorPage } from "@/pages/analytics";
 import { DashboardPage } from "@/pages/dashboard";
@@ -44,6 +44,7 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/setup" element={<SetupPage />} />
       <Route path="/status/:slug" element={<PublicStatusPage />} />
       <Route path="/share/:kind/:slug" element={<SharePage />} />
       <Route element={<RequireAuth />}>

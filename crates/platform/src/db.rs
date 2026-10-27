@@ -114,6 +114,15 @@ impl Database {
     pub async fn begin(&self) -> Result<sqlx::Transaction<'_, Any>, sqlx::Error> {
         self.pool.begin().await
     }
+
+    /// A write transaction. SQLite takes `BEGIN IMMEDIATE` so two setup attempts cannot both pass
+    /// the "not initialized" check. Postgres uses a normal transaction; callers lock the row.
+    pub async fn begin_immediate(&self) -> Result<sqlx::Transaction<'_, Any>, sqlx::Error> {
+        match self.backend {
+            Backend::Sqlite => self.pool.begin_with("BEGIN IMMEDIATE").await,
+            Backend::Postgres => self.pool.begin().await,
+        }
+    }
 }
 
 fn install_drivers() {

@@ -3,16 +3,17 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use haruvo_server::{DEMO_PASSWORD, boot, router, testing_config};
+use haruvo_platform::TimestampMillis;
+use haruvo_server::{DEMO_PASSWORD, boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use tower::ServiceExt;
 
-async fn app() -> Router {
+async fn app() -> (Router, Option<String>) {
     app_with_targets(Vec::new()).await
 }
 
-async fn app_with_targets(connectivity_targets: Vec<String>) -> Router {
+async fn app_with_targets(connectivity_targets: Vec<String>) -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("status.sqlite");
     // Leak the temp dir so the sqlite file outlives the router.
@@ -20,7 +21,30 @@ async fn app_with_targets(connectivity_targets: Vec<String>) -> Router {
     let mut config = testing_config(path);
     config.connectivity_targets = connectivity_targets;
     let state = boot(config).await.unwrap();
-    router(state)
+    let token = initialize_setup_token(&state.db, TimestampMillis::now())
+        .await
+        .unwrap()
+        .map(|issued| issued.token);
+    (router(state), token)
+}
+
+async fn owner(app: &Router, token: &str) -> (Value, String) {
+    let (status, user, cookie) = call(
+        app,
+        "POST",
+        "/api/setup/complete",
+        Some(serde_json::json!({
+            "token": token,
+            "email": "ada@coollabs.io",
+            "password": "correct-horse-battery",
+            "display_name": "Ada"
+        })),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{user}");
+    assert_eq!(user["role"], "owner");
+    (user, cookie.expect("session cookie"))
 }
 
 async fn call(
@@ -70,7 +94,7 @@ async fn call(
 
 #[tokio::test]
 async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
-    let app = app().await;
+    let (app, token) = app().await;
     let (status, health, _) = call(&app, "GET", "/api/health", None, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(health["status"], "ok");
@@ -78,21 +102,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
     let (status, _, _) = call(&app, "GET", "/api/auth/me", None, None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 
-    let (status, user, cookie) = call(
-        &app,
-        "POST",
-        "/api/auth/register",
-        Some(serde_json::json!({
-            "email": "ada@coollabs.io",
-            "password": "correct-horse-battery",
-            "display_name": "Ada"
-        })),
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{user}");
-    assert_eq!(user["role"], "owner");
-    let cookie = cookie.expect("session cookie");
+    let (user, cookie) = owner(&app, token.as_deref().expect("setup token")).await;
+    assert_eq!(user["email"], "ada@coollabs.io");
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -309,21 +320,41 @@ async fn postgres_accepts_the_same_api() {
     let mut config = testing_config(std::path::PathBuf::from("data/ignored-postgres.sqlite"));
     config.database_url = Some(url);
     let state = boot(config).await.expect("postgres boot");
+    let token = initialize_setup_token(&state.db, TimestampMillis::now())
+        .await
+        .unwrap()
+        .map(|issued| issued.token);
     let app = router(state);
     let email = format!("pg-{}@coollabs.io", haruvo_platform::Id::new());
-    let (status, user, _) = call(
-        &app,
-        "POST",
-        "/api/auth/register",
-        Some(serde_json::json!({
-            "email": email,
-            "password": "correct-horse-battery",
-            "display_name": "Postgres"
-        })),
-        None,
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK, "{user}");
+    let (status, user, _) = if let Some(token) = token {
+        call(
+            &app,
+            "POST",
+            "/api/setup/complete",
+            Some(serde_json::json!({
+                "token": token,
+                "email": email,
+                "password": "correct-horse-battery",
+                "display_name": "Postgres"
+            })),
+            None,
+        )
+        .await
+    } else {
+        call(
+            &app,
+            "POST",
+            "/api/auth/register",
+            Some(serde_json::json!({
+                "email": email,
+                "password": "correct-horse-battery",
+                "display_name": "Postgres"
+            })),
+            None,
+        )
+        .await
+    };
+    assert!(status.is_success(), "{status} {user}");
     let (status, ready, _) = call(&app, "GET", "/api/health/ready", None, None).await;
     assert_eq!(status, StatusCode::OK, "{ready}");
     assert_eq!(ready["database"], "postgres");
@@ -331,12 +362,13 @@ async fn postgres_accepts_the_same_api() {
 
 #[tokio::test]
 async fn sign_up_rejects_the_seeded_demo_password() {
-    let app = app().await;
+    let (app, token) = app().await;
     let (status, body, cookie) = call(
         &app,
         "POST",
-        "/api/auth/register",
+        "/api/setup/complete",
         Some(serde_json::json!({
+            "token": token.expect("setup token"),
             "email": "ada@coollabs.io",
             "password": DEMO_PASSWORD,
         })),
@@ -349,19 +381,8 @@ async fn sign_up_rejects_the_seeded_demo_password() {
 
 #[tokio::test]
 async fn failed_check_is_not_counted_when_the_host_has_no_network() {
-    let app = app_with_targets(vec!["127.0.0.1:9".to_owned()]).await;
-    let (_, _, cookie) = call(
-        &app,
-        "POST",
-        "/api/auth/register",
-        Some(serde_json::json!({
-            "email": "ada@coollabs.io",
-            "password": "correct-horse-battery",
-        })),
-        None,
-    )
-    .await;
-    let cookie = cookie.expect("session cookie");
+    let (app, token) = app_with_targets(vec!["127.0.0.1:9".to_owned()]).await;
+    let (_, cookie) = owner(&app, token.as_deref().expect("setup token")).await;
     let (status, monitor, _) = call(
         &app,
         "POST",
@@ -428,19 +449,8 @@ async fn agent_call(app: &Router, uri: &str, body: Value, token: &str) -> (Statu
 
 #[tokio::test]
 async fn agent_registers_its_own_checks_and_reports_outcomes() {
-    let app = app().await;
-    let (_, _, cookie) = call(
-        &app,
-        "POST",
-        "/api/auth/register",
-        Some(serde_json::json!({
-            "email": "ada@coollabs.io",
-            "password": "correct-horse-battery",
-        })),
-        None,
-    )
-    .await;
-    let cookie = cookie.expect("session cookie");
+    let (app, token) = app().await;
+    let (_, cookie) = owner(&app, token.as_deref().expect("setup token")).await;
     let (status, agent, _) = call(
         &app,
         "POST",
