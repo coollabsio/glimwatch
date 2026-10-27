@@ -167,7 +167,44 @@ export type Channel = {
   deliveries: Delivery[];
 };
 
-export type User = { id: string; email: string; display_name: string; role: string };
+export type User = {
+  id: string;
+  email: string;
+  display_name: string;
+  role: string;
+  root: boolean;
+  installation_admin: boolean;
+};
+
+export type InstanceSmtp = {
+  host: string;
+  port: number;
+  username: string | null;
+  from: string;
+  has_password: boolean;
+  source: "saved" | "environment";
+};
+
+export type RootUser = { id: string; email: string; display_name: string };
+
+export type InstanceSettings = {
+  registration_open: boolean;
+  smtp_ready: boolean;
+  smtp: InstanceSmtp | null;
+  root_user: RootUser | null;
+  initialized: boolean;
+  version: string;
+  database: string;
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  display_name: string;
+  role: string;
+  root: boolean;
+  installation_admin: boolean;
+};
 
 export type Audit = {
   id: string;

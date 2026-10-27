@@ -76,7 +76,7 @@ A new database has no open sign-up. The login page does not offer "Create one". 
 Initial setup URL: http://127.0.0.1:43123/setup?token=...
 ```
 
-Open that URL and create the owner account. Do not keep a copy of the token. It expires after 30 minutes, and a later start does not print it again while it is still valid. After the owner exists, setup cannot run again and public registration stays closed.
+Open that URL and create the owner account. That account is the root user. Do not keep a copy of the token. It expires after 30 minutes, and a later start does not print it again while it is still valid. After the owner exists, setup cannot run again and public registration stays closed.
 
 If the token is lost or expired before use, replace it. On SQLite, stop Statixo first (the server owns the database file). On Postgres the command can run while Statixo is up:
 
@@ -87,7 +87,7 @@ statixo setup-token rotate
 
 `setup-token init` prints a URL only when setup is unfinished and no unused token is stored. Rotation invalidates the previous unused token.
 
-`STATIXO_OPEN_SIGNUP=true` allows further public accounts only after the owner exists. It does not replace the setup URL, and it is off by default in development and production. Statixo does not email sign-up links.
+The root user opens registration in Settings. It stays closed until a mail server is saved there, or `STATIXO_SMTP_HOST` and `STATIXO_SMTP_FROM` are set (`HARUVO_SMTP_*` and `STATUS_SMTP_*` still work), and the root user turns Open registration on. Clearing the saved mail server closes registration again. `STATIXO_OPEN_SIGNUP`, `HARUVO_OPEN_SIGNUP`, and `STATUS_OPEN_SIGNUP` are ignored. Statixo does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
 
 Every `STATIXO_*` variable still accepts `HARUVO_*`, and then the older `STATUS_*` name, when the newer variable is unset. See [Migrating from Haruvo](#migrating-from-haruvo).
 
@@ -256,7 +256,7 @@ Statixo follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves
 | SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `STATIXO_DATABASE_URL` / `HARUVO_DATABASE_URL` / `DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
-| Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then no public sign-up |
+| Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then the root user opens registration in Settings after SMTP |
 | `platform::jobs` worker | `scheduler`: a lease row plus the check loop |
 | `justfile`, multi-stage Dockerfile, `deploy/compose.yaml` | same roles |
 

@@ -123,12 +123,15 @@ async fn setup_succeeds_once_and_public_signup_stays_closed() {
     .await;
     assert_eq!(status, StatusCode::CREATED, "{user}");
     assert_eq!(user["role"], "owner");
+    assert_eq!(user["root"], true);
+    assert_eq!(user["installation_admin"], true);
     assert_eq!(user["email"], "owner@coollabs.io");
     let cookie = cookie.expect("session cookie");
 
     let (status, me, _) = call(&app, "GET", "/api/auth/me", None, Some(&cookie)).await;
     assert_eq!(status, StatusCode::OK, "{me}");
     assert_eq!(me["email"], "owner@coollabs.io");
+    assert_eq!(me["root"], true);
 
     let (status, problem, _) = call(
         &app,
@@ -163,7 +166,7 @@ async fn setup_succeeds_once_and_public_signup_stays_closed() {
 }
 
 #[tokio::test]
-async fn open_signup_cannot_create_the_first_account() {
+async fn env_open_signup_does_not_open_registration() {
     let (app, token) = started(true).await;
     let (status, problem, _) = call(
         &app,
@@ -189,7 +192,7 @@ async fn open_signup_cannot_create_the_first_account() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
 
-    let (status, user, _) = call(
+    let (status, problem, _) = call(
         &app,
         "POST",
         "/api/auth/register",
@@ -201,8 +204,11 @@ async fn open_signup_cannot_create_the_first_account() {
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "{user}");
-    assert_eq!(user["role"], "member");
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["code"], "registration_closed");
+    let (status, meta, _) = call(&app, "GET", "/api/meta", None, None).await;
+    assert_eq!(status, StatusCode::OK, "{meta}");
+    assert_eq!(meta["signup_open"], false);
 }
 
 #[tokio::test]
