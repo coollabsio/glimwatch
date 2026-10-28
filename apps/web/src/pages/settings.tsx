@@ -154,7 +154,7 @@ function EmailForm({ settings }: { settings?: InstanceSettings }) {
           </p>
         ) : (
           <p className="text-xs text-[var(--ui-fg-faint)]">
-            Saved here, or with GLIMWATCH_SMTP_HOST and GLIMWATCH_SMTP_FROM. STATUS_SMTP_* still works. Clearing the saved server closes registration.
+            Saved here, or with GLIMWATCH_SMTP_HOST and GLIMWATCH_SMTP_FROM. Clearing the saved server closes registration.
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">

@@ -26,5 +26,5 @@ SOFTWARE.
 
 The tracker source in this repository is apps/server/src/insights/tracker.js.
 IP geolocation databases are optional and are not bundled. DB-IP Lite, when
-you supply it through GLIMWATCH_GEOIP_PATH (STATUS_GEOIP_PATH still works), is a separate work from DB-IP
+you supply it through GLIMWATCH_GEOIP_PATH, is a separate work from DB-IP
 (https://db-ip.com) and is not covered by the MIT notice above.

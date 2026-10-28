@@ -65,7 +65,7 @@ impl Config {
     }
 
     pub fn from_env() -> Result<Self, ConfigError> {
-        let environment = match compat(ENV).as_deref() {
+        let environment = match optional(ENV).as_deref() {
             None => EnvironmentMode::Development,
             Some("development") => EnvironmentMode::Development,
             Some("production") => EnvironmentMode::Production,
@@ -82,27 +82,27 @@ impl Config {
             config.open_signup = false;
             config.bind = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
         }
-        if let Some(bind) = compat(BIND) {
+        if let Some(bind) = optional(BIND) {
             config.bind = bind.parse().map_err(|_| ConfigError::Invalid {
                 name: BIND,
                 value: bind,
             })?;
         }
-        if let Some(port) = compat(PORT).or_else(|| optional("PORT")) {
+        if let Some(port) = optional(PORT).or_else(|| optional("PORT")) {
             config.port = port.parse().map_err(|_| ConfigError::Invalid {
                 name: PORT,
                 value: port,
             })?;
         }
-        config.public_origin = compat(ORIGIN).unwrap_or_else(|| {
+        config.public_origin = optional(ORIGIN).unwrap_or_else(|| {
             let host = match config.bind {
                 IpAddr::V4(ip) if ip.is_unspecified() => "127.0.0.1".to_owned(),
                 other => other.to_string(),
             };
             format!("http://{host}:{}", config.port)
         });
-        config.database_path = resolve_sqlite_path(compat(DATABASE_PATH));
-        if let Some(url) = compat(DATABASE_URL).or_else(|| optional(DATABASE_URL_ALIAS)) {
+        config.database_path = resolve_sqlite_path(optional(DATABASE_PATH));
+        if let Some(url) = optional(DATABASE_URL).or_else(|| optional(DATABASE_URL_ALIAS)) {
             if !(url.starts_with("postgres://") || url.starts_with("postgresql://")) {
                 return Err(ConfigError::DatabaseUrl);
             }
@@ -110,16 +110,16 @@ impl Config {
         }
         // Parsed so an existing environment still boots. Registration is the
         // instance setting in the database, not this flag. GLIMWATCH_OPEN_SIGNUP
-        // and STATUS_OPEN_SIGNUP are ignored.
-        if let Some(signup) = compat(OPEN_SIGNUP) {
+        // is ignored.
+        if let Some(signup) = optional(OPEN_SIGNUP) {
             config.open_signup = parse_bool(&signup).ok_or(ConfigError::Invalid {
                 name: OPEN_SIGNUP,
                 value: signup,
             })?;
         }
-        if let Some(host) = compat(SMTP_HOST) {
-            let from = compat(SMTP_FROM).ok_or(ConfigError::Missing(SMTP_FROM))?;
-            let port = match compat(SMTP_PORT) {
+        if let Some(host) = optional(SMTP_HOST) {
+            let from = optional(SMTP_FROM).ok_or(ConfigError::Missing(SMTP_FROM))?;
+            let port = match optional(SMTP_PORT) {
                 Some(value) => value.parse().map_err(|_| ConfigError::Invalid {
                     name: SMTP_PORT,
                     value,
@@ -129,30 +129,30 @@ impl Config {
             config.smtp = Some(SmtpConfig {
                 host,
                 port,
-                username: compat(SMTP_USERNAME),
-                password: compat(SMTP_PASSWORD),
+                username: optional(SMTP_USERNAME),
+                password: optional(SMTP_PASSWORD),
                 from,
             });
         }
-        if let Some(memory) = compat(ARGON_MEMORY) {
+        if let Some(memory) = optional(ARGON_MEMORY) {
             config.argon_memory_kib = memory.parse().map_err(|_| ConfigError::Invalid {
                 name: ARGON_MEMORY,
                 value: memory,
             })?;
         }
-        if let Some(targets) = compat(CONNECTIVITY_TARGETS) {
+        if let Some(targets) = optional(CONNECTIVITY_TARGETS) {
             config.connectivity_targets = parse_targets(&targets).ok_or(ConfigError::Invalid {
                 name: CONNECTIVITY_TARGETS,
                 value: targets,
             })?;
         }
-        if let Some(hops) = compat(PROXY_HOPS) {
+        if let Some(hops) = optional(PROXY_HOPS) {
             config.proxy_hops = hops.parse().map_err(|_| ConfigError::Invalid {
                 name: PROXY_HOPS,
                 value: hops,
             })?;
         }
-        if let Some(path) = compat(GEOIP_PATH) {
+        if let Some(path) = optional(GEOIP_PATH) {
             config.geoip_path = Some(PathBuf::from(path));
         }
         Ok(config)
@@ -215,7 +215,7 @@ pub enum ConfigError {
     #[error("missing {0}")]
     Missing(&'static str),
     #[error(
-        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set GLIMWATCH_DATABASE_PATH to move the file (STATUS_DATABASE_PATH still works)"
+        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set GLIMWATCH_DATABASE_PATH to move the file"
     )]
     DatabaseUrl,
 }
@@ -227,15 +227,10 @@ fn optional(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// Reads `GLIMWATCH_*` first, then the older `STATUS_*` name.
-fn compat(name: &str) -> Option<String> {
-    optional(name).or_else(|| {
-        let rest = name.strip_prefix("GLIMWATCH_")?;
-        optional(&format!("STATUS_{rest}"))
-    })
-}
-
-const STOCK_SQLITE_PATHS: &[&str] = &["data/glimwatch.sqlite", "/var/lib/glimwatch/glimwatch.sqlite"];
+const STOCK_SQLITE_PATHS: &[&str] = &[
+    "data/glimwatch.sqlite",
+    "/var/lib/glimwatch/glimwatch.sqlite",
+];
 
 /// Uses an explicit path as given. The stock defaults keep an existing
 /// `status.sqlite` when `glimwatch.sqlite` is not there yet.
@@ -269,10 +264,7 @@ fn legacy_sqlite_candidates(chosen: &Path) -> Vec<PathBuf> {
     {
         paths.push(parent.join("status.sqlite"));
     }
-    for candidate in [
-        "data/status.sqlite",
-        "/var/lib/glimwatch/status.sqlite",
-    ] {
+    for candidate in ["data/status.sqlite", "/var/lib/glimwatch/status.sqlite"] {
         paths.push(PathBuf::from(candidate));
     }
     let mut seen = Vec::new();
@@ -388,7 +380,6 @@ mod tests {
         unsafe {
             std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
             std::env::remove_var("GLIMWATCH_DATABASE_URL");
-            std::env::remove_var("STATUS_DATABASE_URL");
         }
         let error = Config::from_env().unwrap_err();
         assert!(matches!(error, ConfigError::DatabaseUrl));
@@ -398,21 +389,27 @@ mod tests {
     }
 
     #[test]
-    fn legacy_database_urls_still_select_postgres() {
+    fn status_database_url_is_ignored() {
         let _env = lock_process_env();
         unsafe {
             std::env::remove_var("GLIMWATCH_DATABASE_URL");
             std::env::remove_var("DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
+            // STATUS_* is not an alias. This URL must not select Postgres.
             std::env::set_var(
                 "STATUS_DATABASE_URL",
                 "postgres://status:secret@127.0.0.1:1/status",
             );
         }
-        let status = Config::from_env().unwrap();
+        let ignored = Config::from_env().unwrap();
+        assert_eq!(ignored.database_url.as_deref(), None);
+        unsafe {
+            std::env::set_var("DATABASE_URL", "postgres://alias:secret@127.0.0.1:1/alias");
+        }
+        let alias = Config::from_env().unwrap();
         assert_eq!(
-            status.database_url.as_deref(),
-            Some("postgres://status:secret@127.0.0.1:1/status")
+            alias.database_url.as_deref(),
+            Some("postgres://alias:secret@127.0.0.1:1/alias")
         );
         unsafe {
             std::env::set_var(
@@ -427,6 +424,7 @@ mod tests {
         );
         unsafe {
             std::env::remove_var("GLIMWATCH_DATABASE_URL");
+            std::env::remove_var("DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
     }
