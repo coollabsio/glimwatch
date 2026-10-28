@@ -423,7 +423,7 @@ pub fn banner_label(banner: PageBanner) -> &'static str {
     banner.as_str()
 }
 
-/// An agent counts as online when it polled within this window. Agents poll every 5 s.
+/// An agent counts as online when it sent a heartbeat within this window. Agents send one every 15 s.
 const AGENT_ONLINE_MS: i64 = 30_000;
 
 #[derive(Serialize)]

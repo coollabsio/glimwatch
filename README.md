@@ -1,8 +1,8 @@
 # Glimwatch
 
-Glimwatch is a self-hosted status page, incident desk, and uptime monitor from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
+Glimwatch is a self-hosted uptime monitor, status page, incident desk, error tracker, and cookieless web analytics tool from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
 
-The project site is [glimwatch.io](https://glimwatch.io). The source repository is [coollabsio/glimwatch](https://github.com/coollabsio/glimwatch).
+The source repository is [coollabsio/glimwatch](https://github.com/coollabsio/glimwatch).
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -41,7 +41,7 @@ Open http://127.0.0.1:43123.
 
 `just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
-The database file is `data/glimwatch.sqlite`. If that file is missing, Glimwatch uses an older `data/status.sqlite` when it is already there. The Docker default `/var/lib/glimwatch/glimwatch.sqlite` does the same for `status.sqlite` in that directory. A custom `GLIMWATCH_DATABASE_PATH` (or a `STATUS_` alias of it) is used as written. Migrations run on startup.
+The database file is `data/glimwatch.sqlite`. If that file is missing, Glimwatch uses an older `status.sqlite` when one is already there: first in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`. The Docker default `/var/lib/glimwatch/glimwatch.sqlite` does the same. This applies only to these two default paths. A custom `GLIMWATCH_DATABASE_PATH` (or a `STATUS_` alias of it) is used as written. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
@@ -106,7 +106,7 @@ just test
 just build    # release binary with the UI embedded
 ```
 
-`just` is optional. The same commands are `bun install`, `cargo test --workspace`, and `cargo build --release -p glimwatch-server` after `bun run build`.
+`just` is optional. The same commands are `bun install --frozen-lockfile` in `apps/web`, `cargo test --workspace`, and `cargo build --release -p glimwatch-server` after `bun run build`.
 
 Frontend dev proxies `/api` to the Rust process. Production does not proxy: the binary serves both.
 
@@ -116,16 +116,16 @@ Frontend dev proxies `/api` to the Rust process. Production does not proxy: the 
 cargo test --workspace
 ```
 
-Domain tests cover assertions, the failure threshold, uptime math (maintenance is excluded), slugs, and incident resolution. Server tests sign up, run an HTTP check against a local server, open an incident after a failure, publish a status page, skip a check during maintenance, and deliver a signed webhook.
+Domain tests cover assertions, the failure threshold, uptime math (maintenance is excluded), slugs, and incident resolution. Server tests create the owner with a setup token, run an HTTP check against a local server, open an incident after a failure, publish a status page, skip a check during maintenance, deliver a signed webhook, skip checks when the host is offline, and sync agent checks. Other server tests cover setup tokens, registration and SMTP settings, error ingest, and analytics with short links.
 
-Postgres runs the same migration and API test when these are set:
+Postgres tests run only when these are set:
 
 ```bash
 export GLIMWATCH_TEST_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_platform
 export GLIMWATCH_APP_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_app
 ```
 
-Use two empty databases. The platform test resets its own schema. `STATUS_TEST_POSTGRES_URL` and `STATUS_APP_POSTGRES_URL` still work.
+`GLIMWATCH_TEST_POSTGRES_URL` runs the migration runner test in `crates/platform`. `GLIMWATCH_APP_POSTGRES_URL` starts the server on Postgres in the `flow`, `errors`, and `insights` tests. Use two empty databases. The platform test resets its own schema. `STATUS_TEST_POSTGRES_URL` and `STATUS_APP_POSTGRES_URL` still work.
 
 ## Docker
 
@@ -260,24 +260,27 @@ Glimwatch follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leav
 | `platform::jobs` worker | `scheduler`: a lease row plus the check loop |
 | `justfile`, multi-stage Dockerfile, `deploy/compose.yaml` | same roles |
 
-The domain follows [OpenStatus](https://github.com/openstatusHQ/openstatus): monitors, check history, status pages and components, incident timelines, maintenance, and a notification provider list. Regions, private locations, and the hosted billing pieces are not in this MVP. Checks run from the Glimwatch process itself (`region = local`).
+The domain follows [OpenStatus](https://github.com/openstatusHQ/openstatus): monitors, check history, status pages and components, incident timelines, maintenance, and a notification provider list. Hosted regions and billing are not in this MVP. The Glimwatch process runs its own checks with `region = local`. [Agents](#agents) are the private locations: their results use the agent name as the region.
 
-The interface takes Coolify's dark shell and pink primary action, which Orbit already uses, and the public page takes the OpenStatus layout: one banner, a component list, and uptime bars.
+The interface takes Coolify's dark shell with a blue accent in place of Coolify's purple. The public page takes the OpenStatus layout: one banner, a component list with uptime bars, maintenance, and incidents.
 
 ## Layout
 
 ```
-apps/server     API, scheduler, checker, repositories, migrations
-apps/web        React dashboard and public status page
+apps/server     API, scheduler, checker, agent mode, error ingest, analytics, short links, repositories, migrations
+apps/web        React dashboard, public status page, and public share pages
 crates/platform Config, SQLite/Postgres pool, migrations, passwords, ids
-crates/status    Assertions, state machine, uptime, slugs, notification signing
-crates/insights  Cookieless visitor ids, URL parsing, user-agent classification
-deploy           Docker Compose
+crates/status   Assertions, state machine, uptime, slugs, notification signing
+crates/insights Cookieless visitor ids, URL parsing, user-agent classification, short-link rules
+crates/errors   Sentry envelope parsing, event normalization, issue fingerprinting
+deploy          Docker Compose
+docs            README screenshots
+examples        PHP, JavaScript, and Rust programs that send errors
 ```
 
 ## Attribution
 
-Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is that script with the Glimwatch event name added. See [NOTICE](NOTICE).
+Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is wire-compatible with Beacon's tracker and also defines `window.glimwatchEvent`. See [NOTICE](NOTICE).
 
 ## Upgrading from older names
 
@@ -289,7 +292,7 @@ Glimwatch was called Haruvo before. Haruvo names are not read. Rename `HARUVO_*`
 | `glimwatch_session` cookie | `status_session`, until the next login replaces it |
 | `window.glimwatchEvent` | `window.beaconEvent` |
 | `X-Glimwatch-Signature` | `X-Status-Signature` is sent with the same value |
-| `data/glimwatch.sqlite`, `/var/lib/glimwatch/glimwatch.sqlite` | `status.sqlite` in the same directory, when the Glimwatch file is absent and the path is a stock default |
+| `data/glimwatch.sqlite`, `/var/lib/glimwatch/glimwatch.sqlite` | `status.sqlite` in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`, when the Glimwatch file is absent and the path is a default |
 
 `DATABASE_URL` is still an alias of the database URL, after `GLIMWATCH_DATABASE_URL` and `STATUS_DATABASE_URL`.
 
