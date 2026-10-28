@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
 use axum::http::HeaderMap;
-use haruvo_insights::clip;
+use glimwatch_insights::clip;
 use maxminddb::{Reader, geoip2};
 
 #[derive(Clone, Debug, Default)]

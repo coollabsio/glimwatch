@@ -3,11 +3,11 @@
 
 use std::ops::DerefMut;
 
-use haruvo_domain::{
+use glimwatch_domain::{
     Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
     JobType, MonitorState,
 };
-use haruvo_platform::{Database, Id, ParseIdError, TimestampMillis};
+use glimwatch_platform::{Database, Id, ParseIdError, TimestampMillis};
 use serde::de::DeserializeOwned;
 use sqlx::{Any, Row, Transaction};
 

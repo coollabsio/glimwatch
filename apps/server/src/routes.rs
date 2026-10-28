@@ -7,12 +7,12 @@ use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post, put};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use haruvo_domain::{
+use glimwatch_domain::{
     Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput,
     MonitorState, NotificationEvent, NotificationPayload, OpenIncident, page_banner,
     resolved_at_after_update, validate_monitor, validate_slug,
 };
-use haruvo_platform::{
+use glimwatch_platform::{
     Id, PasswordError, TimestampMillis, generate_token, hash_token, normalize_email,
 };
 use serde::Deserialize;
@@ -31,8 +31,8 @@ use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
 use crate::setup::{self, NewOwner};
 use crate::state::{self, AppState};
 
-const COOKIE: &str = "haruvo_session";
-/// Older session cookies. A later login replaces them with `haruvo_session`.
+const COOKIE: &str = "glimwatch_session";
+/// Older session cookies. A later login replaces them with `glimwatch_session`.
 const LEGACY_COOKIES: &[&str] = &["status_session"];
 
 fn session_cookie_names() -> impl Iterator<Item = &'static str> {
@@ -494,7 +494,7 @@ async fn settings_body(state: &AppState) -> Result<Value, AppError> {
 
 fn smtp_body(
     settings: &instance_settings::InstanceView,
-    env: Option<&haruvo_platform::SmtpConfig>,
+    env: Option<&glimwatch_platform::SmtpConfig>,
 ) -> Value {
     if let Some(smtp) = &settings.smtp {
         return json!({
@@ -1433,7 +1433,7 @@ async fn test_channel(
         monitor: None,
         check: None,
         incident: None,
-        message: Some("This is a test notification from Haruvo.".to_owned()),
+        message: Some("This is a test notification from Glimwatch.".to_owned()),
     };
     notify::deliver(&state, &channel, &payload, None, None).await;
     Ok(Json(channel_view(&state, channel).await?))
@@ -1572,14 +1572,14 @@ async fn notify_incident(state: &AppState, incident: &Incident, message: &str) {
     let payload = NotificationPayload {
         event: NotificationEvent::IncidentUpdated.as_str().to_owned(),
         sent_at: TimestampMillis::now().to_string(),
-        monitor: monitor.map(|monitor| haruvo_domain::PayloadMonitor {
+        monitor: monitor.map(|monitor| glimwatch_domain::PayloadMonitor {
             id: monitor.id.to_string(),
             name: monitor.name,
             url: monitor.url,
             state: monitor.state,
         }),
         check: None,
-        incident: Some(haruvo_domain::PayloadIncident {
+        incident: Some(glimwatch_domain::PayloadIncident {
             id: incident.id.to_string(),
             title: incident.title.clone(),
             status: incident.status,

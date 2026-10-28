@@ -1,4 +1,4 @@
-use haruvo_platform::{Migration, MigrationRunner};
+use glimwatch_platform::{Migration, MigrationRunner};
 
 pub fn runner() -> MigrationRunner {
     MigrationRunner::new(

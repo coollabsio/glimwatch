@@ -1,14 +1,14 @@
-//! Settings of this Haruvo instance that the root user changes.
+//! Settings of this Glimwatch instance that the root user changes.
 //!
 //! Registration stays closed after setup. Opening it requires a mail server, either
-//! saved here or set with `HARUVO_SMTP_*` (`STATUS_SMTP_*` still counts). Clearing the
+//! saved here or set with `GLIMWATCH_SMTP_*` (`STATUS_SMTP_*` still counts). Clearing the
 //! saved server closes registration. The environment variables are not cleared by that
 //! action; they still count as a mail server until they are unset.
-//! `HARUVO_OPEN_SIGNUP` and `STATUS_OPEN_SIGNUP` are ignored.
+//! `GLIMWATCH_OPEN_SIGNUP` and `STATUS_OPEN_SIGNUP` are ignored.
 
 use std::ops::DerefMut;
 
-use haruvo_platform::{Database, Id, ParseIdError, SmtpConfig, TimestampMillis};
+use glimwatch_platform::{Database, Id, ParseIdError, SmtpConfig, TimestampMillis};
 use sqlx::{Any, Row, Transaction};
 use thiserror::Error;
 
@@ -205,7 +205,7 @@ pub async fn save_smtp(
 }
 
 /// Removes the saved mail server and closes registration.
-/// Environment `HARUVO_SMTP_*` (and the older `STATUS_SMTP_*` names) is left as it was.
+/// Environment `GLIMWATCH_SMTP_*` (and the older `STATUS_SMTP_*` names) is left as it was.
 pub async fn clear_smtp(db: &Database, now: TimestampMillis) -> Result<(), sqlx::Error> {
     let mut tx = db.begin_immediate().await?;
     ensure_row_tx(&mut tx).await?;

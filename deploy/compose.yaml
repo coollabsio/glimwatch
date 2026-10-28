@@ -1,35 +1,35 @@
 services:
-  haruvo:
+  glimwatch:
     build:
       context: ..
-    image: ${HARUVO_IMAGE:-haruvo:local}
+    image: ${GLIMWATCH_IMAGE:-glimwatch:local}
     restart: unless-stopped
     ports: ["8080:8080"]
     environment:
-      HARUVO_ENV: production
-      HARUVO_BIND: 0.0.0.0
-      HARUVO_PORT: 8080
+      GLIMWATCH_ENV: production
+      GLIMWATCH_BIND: 0.0.0.0
+      GLIMWATCH_PORT: 8080
       # Used in the one-time Initial setup URL printed to stderr on a fresh database.
-      HARUVO_PUBLIC_ORIGIN: ${HARUVO_PUBLIC_ORIGIN:-http://localhost:8080}
+      GLIMWATCH_PUBLIC_ORIGIN: ${GLIMWATCH_PUBLIC_ORIGIN:-http://localhost:8080}
       # Stock path. If this file is missing and an older status.sqlite is in
       # this directory, that file is kept. To keep a volume mounted elsewhere, set this to that file.
       # STATUS_DATABASE_PATH applies when this name is unset.
-      HARUVO_DATABASE_PATH: /var/lib/haruvo/haruvo.sqlite
+      GLIMWATCH_DATABASE_PATH: /var/lib/glimwatch/glimwatch.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
       # The root user opens it in Settings after SMTP is configured.
       # Switch the same binary to Postgres by setting this and starting the db service.
-      # HARUVO_DB_PASSWORD comes from the environment. Do not commit a password.
-      # HARUVO_DATABASE_URL: postgres://haruvo:${HARUVO_DB_PASSWORD}@db:5432/haruvo
+      # GLIMWATCH_DB_PASSWORD comes from the environment. Do not commit a password.
+      # GLIMWATCH_DATABASE_URL: postgres://glimwatch:${GLIMWATCH_DB_PASSWORD}@db:5432/glimwatch
     volumes:
-      - haruvo-data:/var/lib/haruvo
+      - glimwatch-data:/var/lib/glimwatch
   # db:
   #   image: postgres:16-alpine
   #   environment:
-  #     POSTGRES_USER: haruvo
-  #     POSTGRES_PASSWORD: ${HARUVO_DB_PASSWORD}
-  #     POSTGRES_DB: haruvo
+  #     POSTGRES_USER: glimwatch
+  #     POSTGRES_PASSWORD: ${GLIMWATCH_DB_PASSWORD}
+  #     POSTGRES_DB: glimwatch
   #   volumes:
-  #     - haruvo-pg:/var/lib/postgresql/data
+  #     - glimwatch-pg:/var/lib/postgresql/data
 volumes:
-  haruvo-data:
-  # haruvo-pg:
+  glimwatch-data:
+  # glimwatch-pg:

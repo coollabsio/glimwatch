@@ -16,13 +16,13 @@ export type Appearance = {
   chartTimes: "local" | "utc";
 };
 
-const KEY = "haruvo-appearance";
-const EVENT = "haruvo-appearance";
+const KEY = "glimwatch-appearance";
+const EVENT = "glimwatch-appearance";
 const customKeys = ["sidebar", "selected", "accent", "background"] as const;
 
 export const customThemePresets: { name: string; theme: CustomTheme | null; swatch?: CustomTheme }[] = [
   // The built-in Dark theme, not a custom theme. Its colors start the fields when you edit it.
-  { name: "Haruvo", theme: null, swatch: { sidebar: "#111a2e", selected: "#1c1c1c", accent: "#2563eb", background: "#0a0a0a" } },
+  { name: "Glimwatch", theme: null, swatch: { sidebar: "#111a2e", selected: "#1c1c1c", accent: "#2563eb", background: "#0a0a0a" } },
   { name: "Midnight", theme: { sidebar: "#0f172a", selected: "#2e4a7d", accent: "#f2458f", background: "#1a2338" } },
   { name: "Forest", theme: { sidebar: "#12342b", selected: "#2c6e57", accent: "#f4b860", background: "#1b2a25" } },
   { name: "Ember", theme: { sidebar: "#3b1410", selected: "#8f2d1f", accent: "#ffb86b", background: "#241816" } },
@@ -82,9 +82,8 @@ function read(): Appearance {
   } catch {
     // A broken entry falls back to the defaults.
   }
-  const legacy = localStorage.getItem("haruvo-theme");
   const customTheme = saved.customTheme ? parseCustomTheme(serializeCustomTheme(saved.customTheme)) : null;
-  const theme = (["light", "system", "dark", "custom"] as const).find((mode) => mode === (saved.theme ?? legacy)) ?? "dark";
+  const theme = (["light", "system", "dark", "custom"] as const).find((mode) => mode === saved.theme) ?? "dark";
   return {
     theme: theme === "custom" && !customTheme ? "dark" : theme,
     customTheme,
@@ -135,7 +134,6 @@ export function setAppearance(patch: Partial<Appearance>) {
   current = { ...current, ...patch };
   const vars = apply(current);
   localStorage.setItem(KEY, JSON.stringify({ ...current, vars }));
-  localStorage.removeItem("haruvo-theme");
   window.dispatchEvent(new Event(EVENT));
 }
 

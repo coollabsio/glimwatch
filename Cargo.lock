@@ -710,10 +710,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "haruvo-domain"
+name = "glimwatch-domain"
 version = "0.1.0"
 dependencies = [
- "haruvo-platform",
+ "glimwatch-platform",
  "hmac",
  "serde",
  "serde_json",
@@ -722,7 +722,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "haruvo-errors"
+name = "glimwatch-errors"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -736,7 +736,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "haruvo-insights"
+name = "glimwatch-insights"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -745,7 +745,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "haruvo-platform"
+name = "glimwatch-platform"
 version = "0.1.0"
 dependencies = [
  "argon2",
@@ -766,7 +766,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "haruvo-server"
+name = "glimwatch-server"
 version = "0.1.0"
 dependencies = [
  "axum",
@@ -774,10 +774,10 @@ dependencies = [
  "chrono",
  "clap",
  "flate2",
- "haruvo-domain",
- "haruvo-errors",
- "haruvo-insights",
- "haruvo-platform",
+ "glimwatch-domain",
+ "glimwatch-errors",
+ "glimwatch-insights",
+ "glimwatch-platform",
  "hex",
  "http-body-util",
  "include_dir",

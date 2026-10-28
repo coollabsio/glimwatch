@@ -1,8 +1,8 @@
-//! Shared platform for Haruvo.
+//! Shared platform for Glimwatch.
 //!
 //! This crate mirrors the role of Orbit's `orbit-platform`: configuration,
 //! the SQLite/Postgres access layer, migrations, password hashing, identifiers,
-//! timestamps, and RFC 9457 problem responses. Haruvo does not include
+//! timestamps, and RFC 9457 problem responses. Glimwatch does not include
 //! Orbit's realtime, file, or collaboration subsystems.
 
 mod auth;

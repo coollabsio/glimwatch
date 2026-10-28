@@ -1,5 +1,5 @@
-use haruvo_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
-use haruvo_platform::{Id, TimestampMillis};
+use glimwatch_domain::{IncidentImpact, IncidentStatus, JobType, MonitorState};
+use glimwatch_platform::{Id, TimestampMillis};
 
 use crate::error::AppError;
 use crate::repo::{self, Channel, Incident, IncidentUpdate, Maintenance, Monitor, Page};

@@ -9,13 +9,13 @@ use axum::http::header::{self, HeaderMap, HeaderValue};
 use axum::http::{Method, Response, StatusCode, Uri};
 use axum::response::IntoResponse;
 use axum_extra::extract::cookie::CookieJar;
-use haruvo_insights::{
+use glimwatch_insights::{
     Bounds, EventPayload, Incoming, LINK_SECTIONS, SITE_SECTIONS, clean_color, clean_destination,
     clean_host, clean_name, clean_public_slug, clean_slug, clean_vitals, clip, flatten, now_secs,
     parse_page, parse_user_agent, percentile, referrer_domain, same_site, sections_json,
     session_id, slugify,
 };
-use haruvo_platform::{Database, Id, generate_token};
+use glimwatch_platform::{Database, Id, generate_token};
 use http_body_util::BodyExt;
 use isbot::Bots;
 use serde::Deserialize;

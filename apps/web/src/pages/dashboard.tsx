@@ -24,7 +24,7 @@ export function DashboardPage() {
   const degraded = monitors.filter((monitor) => monitor.state === "degraded").length;
   const summary =
     monitors.length === 0
-      ? { tone: "neutral" as const, title: "No monitors yet", body: "Add a check and Haruvo will start recording it." }
+      ? { tone: "neutral" as const, title: "No monitors yet", body: "Add a check and Glimwatch will start recording it." }
       : down === monitors.length
         ? { tone: "error" as const, title: "Major outage", body: "Every monitor is down." }
         : down > 0

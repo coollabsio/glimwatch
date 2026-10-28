@@ -1,6 +1,6 @@
-//! Demo site, page views, and short links for `haruvo seed`.
-use haruvo_insights::{Incoming, Vitals, now_secs, session_id};
-use haruvo_platform::Id;
+//! Demo site, page views, and short links for `glimwatch seed`.
+use glimwatch_insights::{Incoming, Vitals, now_secs, session_id};
+use glimwatch_platform::Id;
 
 use super::record;
 use crate::error::AppError;
@@ -31,7 +31,7 @@ pub async fn seed_demo(state: &AppState) -> Result<(), AppError> {
     )
     .bind(&domain_id)
     .bind(&site_id)
-    .bind("go.haruvo.test")
+    .bind("go.glimwatch.test")
     .bind("Demo short domain. On this server, open /go/{slug}.")
     .bind(now)
     .execute(state.db.pool())
@@ -136,11 +136,11 @@ pub async fn seed_demo(state: &AppState) -> Result<(), AppError> {
                         os: Some(browser.1.into()),
                         device: Some(browser.2.into()),
                         metadata: Some(r#"{"plan":"hobby"}"#.into()),
-                        data: vec![haruvo_insights::DataValue {
+                        data: vec![glimwatch_insights::DataValue {
                             key: "plan".into(),
                             string_value: "hobby".into(),
                             number_value: None,
-                            data_type: haruvo_insights::TYPE_STRING,
+                            data_type: glimwatch_insights::TYPE_STRING,
                         }],
                         ..Incoming::default()
                     },

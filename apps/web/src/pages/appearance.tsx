@@ -23,7 +23,7 @@ export function AppearancePage() {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <PageHeader title="Appearance" description="How Haruvo looks in this browser." />
+      <PageHeader title="Appearance" description="How Glimwatch looks in this browser." />
 
       <LayerCard title="Color theme" description="Choose the color scheme used in this browser.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -308,7 +308,7 @@ function CustomThemeDialog({ appearance, onClose }: { appearance: Appearance; on
       open
       wide
       title="Custom theme"
-      description="Colors of Haruvo in this browser. Text stays readable on every color."
+      description="Colors of Glimwatch in this browser. Text stays readable on every color."
       onClose={onClose}
       footer={
         <>
@@ -352,7 +352,7 @@ function CustomThemeDialog({ appearance, onClose }: { appearance: Appearance; on
         <div className="flex min-w-0 flex-col gap-5">
           <div className="flex h-48 overflow-hidden rounded-lg border border-[var(--ui-divider)] text-xs" aria-hidden="true">
             <div className="flex w-2/5 flex-col gap-0.5 p-2.5" style={{ background: colors.sidebar, color: onSidebar }}>
-              <div className="mb-2 px-2 text-sm font-semibold">Haruvo</div>
+              <div className="mb-2 px-2 text-sm font-semibold">Glimwatch</div>
               <div className="flex items-center gap-2 rounded-md px-2 py-1.5 opacity-75">
                 <Home className="size-3.5" /> Dashboard
               </div>

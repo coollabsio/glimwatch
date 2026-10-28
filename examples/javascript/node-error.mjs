@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/node";
 
 const dsn = process.env.SENTRY_DSN;
 if (!dsn) {
-  console.error("Set SENTRY_DSN to the project DSN from the Haruvo UI.");
+  console.error("Set SENTRY_DSN to the project DSN from the Glimwatch UI.");
   process.exit(1);
 }
 

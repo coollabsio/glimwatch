@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 const dsn = process.env.SENTRY_DSN;
 if (!dsn) {
-  console.error("Set SENTRY_DSN to the project DSN from the Haruvo UI.");
+  console.error("Set SENTRY_DSN to the project DSN from the Glimwatch UI.");
   process.exit(1);
 }
 
@@ -21,10 +21,10 @@ const page = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Haruvo browser example</title>
+  <title>Glimwatch browser example</title>
 </head>
 <body>
-  <h1>Haruvo browser example</h1>
+  <h1>Glimwatch browser example</h1>
   <p>This page uses the official @sentry/browser SDK.</p>
   <button id="capture" type="button">Capture error</button>
   <button id="throw" type="button">Throw error</button>

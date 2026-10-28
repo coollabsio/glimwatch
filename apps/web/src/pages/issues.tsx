@@ -42,7 +42,7 @@ export function IssuesPage() {
   const [saved, setSaved] = useState<SavedView[]>([]);
 
   useEffect(() => {
-    const raw = localStorage.getItem("haruvo-error-views");
+    const raw = localStorage.getItem("glimwatch-error-views");
     if (raw) setSaved(JSON.parse(raw) as SavedView[]);
   }, []);
 
@@ -88,7 +88,7 @@ export function IssuesPage() {
     if (!name) return;
     const next = [...saved.filter((view) => view.name !== name), { name, status, projectId, environment, range, q, sort }];
     setSaved(next);
-    localStorage.setItem("haruvo-error-views", JSON.stringify(next));
+    localStorage.setItem("glimwatch-error-views", JSON.stringify(next));
     setSaveName("");
     setSaveOpen(false);
   }

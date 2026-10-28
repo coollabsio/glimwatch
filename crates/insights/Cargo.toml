@@ -1,9 +1,9 @@
 [package]
-name = "haruvo-insights"
+name = "glimwatch-insights"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
-description = "Cookieless web analytics and link-shortener rules for Haruvo"
+description = "Cookieless web analytics and link-shortener rules for Glimwatch"
 
 [dependencies]
 serde.workspace = true

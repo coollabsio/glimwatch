@@ -3,7 +3,7 @@ use axum::extract::{Path, Query, Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{self, HeaderMap, HeaderValue};
 use axum::response::Response;
-use haruvo_errors::{decode_body, normalize_event, parse_envelope};
+use glimwatch_errors::{decode_body, normalize_event, parse_envelope};
 use http_body_util::BodyExt;
 use serde::Deserialize;
 use serde_json::{Value, json};

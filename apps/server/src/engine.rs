@@ -1,10 +1,10 @@
 use std::ops::DerefMut;
 
-use haruvo_domain::{
+use glimwatch_domain::{
     CheckStatus, IncidentImpact, IncidentStatus, NotificationEvent, NotificationPayload,
     PayloadCheck, PayloadIncident, PayloadMonitor, Probe, Rules, apply_outcome, judge,
 };
-use haruvo_platform::{Id, TimestampMillis};
+use glimwatch_platform::{Id, TimestampMillis};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 
@@ -163,7 +163,7 @@ async fn record(
             let incident_id = Id::new();
             let detail = error.unwrap_or_else(|| "The check failed.".to_owned());
             let message = format!(
-                "Haruvo recorded {} consecutive failed checks for {}. {detail}",
+                "Glimwatch recorded {} consecutive failed checks for {}. {detail}",
                 transition.consecutive_failures, monitor.url
             );
             let incident = Incident {

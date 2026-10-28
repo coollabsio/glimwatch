@@ -1,11 +1,11 @@
 [package]
-name = "haruvo-domain"
+name = "glimwatch-domain"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [dependencies]
-haruvo-platform = { path = "../platform" }
+glimwatch-platform = { path = "../platform" }
 hmac.workspace = true
 serde.workspace = true
 serde_json.workspace = true

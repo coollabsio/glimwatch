@@ -1,4 +1,4 @@
-//! Domain rules for Haruvo status pages and uptime.
+//! Domain rules for Glimwatch status pages and uptime.
 //!
 //! This crate plays the role of Orbit's `orbit-domain`: pure decisions about
 //! monitors, assertions, uptime, incidents, and notification payloads. The

@@ -13,14 +13,14 @@ dev:
         source .env.local
         set +a
     fi
-    cargo run -p haruvo-server -- seed
-    cargo run -p haruvo-server -- serve --listen 127.0.0.1:43124 &
+    cargo run -p glimwatch-server -- seed
+    cargo run -p glimwatch-server -- serve --listen 127.0.0.1:43124 &
     server_pid=$!
     trap 'kill "$server_pid" 2>/dev/null || true' EXIT
     (cd apps/web && VITE_API_PROXY=http://127.0.0.1:43124 bun run dev)
     wait
 
-# Backend tests, including Postgres when HARUVO_TEST_POSTGRES_URL is set.
+# Backend tests, including Postgres when GLIMWATCH_TEST_POSTGRES_URL is set.
 # STATUS_TEST_POSTGRES_URL is still accepted.
 test:
     cargo test --workspace
@@ -28,8 +28,8 @@ test:
 # Production assets embedded in the binary, then the release build.
 build:
     cd apps/web && bun run build
-    cargo build --release -p haruvo-server
+    cargo build --release -p glimwatch-server
 
 # Demo account, monitors, status page, analytics site, short links, and error events.
 seed:
-    cargo run -p haruvo-server -- seed
+    cargo run -p glimwatch-server -- seed

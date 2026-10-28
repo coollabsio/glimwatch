@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use haruvo_platform::{Config, TimestampMillis};
+use glimwatch_platform::{Config, TimestampMillis};
 
 use crate::agent;
 use crate::connectivity::Connectivity;
@@ -15,9 +15,9 @@ use crate::state::{self, BootError};
 
 #[derive(Parser)]
 #[command(
-    name = "haruvo",
+    name = "glimwatch",
     version,
-    about = "Haruvo status pages, incidents, and uptime monitoring"
+    about = "Glimwatch status pages, incidents, and uptime monitoring"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -55,19 +55,19 @@ enum Command {
         #[command(subcommand)]
         command: SetupTokenCommand,
     },
-    /// Run the checks in a config file from this network and report them to a Haruvo server.
+    /// Run the checks in a config file from this network and report them to a Glimwatch server.
     Agent {
-        /// Haruvo server URL, for example https://status.example.com.
+        /// Glimwatch server URL, for example https://status.example.com.
         /// `STATUS_AGENT_SERVER` is used when this is unset.
-        #[arg(long, env = "HARUVO_AGENT_SERVER")]
+        #[arg(long, env = "GLIMWATCH_AGENT_SERVER")]
         server: String,
         /// Token shown once when the agent was created.
         /// `STATUS_AGENT_TOKEN` is used when this is unset.
-        #[arg(long, env = "HARUVO_AGENT_TOKEN", hide_env_values = true)]
+        #[arg(long, env = "GLIMWATCH_AGENT_TOKEN", hide_env_values = true)]
         token: String,
         /// TOML file with [[check]] entries.
         /// `STATUS_AGENT_CONFIG` is used when this is unset.
-        #[arg(long, env = "HARUVO_AGENT_CONFIG")]
+        #[arg(long, env = "GLIMWATCH_AGENT_CONFIG")]
         config: PathBuf,
     },
 }
@@ -76,15 +76,15 @@ enum Command {
 enum SetupTokenCommand {
     /// Print a setup URL when setup is unfinished and no unused token is stored.
     Init {
-        /// Public origin to put in the URL. Defaults to HARUVO_PUBLIC_ORIGIN.
+        /// Public origin to put in the URL. Defaults to GLIMWATCH_PUBLIC_ORIGIN.
         /// `STATUS_PUBLIC_ORIGIN` still works.
         #[arg(long)]
         origin: Option<String>,
     },
     /// Replace the unused setup token. Refuses after setup is complete.
-    /// On SQLite, stop Haruvo first. On Postgres, this can run while Haruvo is up.
+    /// On SQLite, stop Glimwatch first. On Postgres, this can run while Glimwatch is up.
     Rotate {
-        /// Public origin to put in the URL. Defaults to HARUVO_PUBLIC_ORIGIN.
+        /// Public origin to put in the URL. Defaults to GLIMWATCH_PUBLIC_ORIGIN.
         /// `STATUS_PUBLIC_ORIGIN` still works.
         #[arg(long)]
         origin: Option<String>,
@@ -112,7 +112,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             scheduler::spawn(state.clone());
             let listener = tokio::net::TcpListener::bind(addr).await?;
             let bound = listener.local_addr()?;
-            tracing::info!("Haruvo listening on http://{bound}");
+            tracing::info!("Glimwatch listening on http://{bound}");
             axum::serve(listener, crate::routes::router(state))
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
@@ -188,7 +188,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
 fn promote_legacy_agent_env() {
     for suffix in ["AGENT_SERVER", "AGENT_TOKEN", "AGENT_CONFIG"] {
-        let primary = format!("HARUVO_{suffix}");
+        let primary = format!("GLIMWATCH_{suffix}");
         if std::env::var_os(&primary).is_some() {
             continue;
         }
@@ -200,7 +200,7 @@ fn promote_legacy_agent_env() {
     }
 }
 
-/// SQLite is owned by one Haruvo process. Postgres stays unlocked so `setup-token`
+/// SQLite is owned by one Glimwatch process. Postgres stays unlocked so `setup-token`
 /// can run while the server is up, matching Orbit.
 fn sqlite_owner(config: &Config) -> Result<Option<ownership::Guard>, BootError> {
     if config.database_url.is_some() {
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn parses_setup_token_rotate() {
         let cli = Cli::try_parse_from([
-            "haruvo",
+            "glimwatch",
             "setup-token",
             "rotate",
             "--origin",
