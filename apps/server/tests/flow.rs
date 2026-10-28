@@ -323,7 +323,6 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
 #[tokio::test]
 async fn postgres_accepts_the_same_api() {
     let Some(url) = std::env::var("GLIMWATCH_APP_POSTGRES_URL")
-        .or_else(|_| std::env::var("STATUS_APP_POSTGRES_URL"))
         .ok()
         .filter(|url| !url.is_empty())
     else {

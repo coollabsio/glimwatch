@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use glimwatch_platform::{TracingFormat, init_tracing};
 
 fn main() -> ExitCode {
-    let environment = std::env::var("GLIMWATCH_ENV").or_else(|_| std::env::var("STATUS_ENV"));
+    let environment = std::env::var("GLIMWATCH_ENV");
     let format = match environment.as_deref() {
         Ok("production") => TracingFormat::Json,
         _ => TracingFormat::Compact,

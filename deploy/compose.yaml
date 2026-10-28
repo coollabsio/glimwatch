@@ -13,7 +13,6 @@ services:
       GLIMWATCH_PUBLIC_ORIGIN: ${GLIMWATCH_PUBLIC_ORIGIN:-http://localhost:8080}
       # Stock path. If this file is missing and an older status.sqlite is in
       # this directory, that file is kept. To keep a volume mounted elsewhere, set this to that file.
-      # STATUS_DATABASE_PATH applies when this name is unset.
       GLIMWATCH_DATABASE_PATH: /var/lib/glimwatch/glimwatch.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
       # The root user opens it in Settings after SMTP is configured.
