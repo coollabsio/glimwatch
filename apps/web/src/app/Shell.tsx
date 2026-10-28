@@ -365,8 +365,8 @@ export function Shell() {
 export function Logo({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 352 352" className={cn("size-6 shrink-0", className)} role="img" aria-label="Glimwatch">
-      <path d="M0 0h64v128h192V0h64v320h-64V192H64v128H0Z" transform="translate(32 32)" fill="#1e3a8a" />
-      <path d="M0 0h64v128h192V0h64v320h-64V192H64v128H0Z" fill="#2b7fff" />
+      <path d="M0 0h320v64H64v192h192v-64h-96v-64h160v192H0Z" transform="translate(32 32)" fill="#1e3a8a" />
+      <path d="M0 0h320v64H64v192h192v-64h-96v-64h160v192H0Z" fill="#2b7fff" />
     </svg>
   );
 }
