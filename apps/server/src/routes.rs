@@ -33,7 +33,7 @@ use crate::state::{self, AppState};
 
 const COOKIE: &str = "haruvo_session";
 /// Older session cookies. A later login replaces them with `haruvo_session`.
-const LEGACY_COOKIES: &[&str] = &["statixo_session", "status_session"];
+const LEGACY_COOKIES: &[&str] = &["status_session"];
 
 fn session_cookie_names() -> impl Iterator<Item = &'static str> {
     std::iter::once(COOKIE).chain(LEGACY_COOKIES.iter().copied())

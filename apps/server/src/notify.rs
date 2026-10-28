@@ -96,7 +96,6 @@ async fn send(
                     let header = format!("sha256={signature}");
                     request = request
                         .header("x-haruvo-signature", header.clone())
-                        .header("x-statixo-signature", header.clone())
                         .header("x-status-signature", header);
                 }
             }

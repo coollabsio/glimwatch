@@ -272,7 +272,7 @@ async fn legacy_session_cookies_still_authenticate() {
     let cookie = cookie.expect("session cookie");
     assert!(cookie.starts_with("haruvo_session="), "{cookie}");
     let value = cookie.split_once('=').unwrap().1;
-    for name in ["statixo_session", "status_session"] {
+    for name in ["status_session"] {
         let (status, me, _) = call(
             &app,
             "GET",

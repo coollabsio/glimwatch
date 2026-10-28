@@ -111,7 +111,6 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
     let script = script.as_str().unwrap_or("");
     assert!(script.contains("/api/receive"), "{script}");
     assert!(script.contains("haruvoEvent"), "{script}");
-    assert!(script.contains("statixoEvent"), "{script}");
     assert!(script.contains("beaconEvent"), "{script}");
 
     let (status, site, _, _) = call(

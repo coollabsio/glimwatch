@@ -78,8 +78,7 @@ export function parseCustomTheme(code: string): CustomTheme | null {
 function read(): Appearance {
   let saved: Partial<Appearance> = {};
   try {
-    const raw = localStorage.getItem(KEY) ?? localStorage.getItem("statixo-appearance");
-    saved = JSON.parse(raw ?? "{}") ?? {};
+    saved = JSON.parse(localStorage.getItem(KEY) ?? "{}") ?? {};
   } catch {
     // A broken entry falls back to the defaults.
   }
@@ -137,7 +136,6 @@ export function setAppearance(patch: Partial<Appearance>) {
   const vars = apply(current);
   localStorage.setItem(KEY, JSON.stringify({ ...current, vars }));
   localStorage.removeItem("haruvo-theme");
-  localStorage.removeItem("statixo-appearance");
   window.dispatchEvent(new Event(EVENT));
 }
 

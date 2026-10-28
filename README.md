@@ -41,7 +41,7 @@ Open http://127.0.0.1:43123.
 
 `just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
-The database file is `data/haruvo.sqlite`. If that file is missing, Haruvo uses `data/statixo.sqlite` or `data/status.sqlite` when one of those older files is already there. The Docker default `/var/lib/haruvo/haruvo.sqlite` does the same for `statixo.sqlite` and `status.sqlite` in that directory and under `/var/lib/statixo`. A custom `HARUVO_DATABASE_PATH` (or a `STATUS_` alias of it) is used as written. Migrations run on startup.
+The database file is `data/haruvo.sqlite`. If that file is missing, Haruvo uses an older `data/status.sqlite` when it is already there. The Docker default `/var/lib/haruvo/haruvo.sqlite` does the same for `status.sqlite` in that directory. A custom `HARUVO_DATABASE_PATH` (or a `STATUS_` alias of it) is used as written. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
@@ -66,7 +66,7 @@ export HARUVO_SMTP_PORT=587
 export HARUVO_SMTP_FROM=status@example.com
 ```
 
-Webhook channels can set a secret. The body is posted as JSON with `X-Haruvo-Signature: sha256=<hmac-sha256>`. `X-Statixo-Signature` and `X-Status-Signature` are sent with the same value.
+Webhook channels can set a secret. The body is posted as JSON with `X-Haruvo-Signature: sha256=<hmac-sha256>`. `X-Status-Signature` is sent with the same value.
 
 ### First-run setup
 
@@ -89,7 +89,7 @@ haruvo setup-token rotate
 
 The root user opens registration in Settings. It stays closed until a mail server is saved there, or `HARUVO_SMTP_HOST` and `HARUVO_SMTP_FROM` are set (`STATUS_SMTP_*` still works), and the root user turns Open registration on. Clearing the saved mail server closes registration again. `HARUVO_OPEN_SIGNUP` and `STATUS_OPEN_SIGNUP` are ignored. Haruvo does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
 
-Every `HARUVO_*` variable still accepts the older `STATUS_*` name when the `HARUVO_*` variable is unset. See [Migrating from Statixo](#migrating-from-statixo).
+Every `HARUVO_*` variable still accepts the older `STATUS_*` name when the `HARUVO_*` variable is unset. See [Upgrading from older names](#upgrading-from-older-names).
 
 When a check cannot connect (DNS, connect, or timeout error), Haruvo first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Haruvo host's own network. Haruvo then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
 
@@ -134,7 +134,7 @@ docker build -t haruvo:local .
 docker run --rm -p 8080:8080 -v haruvo-data:/var/lib/haruvo haruvo:local
 ```
 
-Pushes to `main` publish `ghcr.io/coollabsio/haruvo` (`linux/amd64` and `linux/arm64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab. It does not delete `ghcr.io/coollabsio/statixo`. If the package is not linked to this repository automatically, link it from the package settings.
+Pushes to `main` publish `ghcr.io/coollabsio/haruvo` (`linux/amd64` and `linux/arm64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab. If the package is not linked to this repository automatically, link it from the package settings.
 
 ```bash
 docker pull ghcr.io/coollabsio/haruvo:latest
@@ -226,7 +226,7 @@ Add a site in **Sites**, then paste the snippet from **Tracker**:
 <script defer src="https://haruvo.example.com/data.js" data-site="YOUR_PUBLIC_ID"></script>
 ```
 
-The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.haruvoEvent(name, data)` records a custom event. `window.statixoEvent` and `window.beaconEvent` are the same function, so a snippet written for Statixo or for [Beacon](https://github.com/ShadowArcanist/beacons) still works.
+The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.haruvoEvent(name, data)` records a custom event. `window.beaconEvent` is the same function, so a snippet written for [Beacon](https://github.com/ShadowArcanist/beacons) still works.
 
 Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `HARUVO_PROXY_HOPS` when Haruvo sits behind a reverse proxy (`1` for one proxy, `2` when Cloudflare is in front, which also enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). Point `HARUVO_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
 
@@ -279,27 +279,26 @@ deploy           Docker Compose
 
 Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is that script with the Haruvo event name added. See [NOTICE](NOTICE).
 
-## Migrating from Statixo
+## Upgrading from older names
 
-Haruvo is the product name again. Older `STATUS_*` settings keep working until you rename them. Rename Statixo environment variables to the `HARUVO_` prefix.
+Older `STATUS_*` settings keep working until you rename them to the `HARUVO_` prefix. Haruvo no longer reads any Statixo names.
 
 | Current | Still accepted |
 | --- | --- |
 | `HARUVO_*` | `STATUS_*` when `HARUVO_*` is unset |
-| `haruvo_session` cookie | `statixo_session`, then `status_session`, until the next login replaces them |
-| `window.haruvoEvent` | `window.statixoEvent` and `window.beaconEvent` |
-| `X-Haruvo-Signature` | `X-Statixo-Signature` and `X-Status-Signature` are sent with the same value |
-| `data/haruvo.sqlite`, `/var/lib/haruvo/haruvo.sqlite` | `statixo.sqlite`, then `status.sqlite`, in the same directory or under `/var/lib/statixo`, when the Haruvo file is absent and the path is a stock default |
-| Browser appearance and saved issue views | `statixo-appearance` and `statixo-error-views` are read once and stored under the `haruvo-` names. `haruvo-theme` is still read |
+| `haruvo_session` cookie | `status_session`, until the next login replaces it |
+| `window.haruvoEvent` | `window.beaconEvent` |
+| `X-Haruvo-Signature` | `X-Status-Signature` is sent with the same value |
+| `data/haruvo.sqlite`, `/var/lib/haruvo/haruvo.sqlite` | `status.sqlite` in the same directory, when the Haruvo file is absent and the path is a stock default |
+| Browser appearance | `haruvo-theme` is still read |
 
 `DATABASE_URL` is still an alias of the database URL, after `HARUVO_DATABASE_URL` and `STATUS_DATABASE_URL`.
 
-The container image sets `HARUVO_ENV`, `HARUVO_BIND`, `HARUVO_PORT`, `HARUVO_DATABASE_PATH`, and `HARUVO_PUBLIC_ORIGIN`. Those win over a `STATUS_*` name of the same setting. Rename Statixo environment variables to those `HARUVO_` names.
+The container image sets `HARUVO_ENV`, `HARUVO_BIND`, `HARUVO_PORT`, `HARUVO_DATABASE_PATH`, and `HARUVO_PUBLIC_ORIGIN`. Those win over a `STATUS_*` name of the same setting.
 
-The stock database path still opens an existing file. If `/var/lib/haruvo/haruvo.sqlite` is missing, Haruvo uses `statixo.sqlite` or `status.sqlite` in that directory or under `/var/lib/statixo`. To point at a file directly:
+A Statixo database is not found automatically. Point Haruvo at the file:
 
 ```bash
-# keep a Statixo volume mounted at its old path
 export HARUVO_DATABASE_PATH=/var/lib/statixo/statixo.sqlite
 ```
 
@@ -310,7 +309,7 @@ docker run --rm -v statixo-data:/from -v haruvo-data:/to alpine \
   cp -a /from/statixo.sqlite /to/haruvo.sqlite
 ```
 
-Point Coolify at `ghcr.io/coollabsio/haruvo`. `HARUVO_IMAGE` is the compose override. The source repository stays `https://github.com/coollabsio/haruvo`. The container workflow publishes `ghcr.io/coollabsio/haruvo` and leaves `ghcr.io/coollabsio/statixo` in place. API problem URLs use `https://haruvo.io/problems/...`. Existing browsers stay signed in: `statixo_session` and `status_session` are still accepted, and the next login writes `haruvo_session`.
+Point Coolify at `ghcr.io/coollabsio/haruvo`. `HARUVO_IMAGE` is the compose override. The source repository is `https://github.com/coollabsio/haruvo`. API problem URLs use `https://haruvo.io/problems/...`.
 
 ## License
 

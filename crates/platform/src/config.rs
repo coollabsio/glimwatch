@@ -238,7 +238,7 @@ fn compat(name: &str) -> Option<String> {
 const STOCK_SQLITE_PATHS: &[&str] = &["data/haruvo.sqlite", "/var/lib/haruvo/haruvo.sqlite"];
 
 /// Uses an explicit path as given. The stock defaults keep an existing
-/// `statixo.sqlite` or `status.sqlite` when `haruvo.sqlite` is not there yet.
+/// `status.sqlite` when `haruvo.sqlite` is not there yet.
 fn resolve_sqlite_path(explicit: Option<String>) -> PathBuf {
     let chosen = explicit
         .as_deref()
@@ -267,17 +267,10 @@ fn legacy_sqlite_candidates(chosen: &Path) -> Vec<PathBuf> {
     if let Some(parent) = chosen.parent()
         && !parent.as_os_str().is_empty()
     {
-        for name in ["statixo.sqlite", "status.sqlite"] {
-            paths.push(parent.join(name));
-        }
+        paths.push(parent.join("status.sqlite"));
     }
     for candidate in [
-        "data/statixo.sqlite",
         "data/status.sqlite",
-        "/var/lib/statixo/statixo.sqlite",
-        "/var/lib/statixo/status.sqlite",
-        "/var/lib/statixo/haruvo.sqlite",
-        "/var/lib/haruvo/statixo.sqlite",
         "/var/lib/haruvo/status.sqlite",
     ] {
         paths.push(PathBuf::from(candidate));
@@ -411,15 +404,6 @@ mod tests {
             std::env::remove_var("HARUVO_DATABASE_URL");
             std::env::remove_var("DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
-            // STATIXO_* is not an alias. This URL must not select Postgres.
-            std::env::set_var(
-                "STATIXO_DATABASE_URL",
-                "postgres://statixo:secret@127.0.0.1:1/statixo",
-            );
-        }
-        let ignored = Config::from_env().unwrap();
-        assert_eq!(ignored.database_url.as_deref(), None);
-        unsafe {
             std::env::set_var(
                 "STATUS_DATABASE_URL",
                 "postgres://status:secret@127.0.0.1:1/status",
@@ -443,7 +427,6 @@ mod tests {
         );
         unsafe {
             std::env::remove_var("HARUVO_DATABASE_URL");
-            std::env::remove_var("STATIXO_DATABASE_URL");
             std::env::remove_var("STATUS_DATABASE_URL");
         }
     }
@@ -453,14 +436,14 @@ mod tests {
         assert!(is_stock_sqlite_path("data/haruvo.sqlite"));
         assert!(is_stock_sqlite_path("/var/lib/haruvo/haruvo.sqlite"));
         assert!(!is_stock_sqlite_path("/tmp/custom.sqlite"));
-        assert!(!is_stock_sqlite_path("data/statixo.sqlite"));
+        assert!(!is_stock_sqlite_path("data/status.sqlite"));
         let candidates = legacy_sqlite_candidates(Path::new("data/haruvo.sqlite"));
-        assert_eq!(candidates[0], PathBuf::from("data/statixo.sqlite"));
-        assert_eq!(candidates[1], PathBuf::from("data/status.sqlite"));
-        assert!(
-            candidates
-                .iter()
-                .any(|path| path == Path::new("/var/lib/statixo/statixo.sqlite"))
+        assert_eq!(
+            candidates,
+            [
+                PathBuf::from("data/status.sqlite"),
+                PathBuf::from("/var/lib/haruvo/status.sqlite"),
+            ]
         );
         let custom = std::env::temp_dir().join(format!(
             "haruvo-missing-{}-{}.sqlite",

@@ -160,6 +160,5 @@
   send('pageview')
   const track = (name, data) => send(name, { data })
   window.haruvoEvent = track
-  window.statixoEvent = track
   window.beaconEvent = track
 })()
