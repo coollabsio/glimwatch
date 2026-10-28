@@ -70,7 +70,7 @@ async fn send(
         "email" => {
             let Some(smtp) = effective_smtp(state).await else {
                 return Ok(SendOutcome::Skipped(
-                    "SMTP is not configured. Save a mail server in Settings, or set GLIMWATCH_SMTP_HOST and GLIMWATCH_SMTP_FROM. STATUS_SMTP_* still works.".to_owned(),
+                    "SMTP is not configured. Save a mail server in Settings, or set GLIMWATCH_SMTP_HOST and GLIMWATCH_SMTP_FROM.".to_owned(),
                 ));
             };
             let to = config

@@ -58,15 +58,12 @@ enum Command {
     /// Run the checks in a config file from this network and report them to a Glimwatch server.
     Agent {
         /// Glimwatch server URL, for example https://status.example.com.
-        /// `STATUS_AGENT_SERVER` is used when this is unset.
         #[arg(long, env = "GLIMWATCH_AGENT_SERVER")]
         server: String,
         /// Token shown once when the agent was created.
-        /// `STATUS_AGENT_TOKEN` is used when this is unset.
         #[arg(long, env = "GLIMWATCH_AGENT_TOKEN", hide_env_values = true)]
         token: String,
         /// TOML file with [[check]] entries.
-        /// `STATUS_AGENT_CONFIG` is used when this is unset.
         #[arg(long, env = "GLIMWATCH_AGENT_CONFIG")]
         config: PathBuf,
     },
@@ -77,7 +74,6 @@ enum SetupTokenCommand {
     /// Print a setup URL when setup is unfinished and no unused token is stored.
     Init {
         /// Public origin to put in the URL. Defaults to GLIMWATCH_PUBLIC_ORIGIN.
-        /// `STATUS_PUBLIC_ORIGIN` still works.
         #[arg(long)]
         origin: Option<String>,
     },
@@ -85,14 +81,12 @@ enum SetupTokenCommand {
     /// On SQLite, stop Glimwatch first. On Postgres, this can run while Glimwatch is up.
     Rotate {
         /// Public origin to put in the URL. Defaults to GLIMWATCH_PUBLIC_ORIGIN.
-        /// `STATUS_PUBLIC_ORIGIN` still works.
         #[arg(long)]
         origin: Option<String>,
     },
 }
 
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    promote_legacy_agent_env();
     let cli = Cli::parse();
     match cli.command.unwrap_or(Command::Serve {
         listen: None,
@@ -184,20 +178,6 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
-}
-
-fn promote_legacy_agent_env() {
-    for suffix in ["AGENT_SERVER", "AGENT_TOKEN", "AGENT_CONFIG"] {
-        let primary = format!("GLIMWATCH_{suffix}");
-        if std::env::var_os(&primary).is_some() {
-            continue;
-        }
-        let legacy = format!("STATUS_{suffix}");
-        if let Some(value) = std::env::var_os(&legacy) {
-            // SAFETY: process startup, before other threads read these variables.
-            unsafe { std::env::set_var(&primary, value) };
-        }
-    }
 }
 
 /// SQLite is owned by one Glimwatch process. Postgres stays unlocked so `setup-token`

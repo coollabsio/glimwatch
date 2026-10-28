@@ -21,7 +21,6 @@ dev:
     wait
 
 # Backend tests, including Postgres when GLIMWATCH_TEST_POSTGRES_URL is set.
-# STATUS_TEST_POSTGRES_URL is still accepted.
 test:
     cargo test --workspace
 

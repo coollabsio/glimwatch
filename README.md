@@ -39,13 +39,13 @@ Open http://127.0.0.1:43123.
 
 `just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
-The database file is `data/glimwatch.sqlite`. If that file is missing, Glimwatch uses an older `status.sqlite` when one is already there: first in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`. The Docker default `/var/lib/glimwatch/glimwatch.sqlite` does the same. This applies only to these two default paths. A custom `GLIMWATCH_DATABASE_PATH` (or a `STATUS_` alias of it) is used as written. Migrations run on startup.
+The database file is `data/glimwatch.sqlite`. If that file is missing, Glimwatch uses an older `status.sqlite` when one is already there: first in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`. The Docker default `/var/lib/glimwatch/glimwatch.sqlite` does the same. This applies only to these two default paths. A custom `GLIMWATCH_DATABASE_PATH` is used as written. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
 ### Postgres
 
-Leave the SQLite path in place (it is unused for data) and set a URL. `STATUS_DATABASE_URL` and `DATABASE_URL` are accepted when `GLIMWATCH_DATABASE_URL` is unset. `GLIMWATCH_*` wins over `STATUS_*`.
+Leave the SQLite path in place (it is unused for data) and set a URL. `DATABASE_URL` is accepted when `GLIMWATCH_DATABASE_URL` is unset.
 
 ```bash
 export GLIMWATCH_DATABASE_URL=postgres://glimwatch:glimwatch@127.0.0.1:5432/glimwatch
@@ -85,9 +85,9 @@ glimwatch setup-token rotate
 
 `setup-token init` prints a URL only when setup is unfinished and no unused token is stored. Rotation invalidates the previous unused token.
 
-The root user opens registration in Settings. It stays closed until a mail server is saved there, or `GLIMWATCH_SMTP_HOST` and `GLIMWATCH_SMTP_FROM` are set (`STATUS_SMTP_*` still works), and the root user turns Open registration on. Clearing the saved mail server closes registration again. `GLIMWATCH_OPEN_SIGNUP` and `STATUS_OPEN_SIGNUP` are ignored. Glimwatch does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
+The root user opens registration in Settings. It stays closed until a mail server is saved there, or `GLIMWATCH_SMTP_HOST` and `GLIMWATCH_SMTP_FROM` are set, and the root user turns Open registration on. Clearing the saved mail server closes registration again. `GLIMWATCH_OPEN_SIGNUP` is ignored. Glimwatch does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
 
-Every `GLIMWATCH_*` variable still accepts the older `STATUS_*` name when the `GLIMWATCH_*` variable is unset. See [Upgrading from older names](#upgrading-from-older-names).
+Older `HARUVO_*` and `STATUS_*` names are not read. See [Upgrading from older names](#upgrading-from-older-names).
 
 When a check cannot connect (DNS, connect, or timeout error), Glimwatch first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Glimwatch host's own network. Glimwatch then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
 
@@ -123,7 +123,7 @@ export GLIMWATCH_TEST_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/statu
 export GLIMWATCH_APP_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_app
 ```
 
-`GLIMWATCH_TEST_POSTGRES_URL` runs the migration runner test in `crates/platform`. `GLIMWATCH_APP_POSTGRES_URL` starts the server on Postgres in the `flow`, `errors`, and `insights` tests. Use two empty databases. The platform test resets its own schema. `STATUS_TEST_POSTGRES_URL` and `STATUS_APP_POSTGRES_URL` still work.
+`GLIMWATCH_TEST_POSTGRES_URL` runs the migration runner test in `crates/platform`. `GLIMWATCH_APP_POSTGRES_URL` starts the server on Postgres in the `flow`, `errors`, and `insights` tests. Use two empty databases. The platform test resets its own schema.
 
 ## Docker
 
@@ -194,7 +194,7 @@ The checks are in a config file on the agent host. The server cannot add or chan
    PG_PASSWORD=... glimwatch agent --server https://status.example.com --token <token> --config /etc/glimwatch/agent.toml
    ```
 
-   The command also reads `GLIMWATCH_AGENT_SERVER`, `GLIMWATCH_AGENT_TOKEN`, and `GLIMWATCH_AGENT_CONFIG`. `STATUS_AGENT_*` still works when the `GLIMWATCH_` name is unset. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
+   The command also reads `GLIMWATCH_AGENT_SERVER`, `GLIMWATCH_AGENT_TOKEN`, and `GLIMWATCH_AGENT_CONFIG`. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
 
 When the agent starts, it sends its list of checks to the server, without secrets. The server creates a monitor for each new check name, updates the monitors that already exist, and pauses the monitors of checks that are no longer in the file. History stays. To change a check, edit the file and restart the agent. The agent stops at once when the server rejects the token or the config, and it shows the reason.
 
@@ -251,7 +251,7 @@ Glimwatch follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leav
 | `crates/platform` (config, db, auth, migrations) | `crates/platform` |
 | `crates/orbit` domain rules | `crates/status` |
 | `apps/web` Vite, React, Tailwind | `apps/web` |
-| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `GLIMWATCH_DATABASE_URL` / `STATUS_DATABASE_URL` / `DATABASE_URL` |
+| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `GLIMWATCH_DATABASE_URL` / `DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
 | Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then the root user opens registration in Settings after SMTP |
@@ -282,19 +282,17 @@ Cookieless analytics and the link shortener reimplement [Beacon](https://github.
 
 ## Upgrading from older names
 
-Glimwatch was called Haruvo before. Haruvo names are not read. Rename `HARUVO_*` variables to the `GLIMWATCH_` prefix. Older `STATUS_*` settings keep working until you rename them.
+Glimwatch was called Haruvo, and before that Status. `HARUVO_*` and `STATUS_*` are not read. Rename them to the `GLIMWATCH_` prefix: `HARUVO_DATABASE_URL` and `STATUS_DATABASE_URL` become `GLIMWATCH_DATABASE_URL`, and the same replacement applies to every other setting (`ENV`, `BIND`, `PORT`, `PUBLIC_ORIGIN`, `DATABASE_PATH`, `SMTP_*`, `AGENT_*`, and the rest).
 
 | Current | Still accepted |
 | --- | --- |
-| `GLIMWATCH_*` | `STATUS_*` when `GLIMWATCH_*` is unset |
+| `GLIMWATCH_DATABASE_URL` | `DATABASE_URL`, when `GLIMWATCH_DATABASE_URL` is unset |
 | `glimwatch_session` cookie | `status_session`, until the next login replaces it |
 | `window.glimwatchEvent` | `window.beaconEvent` |
 | `X-Glimwatch-Signature` | `X-Status-Signature` is sent with the same value |
 | `data/glimwatch.sqlite`, `/var/lib/glimwatch/glimwatch.sqlite` | `status.sqlite` in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`, when the Glimwatch file is absent and the path is a default |
 
-`DATABASE_URL` is still an alias of the database URL, after `GLIMWATCH_DATABASE_URL` and `STATUS_DATABASE_URL`.
-
-The container image sets `GLIMWATCH_ENV`, `GLIMWATCH_BIND`, `GLIMWATCH_PORT`, `GLIMWATCH_DATABASE_PATH`, and `GLIMWATCH_PUBLIC_ORIGIN`. Those win over a `STATUS_*` name of the same setting.
+The container image sets `GLIMWATCH_ENV`, `GLIMWATCH_BIND`, `GLIMWATCH_PORT`, `GLIMWATCH_DATABASE_PATH`, and `GLIMWATCH_PUBLIC_ORIGIN`.
 
 A Haruvo or Statixo database is not found automatically. Point Glimwatch at the file:
 

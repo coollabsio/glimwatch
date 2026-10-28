@@ -236,7 +236,6 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
 #[tokio::test]
 async fn postgres_collects_a_pageview_when_configured() {
     let Some(url) = std::env::var("GLIMWATCH_APP_POSTGRES_URL")
-        .or_else(|_| std::env::var("STATUS_APP_POSTGRES_URL"))
         .ok()
         .filter(|url| !url.is_empty())
     else {
