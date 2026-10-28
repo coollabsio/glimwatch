@@ -2,8 +2,6 @@
 
 Glimwatch is a self-hosted uptime monitor, status page, incident desk, error tracker, and cookieless web analytics tool from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
 
-The source repository is [coollabsio/glimwatch](https://github.com/coollabsio/glimwatch).
-
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ![Public status page](docs/screenshots/status-page.png)
