@@ -1,6 +1,6 @@
 //! Writes one analytics event and the daily aggregates it belongs to.
-use glimwatch_insights::{DataValue, Incoming, VISIT_IDLE, day, visit_id};
-use glimwatch_platform::{Database, Id};
+use owlee_insights::{DataValue, Incoming, VISIT_IDLE, day, visit_id};
+use owlee_platform::{Database, Id};
 use sqlx::{Any, Transaction};
 
 pub async fn record(db: &Database, event: Incoming) -> Result<(), sqlx::Error> {

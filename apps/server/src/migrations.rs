@@ -1,4 +1,4 @@
-use glimwatch_platform::{Migration, MigrationRunner};
+use owlee_platform::{Migration, MigrationRunner};
 
 pub fn runner() -> MigrationRunner {
     MigrationRunner::new(

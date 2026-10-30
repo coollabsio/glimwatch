@@ -1,5 +1,5 @@
 [package]
-name = "glimwatch-errors"
+name = "owlee-errors"
 edition.workspace = true
 version.workspace = true
 license.workspace = true

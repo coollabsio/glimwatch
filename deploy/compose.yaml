@@ -1,34 +1,33 @@
 services:
-  glimwatch:
+  owlee:
     build:
       context: ..
-    image: ${GLIMWATCH_IMAGE:-glimwatch:local}
+    image: ${OWLEE_IMAGE:-owlee:local}
     restart: unless-stopped
     ports: ["8080:8080"]
     environment:
-      GLIMWATCH_ENV: production
-      GLIMWATCH_BIND: 0.0.0.0
-      GLIMWATCH_PORT: 8080
+      OWLEE_ENV: production
+      OWLEE_BIND: 0.0.0.0
+      OWLEE_PORT: 8080
       # Used in the one-time Initial setup URL printed to stderr on a fresh database.
-      GLIMWATCH_PUBLIC_ORIGIN: ${GLIMWATCH_PUBLIC_ORIGIN:-http://localhost:8080}
-      # Stock path. If this file is missing and an older status.sqlite is in
-      # this directory, that file is kept. To keep a volume mounted elsewhere, set this to that file.
-      GLIMWATCH_DATABASE_PATH: /var/lib/glimwatch/glimwatch.sqlite
+      OWLEE_PUBLIC_ORIGIN: ${OWLEE_PUBLIC_ORIGIN:-http://localhost:8080}
+      # SQLite file inside the volume. Set this to another path to use a different file.
+      OWLEE_DATABASE_PATH: /var/lib/owlee/owlee.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
       # The root user opens it in Settings after SMTP is configured.
       # Switch the same binary to Postgres by setting this and starting the db service.
-      # GLIMWATCH_DB_PASSWORD comes from the environment. Do not commit a password.
-      # GLIMWATCH_DATABASE_URL: postgres://glimwatch:${GLIMWATCH_DB_PASSWORD}@db:5432/glimwatch
+      # OWLEE_DB_PASSWORD comes from the environment. Do not commit a password.
+      # OWLEE_DATABASE_URL: postgres://owlee:${OWLEE_DB_PASSWORD}@db:5432/owlee
     volumes:
-      - glimwatch-data:/var/lib/glimwatch
+      - owlee-data:/var/lib/owlee
   # db:
   #   image: postgres:16-alpine
   #   environment:
-  #     POSTGRES_USER: glimwatch
-  #     POSTGRES_PASSWORD: ${GLIMWATCH_DB_PASSWORD}
-  #     POSTGRES_DB: glimwatch
+  #     POSTGRES_USER: owlee
+  #     POSTGRES_PASSWORD: ${OWLEE_DB_PASSWORD}
+  #     POSTGRES_DB: owlee
   #   volumes:
-  #     - glimwatch-pg:/var/lib/postgresql/data
+  #     - owlee-pg:/var/lib/postgresql/data
 volumes:
-  glimwatch-data:
-  # glimwatch-pg:
+  owlee-data:
+  # owlee-pg:

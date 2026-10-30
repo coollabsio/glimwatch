@@ -29,7 +29,7 @@
   const reportFailure = () => {
     if (failureReported) return
     failureReported = true
-    console.info('[Glimwatch] Analytics was disabled automatically because tracking is blocked by the browser or a privacy tool.')
+    console.info('[Owlee] Analytics was disabled automatically because tracking is blocked by the browser or a privacy tool.')
   }
   const payload = () => ({ site, url: currentUrl, referrer: currentRef || null, title: document.title, hostname: location.hostname, screen, language: navigator.language })
   const send = (type, extra) => {
@@ -159,6 +159,5 @@
   initPerformance()
   send('pageview')
   const track = (name, data) => send(name, { data })
-  window.glimwatchEvent = track
-  window.beaconEvent = track
+  window.owleeEvent = track
 })()

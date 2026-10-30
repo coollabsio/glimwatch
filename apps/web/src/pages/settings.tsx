@@ -21,7 +21,7 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title="Settings" description="This Glimwatch install and the signed-in operator." />
+      <PageHeader title="Settings" description="This Owlee install and the signed-in operator." />
       <LayerCard title="Account" description="The operator signed in to this browser.">
         <dl className="grid gap-4 sm:grid-cols-3">
           <Item label="Name">{me.data?.display_name ?? "…"}</Item>
@@ -154,7 +154,7 @@ function EmailForm({ settings }: { settings?: InstanceSettings }) {
           </p>
         ) : (
           <p className="text-xs text-[var(--ui-fg-faint)]">
-            Saved here, or with GLIMWATCH_SMTP_HOST and GLIMWATCH_SMTP_FROM. Clearing the saved server closes registration.
+            Saved here, or with OWLEE_SMTP_HOST and OWLEE_SMTP_FROM. Clearing the saved server closes registration.
           </p>
         )}
         <div className="grid gap-3 sm:grid-cols-2">

@@ -41,7 +41,7 @@ export function LinksPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Links"
-        description="Short links on your own hostnames, plus /go/{slug} on this Glimwatch server. Clicks are counted the same way as page views: no cookies."
+        description="Short links on your own hostnames, plus /go/{slug} on this Owlee server. Clicks are counted the same way as page views: no cookies."
       />
       <LayerCard
         title="Short links"

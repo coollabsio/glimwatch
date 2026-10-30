@@ -1,6 +1,6 @@
 use chrono::{DateTime, Duration, SecondsFormat, Utc};
-use glimwatch_errors::NormalizedEvent;
-use glimwatch_platform::{Backend, Database};
+use owlee_errors::NormalizedEvent;
+use owlee_platform::{Backend, Database};
 use rand::RngCore;
 use serde::Serialize;
 use sqlx::Row;
@@ -666,7 +666,7 @@ pub async fn issue_analytics(
             }
         }
         if let Ok(raw) = serde_json::from_str::<serde_json::Value>(&payload) {
-            let normalized = glimwatch_errors::normalize_event(raw);
+            let normalized = owlee_errors::normalize_event(raw);
             for tag in normalized.tags {
                 *tags.entry((tag.key, tag.value)).or_default() += 1;
             }
@@ -737,7 +737,7 @@ pub async fn backfill_derived(db: &Database) -> Result<(), AppError> {
         let payload: String = row.try_get("payload")?;
         let key = serde_json::from_str::<serde_json::Value>(&payload)
             .ok()
-            .map(|raw| user_key_of(&glimwatch_errors::normalize_event(raw)))
+            .map(|raw| user_key_of(&owlee_errors::normalize_event(raw)))
             .unwrap_or(None);
         let update = statement(db, "UPDATE events SET user_key = ? WHERE id = ?");
         sqlx::query(&update)
@@ -778,7 +778,7 @@ pub async fn regroup_issues(db: &Database) -> Result<(), AppError> {
     for row in &rows {
         let payload: String = row.try_get("payload")?;
         let raw = serde_json::from_str(&payload).unwrap_or(serde_json::Value::Null);
-        let normalized = glimwatch_errors::normalize_event(raw);
+        let normalized = owlee_errors::normalize_event(raw);
         let unhandled = event_unhandled(&normalized);
         events.push(EventGroup {
             id: row.try_get("id")?,

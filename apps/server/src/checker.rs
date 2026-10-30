@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use glimwatch_domain::{HeaderPair, JobType, Probe, parse_tcp_target};
+use owlee_domain::{HeaderPair, JobType, Probe, parse_tcp_target};
 use sqlx::Connection;
 use sqlx::mysql::{MySqlConnectOptions, MySqlConnection};
 use sqlx::postgres::{PgConnectOptions, PgConnection};

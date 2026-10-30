@@ -1,5 +1,5 @@
 [package]
-name = "glimwatch-platform"
+name = "owlee-platform"
 edition.workspace = true
 version.workspace = true
 license.workspace = true

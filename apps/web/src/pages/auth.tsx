@@ -38,7 +38,7 @@ export function RegisterPage() {
     return (
       <AuthShell
         title="Registration is closed"
-        subtitle="This Glimwatch does not accept public sign-up."
+        subtitle="This Owlee does not accept public sign-up."
         footer={
           <>
             Already have an account? <Link className="auth-text-link" to="/login">Sign in</Link>
@@ -71,7 +71,7 @@ export function SetupPage() {
   if (!token) {
     return (
       <AuthShell
-        title="Set up Glimwatch"
+        title="Set up Owlee"
         subtitle="The first account becomes the owner of this install."
         footer={
           <>
@@ -130,7 +130,7 @@ function AuthShell({
         <div className="w-full max-w-[27rem]">
           <div className="mb-5 text-center">
             <Logo className="mx-auto mb-3 size-10" />
-            <div className="text-[15px] font-semibold tracking-tight text-[var(--ui-fg)]">Glimwatch</div>
+            <div className="text-[15px] font-semibold tracking-tight text-[var(--ui-fg)]">Owlee</div>
             <div className="text-[11px] text-[var(--ui-fg-faint)]">coolLabs</div>
           </div>
           <div className="auth-card">

@@ -1,14 +1,14 @@
-//! Settings of this Glimwatch instance that the root user changes.
+//! Settings of this Owlee instance that the root user changes.
 //!
 //! Registration stays closed after setup. Opening it requires a mail server, either
-//! saved here or set with `GLIMWATCH_SMTP_*`. Clearing the
+//! saved here or set with `OWLEE_SMTP_*`. Clearing the
 //! saved server closes registration. The environment variables are not cleared by that
 //! action; they still count as a mail server until they are unset.
-//! `GLIMWATCH_OPEN_SIGNUP` is ignored.
+//! `OWLEE_OPEN_SIGNUP` is ignored.
 
 use std::ops::DerefMut;
 
-use glimwatch_platform::{Database, Id, ParseIdError, SmtpConfig, TimestampMillis};
+use owlee_platform::{Database, Id, ParseIdError, SmtpConfig, TimestampMillis};
 use sqlx::{Any, Row, Transaction};
 use thiserror::Error;
 
@@ -205,7 +205,7 @@ pub async fn save_smtp(
 }
 
 /// Removes the saved mail server and closes registration.
-/// Environment `GLIMWATCH_SMTP_*` is left as it was.
+/// Environment `OWLEE_SMTP_*` is left as it was.
 pub async fn clear_smtp(db: &Database, now: TimestampMillis) -> Result<(), sqlx::Error> {
     let mut tx = db.begin_immediate().await?;
     ensure_row_tx(&mut tx).await?;

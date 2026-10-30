@@ -133,7 +133,7 @@ export function PublicStatusPage() {
           )}
         </LayerCard>
         <footer className="pt-4 text-center text-[11px] text-[var(--ui-fg-faint)]">
-          <a href="https://glimwatch.io" className="underline decoration-[var(--ui-fg-faint)] underline-offset-2 hover:text-[var(--ui-fg)]">Powered by Glimwatch</a>
+          <a href="https://owlee.io" className="underline decoration-[var(--ui-fg-faint)] underline-offset-2 hover:text-[var(--ui-fg)]">Powered by Owlee</a>
         </footer>
       </div>
     </div>

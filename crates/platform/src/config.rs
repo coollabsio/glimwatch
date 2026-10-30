@@ -1,27 +1,26 @@
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 
 use thiserror::Error;
 
-const ENV: &str = "GLIMWATCH_ENV";
-const BIND: &str = "GLIMWATCH_BIND";
-const PORT: &str = "GLIMWATCH_PORT";
-const ORIGIN: &str = "GLIMWATCH_PUBLIC_ORIGIN";
-const DATABASE_PATH: &str = "GLIMWATCH_DATABASE_PATH";
-const DATABASE_URL: &str = "GLIMWATCH_DATABASE_URL";
-const DATABASE_URL_ALIAS: &str = "DATABASE_URL";
-const OPEN_SIGNUP: &str = "GLIMWATCH_OPEN_SIGNUP";
-const SMTP_HOST: &str = "GLIMWATCH_SMTP_HOST";
-const SMTP_PORT: &str = "GLIMWATCH_SMTP_PORT";
-const SMTP_USERNAME: &str = "GLIMWATCH_SMTP_USERNAME";
-const SMTP_PASSWORD: &str = "GLIMWATCH_SMTP_PASSWORD";
-const SMTP_FROM: &str = "GLIMWATCH_SMTP_FROM";
-const ARGON_MEMORY: &str = "GLIMWATCH_ARGON_MEMORY_KIB";
-const CONNECTIVITY_TARGETS: &str = "GLIMWATCH_CONNECTIVITY_TARGETS";
-const PROXY_HOPS: &str = "GLIMWATCH_PROXY_HOPS";
-const GEOIP_PATH: &str = "GLIMWATCH_GEOIP_PATH";
+const ENV: &str = "OWLEE_ENV";
+const BIND: &str = "OWLEE_BIND";
+const PORT: &str = "OWLEE_PORT";
+const ORIGIN: &str = "OWLEE_PUBLIC_ORIGIN";
+const DATABASE_PATH: &str = "OWLEE_DATABASE_PATH";
+const DATABASE_URL: &str = "OWLEE_DATABASE_URL";
+const OPEN_SIGNUP: &str = "OWLEE_OPEN_SIGNUP";
+const SMTP_HOST: &str = "OWLEE_SMTP_HOST";
+const SMTP_PORT: &str = "OWLEE_SMTP_PORT";
+const SMTP_USERNAME: &str = "OWLEE_SMTP_USERNAME";
+const SMTP_PASSWORD: &str = "OWLEE_SMTP_PASSWORD";
+const SMTP_FROM: &str = "OWLEE_SMTP_FROM";
+const ARGON_MEMORY: &str = "OWLEE_ARGON_MEMORY_KIB";
+const CONNECTIVITY_TARGETS: &str = "OWLEE_CONNECTIVITY_TARGETS";
+const PROXY_HOPS: &str = "OWLEE_PROXY_HOPS";
+const GEOIP_PATH: &str = "OWLEE_GEOIP_PATH";
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -34,10 +33,10 @@ pub struct Config {
     pub open_signup: bool,
     pub smtp: Option<SmtpConfig>,
     pub argon_memory_kib: u32,
-    /// `host:port` targets that prove the Glimwatch host itself has network.
+    /// `host:port` targets that prove the Owlee host itself has network.
     /// Empty disables the check.
     pub connectivity_targets: Vec<String>,
-    /// Trusted reverse proxies in front of Glimwatch. `0` means the socket address is the client.
+    /// Trusted reverse proxies in front of Owlee. `0` means the socket address is the client.
     pub proxy_hops: usize,
     /// Optional MaxMind or DB-IP city database (`.mmdb`) for analytics geolocation.
     pub geoip_path: Option<PathBuf>,
@@ -51,7 +50,7 @@ impl Config {
             bind: IpAddr::V4(Ipv4Addr::LOCALHOST),
             port: 43123,
             public_origin: "http://127.0.0.1:43123".to_owned(),
-            database_path: PathBuf::from("data/glimwatch.sqlite"),
+            database_path: PathBuf::from("data/owlee.sqlite"),
             database_url: None,
             open_signup: false,
             smtp: None,
@@ -88,7 +87,7 @@ impl Config {
                 value: bind,
             })?;
         }
-        if let Some(port) = optional(PORT).or_else(|| optional("PORT")) {
+        if let Some(port) = optional(PORT) {
             config.port = port.parse().map_err(|_| ConfigError::Invalid {
                 name: PORT,
                 value: port,
@@ -102,14 +101,14 @@ impl Config {
             format!("http://{host}:{}", config.port)
         });
         config.database_path = resolve_sqlite_path(optional(DATABASE_PATH));
-        if let Some(url) = optional(DATABASE_URL).or_else(|| optional(DATABASE_URL_ALIAS)) {
+        if let Some(url) = optional(DATABASE_URL) {
             if !(url.starts_with("postgres://") || url.starts_with("postgresql://")) {
                 return Err(ConfigError::DatabaseUrl);
             }
             config.database_url = Some(url);
         }
         // Parsed so an existing environment still boots. Registration is the
-        // instance setting in the database, not this flag. GLIMWATCH_OPEN_SIGNUP
+        // instance setting in the database, not this flag. OWLEE_OPEN_SIGNUP
         // is ignored.
         if let Some(signup) = optional(OPEN_SIGNUP) {
             config.open_signup = parse_bool(&signup).ok_or(ConfigError::Invalid {
@@ -215,7 +214,7 @@ pub enum ConfigError {
     #[error("missing {0}")]
     Missing(&'static str),
     #[error(
-        "DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set GLIMWATCH_DATABASE_PATH to move the file"
+        "OWLEE_DATABASE_URL must be a postgres:// or postgresql:// URL. SQLite is the default; set OWLEE_DATABASE_PATH to move the file"
     )]
     DatabaseUrl,
 }
@@ -227,53 +226,10 @@ fn optional(name: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-const STOCK_SQLITE_PATHS: &[&str] = &[
-    "data/glimwatch.sqlite",
-    "/var/lib/glimwatch/glimwatch.sqlite",
-];
-
-/// Uses an explicit path as given. The stock defaults keep an existing
-/// `status.sqlite` when `glimwatch.sqlite` is not there yet.
 fn resolve_sqlite_path(explicit: Option<String>) -> PathBuf {
-    let chosen = explicit
-        .as_deref()
+    explicit
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(STOCK_SQLITE_PATHS[0]));
-    if chosen.exists()
-        || explicit
-            .as_deref()
-            .is_some_and(|path| !is_stock_sqlite_path(path))
-    {
-        return chosen;
-    }
-    legacy_sqlite_candidates(&chosen)
-        .into_iter()
-        .find(|path| path.exists())
-        .unwrap_or(chosen)
-}
-
-fn is_stock_sqlite_path(path: &str) -> bool {
-    let normalized = path.replace('\\', "/");
-    STOCK_SQLITE_PATHS.contains(&normalized.as_str())
-}
-
-fn legacy_sqlite_candidates(chosen: &Path) -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    if let Some(parent) = chosen.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        paths.push(parent.join("status.sqlite"));
-    }
-    for candidate in ["data/status.sqlite", "/var/lib/glimwatch/status.sqlite"] {
-        paths.push(PathBuf::from(candidate));
-    }
-    let mut seen = Vec::new();
-    for path in paths {
-        if path != chosen && !seen.contains(&path) {
-            seen.push(path);
-        }
-    }
-    seen
+        .unwrap_or_else(|| PathBuf::from("data/owlee.sqlite"))
 }
 
 fn parse_targets(value: &str) -> Option<Vec<String>> {
@@ -343,7 +299,7 @@ impl FromStr for EnvironmentMode {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     use super::*;
 
@@ -366,7 +322,7 @@ mod tests {
         );
     }
 
-    /// `Config::from_env` reads process globals. These two tests must not overlap.
+    /// `Config::from_env` reads process globals.
     fn lock_process_env() -> std::sync::MutexGuard<'static, ()> {
         static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
         LOCK.lock()
@@ -376,84 +332,26 @@ mod tests {
     #[test]
     fn rejects_sqlite_database_urls() {
         let _env = lock_process_env();
-        // SAFETY: the lock above is the only other writer of these variables.
+        // SAFETY: the lock above is the only other writer of this variable.
         unsafe {
-            std::env::set_var("DATABASE_URL", "sqlite://data/ignored.sqlite");
-            std::env::remove_var("GLIMWATCH_DATABASE_URL");
+            std::env::set_var("OWLEE_DATABASE_URL", "sqlite://data/ignored.sqlite");
         }
         let error = Config::from_env().unwrap_err();
         assert!(matches!(error, ConfigError::DatabaseUrl));
         unsafe {
-            std::env::remove_var("DATABASE_URL");
+            std::env::remove_var("OWLEE_DATABASE_URL");
         }
     }
 
     #[test]
-    fn status_database_url_is_ignored() {
-        let _env = lock_process_env();
-        unsafe {
-            std::env::remove_var("GLIMWATCH_DATABASE_URL");
-            std::env::remove_var("DATABASE_URL");
-            std::env::remove_var("STATUS_DATABASE_URL");
-            // STATUS_* is not an alias. This URL must not select Postgres.
-            std::env::set_var(
-                "STATUS_DATABASE_URL",
-                "postgres://status:secret@127.0.0.1:1/status",
-            );
-        }
-        let ignored = Config::from_env().unwrap();
-        assert_eq!(ignored.database_url.as_deref(), None);
-        unsafe {
-            std::env::set_var("DATABASE_URL", "postgres://alias:secret@127.0.0.1:1/alias");
-        }
-        let alias = Config::from_env().unwrap();
+    fn database_path_uses_the_given_file_or_the_default() {
         assert_eq!(
-            alias.database_url.as_deref(),
-            Some("postgres://alias:secret@127.0.0.1:1/alias")
+            resolve_sqlite_path(None),
+            PathBuf::from("data/owlee.sqlite")
         );
-        unsafe {
-            std::env::set_var(
-                "GLIMWATCH_DATABASE_URL",
-                "postgres://glimwatch:secret@127.0.0.1:1/glimwatch",
-            );
-        }
-        let preferred = Config::from_env().unwrap();
         assert_eq!(
-            preferred.database_url.as_deref(),
-            Some("postgres://glimwatch:secret@127.0.0.1:1/glimwatch")
-        );
-        unsafe {
-            std::env::remove_var("GLIMWATCH_DATABASE_URL");
-            std::env::remove_var("DATABASE_URL");
-            std::env::remove_var("STATUS_DATABASE_URL");
-        }
-    }
-
-    #[test]
-    fn stock_sqlite_paths_prefer_older_files_and_custom_paths_stay() {
-        assert!(is_stock_sqlite_path("data/glimwatch.sqlite"));
-        assert!(is_stock_sqlite_path("/var/lib/glimwatch/glimwatch.sqlite"));
-        assert!(!is_stock_sqlite_path("/tmp/custom.sqlite"));
-        assert!(!is_stock_sqlite_path("data/status.sqlite"));
-        let candidates = legacy_sqlite_candidates(Path::new("data/glimwatch.sqlite"));
-        assert_eq!(
-            candidates,
-            [
-                PathBuf::from("data/status.sqlite"),
-                PathBuf::from("/var/lib/glimwatch/status.sqlite"),
-            ]
-        );
-        let custom = std::env::temp_dir().join(format!(
-            "glimwatch-missing-{}-{}.sqlite",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-        assert_eq!(
-            resolve_sqlite_path(Some(custom.display().to_string())),
-            custom
+            resolve_sqlite_path(Some("/tmp/custom.sqlite".to_owned())),
+            PathBuf::from("/tmp/custom.sqlite")
         );
     }
 }

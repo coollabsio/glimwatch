@@ -3,8 +3,8 @@ use std::time::Duration;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use glimwatch_platform::TimestampMillis;
-use glimwatch_server::{
+use owlee_platform::TimestampMillis;
+use owlee_server::{
     DEMO_PASSWORD, boot, initialize_setup_token, permit_signup, router, testing_config,
 };
 use http_body_util::BodyExt;
@@ -17,7 +17,7 @@ async fn app() -> (Router, Option<String>) {
 
 async fn app_with_targets(connectivity_targets: Vec<String>) -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("status.sqlite");
+    let path = dir.path().join("owlee.sqlite");
     // Leak the temp dir so the sqlite file outlives the router.
     let _keep = Box::leak(Box::new(dir));
     let mut config = testing_config(path);
@@ -99,7 +99,7 @@ fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
     pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("glimwatch_session="))
+        .find(|value| value.starts_with("owlee_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned)
 }
@@ -231,8 +231,8 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
     assert_eq!(public["components"].as_array().unwrap().len(), 2);
     assert!(!public["incidents"].as_array().unwrap().is_empty());
 
-    let starts = glimwatch_platform::TimestampMillis::now();
-    let ends = glimwatch_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
+    let starts = owlee_platform::TimestampMillis::now();
+    let ends = owlee_platform::TimestampMillis::from_millis(starts.as_millis() + 3_600_000);
     let (status, maintenance, _) = call(
         &app,
         "POST",
@@ -322,7 +322,7 @@ async fn sqlite_flow_covers_checks_incidents_and_the_public_page() {
 
 #[tokio::test]
 async fn postgres_accepts_the_same_api() {
-    let Some(url) = std::env::var("GLIMWATCH_APP_POSTGRES_URL")
+    let Some(url) = std::env::var("OWLEE_APP_POSTGRES_URL")
         .ok()
         .filter(|url| !url.is_empty())
     else {
@@ -339,7 +339,7 @@ async fn postgres_accepts_the_same_api() {
         permit_signup(&state.db).await.unwrap();
     }
     let app = router(state);
-    let email = format!("pg-{}@coollabs.io", glimwatch_platform::Id::new());
+    let email = format!("pg-{}@coollabs.io", owlee_platform::Id::new());
     let (status, user, _) = if let Some(token) = token {
         call(
             &app,

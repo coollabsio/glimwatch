@@ -1,4 +1,4 @@
-//! `glimwatch agent` runs the checks in its own config file from inside a private network. It
+//! `owlee agent` runs the checks in its own config file from inside a private network. It
 //! tells the server which checks exist, judges each result itself, and sends only the outcome.
 //! The server never tells an agent what to connect to, and secrets never leave the agent host.
 
@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
-use glimwatch_domain::{Assertion, CheckType, Rules, StrCompare};
-use glimwatch_platform::Id;
+use owlee_domain::{Assertion, CheckType, Rules, StrCompare};
+use owlee_platform::Id;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::json;
@@ -186,7 +186,7 @@ pub async fn run(
     let server = Server {
         client: reqwest::Client::builder()
             .timeout(Duration::from_secs(15))
-            .user_agent(concat!("Glimwatch-Agent/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("Owlee-Agent/", env!("CARGO_PKG_VERSION")))
             .build()?,
         base: server.trim_end_matches('/').to_owned(),
         token,
@@ -202,7 +202,7 @@ pub async fn run(
             }
         }
     };
-    tracing::info!(server = %server.base, checks = checks.len(), "Glimwatch agent started");
+    tracing::info!(server = %server.base, checks = checks.len(), "Owlee agent started");
     for check in checks {
         let Some(&monitor_id) = ids.get(&check.name) else {
             continue;

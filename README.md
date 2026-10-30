@@ -1,6 +1,6 @@
-# Glimwatch
+# Owlee
 
-Glimwatch is a self-hosted uptime monitor, status page, incident desk, error tracker, and cookieless web analytics tool from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
+Owlee is a self-hosted uptime monitor, status page, incident desk, error tracker, and cookieless web analytics tool from [coolLabs](https://github.com/coollabsio), the team behind [Coolify](https://github.com/coollabsio/coolify). One Rust binary serves the API, runs the checks, and hosts the React app. SQLite is the default database. Postgres is the same schema and the same queries, selected with a URL.
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -25,8 +25,8 @@ You need Rust 1.99 (see `rust-toolchain.toml`) and [Bun](https://bun.sh) 1.2 or 
 
 ```bash
 cd apps/web && bun install && bun run build
-cargo run -p glimwatch-server -- seed
-cargo run -p glimwatch-server -- serve --listen 127.0.0.1:43123
+cargo run -p owlee-server -- seed
+cargo run -p owlee-server -- serve --listen 127.0.0.1:43123
 ```
 
 Open http://127.0.0.1:43123.
@@ -39,17 +39,17 @@ Open http://127.0.0.1:43123.
 
 `just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
-The database file is `data/glimwatch.sqlite`. If that file is missing, Glimwatch uses an older `status.sqlite` when one is already there: first in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`. The Docker default `/var/lib/glimwatch/glimwatch.sqlite` does the same. This applies only to these two default paths. A custom `GLIMWATCH_DATABASE_PATH` is used as written. Migrations run on startup.
+The database file is `data/owlee.sqlite`. The Docker default is `/var/lib/owlee/owlee.sqlite`. A custom `OWLEE_DATABASE_PATH` is used as written. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
 ### Postgres
 
-Leave the SQLite path in place (it is unused for data) and set a URL. `DATABASE_URL` is accepted when `GLIMWATCH_DATABASE_URL` is unset.
+Leave the SQLite path in place (it is unused for data) and set `OWLEE_DATABASE_URL`.
 
 ```bash
-export GLIMWATCH_DATABASE_URL=postgres://glimwatch:glimwatch@127.0.0.1:5432/glimwatch
-cargo run -p glimwatch-server -- serve --listen 127.0.0.1:43123
+export OWLEE_DATABASE_URL=postgres://owlee:owlee@127.0.0.1:5432/owlee
+cargo run -p owlee-server -- serve --listen 127.0.0.1:43123
 ```
 
 The URL must start with `postgres://` or `postgresql://`. Integer columns are `BIGINT` so one SQL file decodes as `i64` on both engines. A migration is applied once, inside a transaction, and its SHA-256 is stored in `schema_migrations`. A later binary with different SQL for that version refuses to start.
@@ -59,12 +59,12 @@ Copy `.env.example` to `.env.local` if you want the variables written down. The 
 Email delivery needs SMTP. Without it, an email channel is saved and each send is recorded as skipped:
 
 ```bash
-export GLIMWATCH_SMTP_HOST=smtp.example.com
-export GLIMWATCH_SMTP_PORT=587
-export GLIMWATCH_SMTP_FROM=status@example.com
+export OWLEE_SMTP_HOST=smtp.example.com
+export OWLEE_SMTP_PORT=587
+export OWLEE_SMTP_FROM=status@example.com
 ```
 
-Webhook channels can set a secret. The body is posted as JSON with `X-Glimwatch-Signature: sha256=<hmac-sha256>`. `X-Status-Signature` is sent with the same value.
+Webhook channels can set a secret. The body is posted as JSON with `X-Owlee-Signature: sha256=<hmac-sha256>`.
 
 ### First-run setup
 
@@ -76,23 +76,21 @@ Initial setup URL: http://127.0.0.1:43123/setup?token=...
 
 Open that URL and create the owner account. That account is the root user. Do not keep a copy of the token. It expires after 30 minutes, and a later start does not print it again while it is still valid. After the owner exists, setup cannot run again and public registration stays closed.
 
-If the token is lost or expired before use, replace it. On SQLite, stop Glimwatch first (the server owns the database file). On Postgres the command can run while Glimwatch is up:
+If the token is lost or expired before use, replace it. On SQLite, stop Owlee first (the server owns the database file). On Postgres the command can run while Owlee is up:
 
 ```bash
-glimwatch setup-token rotate
-# optional: glimwatch setup-token rotate --origin https://status.example.com
+owlee setup-token rotate
+# optional: owlee setup-token rotate --origin https://status.example.com
 ```
 
 `setup-token init` prints a URL only when setup is unfinished and no unused token is stored. Rotation invalidates the previous unused token.
 
-The root user opens registration in Settings. It stays closed until a mail server is saved there, or `GLIMWATCH_SMTP_HOST` and `GLIMWATCH_SMTP_FROM` are set, and the root user turns Open registration on. Clearing the saved mail server closes registration again. `GLIMWATCH_OPEN_SIGNUP` is ignored. Glimwatch does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
+The root user opens registration in Settings. It stays closed until a mail server is saved there, or `OWLEE_SMTP_HOST` and `OWLEE_SMTP_FROM` are set, and the root user turns Open registration on. Clearing the saved mail server closes registration again. `OWLEE_OPEN_SIGNUP` is ignored. Owlee does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
 
-Older `HARUVO_*` and `STATUS_*` names are not read. See [Upgrading from older names](#upgrading-from-older-names).
-
-When a check cannot connect (DNS, connect, or timeout error), Glimwatch first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Glimwatch host's own network. Glimwatch then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
+When a check cannot connect (DNS, connect, or timeout error), Owlee first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Owlee host's own network. Owlee then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
 
 ```bash
-export GLIMWATCH_CONNECTIVITY_TARGETS=10.0.0.1:53,10.0.0.2:53   # or "off"
+export OWLEE_CONNECTIVITY_TARGETS=10.0.0.1:53,10.0.0.2:53   # or "off"
 ```
 
 ## Development
@@ -104,7 +102,7 @@ just test
 just build    # release binary with the UI embedded
 ```
 
-`just` is optional. The same commands are `bun install --frozen-lockfile` in `apps/web`, `cargo test --workspace`, and `cargo build --release -p glimwatch-server` after `bun run build`.
+`just` is optional. The same commands are `bun install --frozen-lockfile` in `apps/web`, `cargo test --workspace`, and `cargo build --release -p owlee-server` after `bun run build`.
 
 Frontend dev proxies `/api` to the Rust process. Production does not proxy: the binary serves both.
 
@@ -119,54 +117,54 @@ Domain tests cover assertions, the failure threshold, uptime math (maintenance i
 Postgres tests run only when these are set:
 
 ```bash
-export GLIMWATCH_TEST_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_platform
-export GLIMWATCH_APP_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_app
+export OWLEE_TEST_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_platform
+export OWLEE_APP_POSTGRES_URL=postgres://status:status@127.0.0.1:5432/status_app
 ```
 
-`GLIMWATCH_TEST_POSTGRES_URL` runs the migration runner test in `crates/platform`. `GLIMWATCH_APP_POSTGRES_URL` starts the server on Postgres in the `flow`, `errors`, and `insights` tests. Use two empty databases. The platform test resets its own schema.
+`OWLEE_TEST_POSTGRES_URL` runs the migration runner test in `crates/platform`. `OWLEE_APP_POSTGRES_URL` starts the server on Postgres in the `flow`, `errors`, and `insights` tests. Use two empty databases. The platform test resets its own schema.
 
 ## Docker
 
 ```bash
-docker build -t glimwatch:local .
-docker run --rm -p 8080:8080 -v glimwatch-data:/var/lib/glimwatch glimwatch:local
+docker build -t owlee:local .
+docker run --rm -p 8080:8080 -v owlee-data:/var/lib/owlee owlee:local
 ```
 
-Pushes to `main` publish `ghcr.io/coollabsio/glimwatch` (`linux/amd64` and `linux/arm64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab. If the package is not linked to this repository automatically, link it from the package settings.
+Pushes to `main` publish `ghcr.io/coollabsio/owlee` (`linux/amd64` and `linux/arm64`), tagged `latest`, `main`, and the seven-character commit SHA. The same workflow can be run by hand from the Actions tab. If the package is not linked to this repository automatically, link it from the package settings.
 
 ```bash
-docker pull ghcr.io/coollabsio/glimwatch:latest
+docker pull ghcr.io/coollabsio/owlee:latest
 ```
 
-The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/glimwatch`, and uses `glimwatch healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service. Set `GLIMWATCH_IMAGE=ghcr.io/coollabsio/glimwatch:latest` to point that file at the published image.
+The image listens on `0.0.0.0:8080`, stores SQLite in `/var/lib/owlee`, and uses `owlee healthcheck` for the container check. `deploy/compose.yaml` is the same shape as Orbit's compose file, with Postgres left as a commented service. Set `OWLEE_IMAGE=ghcr.io/coollabsio/owlee:latest` to point that file at the published image.
 
-On a fresh volume the container prints `Initial setup URL` to stderr. Read it from the container logs (`docker logs` or `docker compose logs glimwatch`), open it in a browser, and create the owner. Set `GLIMWATCH_PUBLIC_ORIGIN` to the URL you will open before the first start so the printed link uses that host. The token is not stored in the image.
+On a fresh volume the container prints `Initial setup URL` to stderr. Read it from the container logs (`docker logs` or `docker compose logs owlee`), open it in a browser, and create the owner. Set `OWLEE_PUBLIC_ORIGIN` to the URL you will open before the first start so the printed link uses that host. The token is not stored in the image.
 
-If you miss the URL, stop the container (required for the default SQLite volume; leave Glimwatch running when `GLIMWATCH_DATABASE_URL` is Postgres) and issue another:
+If you miss the URL, stop the container (required for the default SQLite volume; leave Owlee running when `OWLEE_DATABASE_URL` is Postgres) and issue another:
 
 ```bash
 docker stop <container>
-docker run --rm -v glimwatch-data:/var/lib/glimwatch \
-  -e GLIMWATCH_PUBLIC_ORIGIN=https://status.example.com \
-  ghcr.io/coollabsio/glimwatch:latest setup-token rotate
+docker run --rm -v owlee-data:/var/lib/owlee \
+  -e OWLEE_PUBLIC_ORIGIN=https://status.example.com \
+  ghcr.io/coollabsio/owlee:latest setup-token rotate
 ```
 
 With Compose, from the repository root:
 
 ```bash
-docker compose -f deploy/compose.yaml stop glimwatch
-docker compose -f deploy/compose.yaml run --rm glimwatch setup-token rotate
-docker compose -f deploy/compose.yaml start glimwatch
+docker compose -f deploy/compose.yaml stop owlee
+docker compose -f deploy/compose.yaml run --rm owlee setup-token rotate
+docker compose -f deploy/compose.yaml start owlee
 ```
 
 ## Agents
 
-An agent checks targets that the Glimwatch server cannot reach, for example a database on a private Docker network or a host in a VPC. The agent is the same binary. You start it on the target server or in the same network. It makes only outbound HTTPS requests to the server, so you do not need to open a port into the private network.
+An agent checks targets that the Owlee server cannot reach, for example a database on a private Docker network or a host in a VPC. The agent is the same binary. You start it on the target server or in the same network. It makes only outbound HTTPS requests to the server, so you do not need to open a port into the private network.
 
 The checks are in a config file on the agent host. The server cannot add or change agent checks, so a compromised dashboard cannot make an agent connect to other hosts. Passwords stay on the agent host. The agent judges each check and sends only the status, the status code, the latency, and the error. It never sends a response body.
 
 1. In the web app, open **Agents** and create an agent. Copy the token. The token is shown once.
-2. Write the config file, for example `/etc/glimwatch/agent.toml`:
+2. Write the config file, for example `/etc/owlee/agent.toml`:
 
    ```toml
    [[check]]
@@ -191,14 +189,14 @@ The checks are in a config file on the agent host. The server cannot add or chan
 3. Start the agent:
 
    ```bash
-   PG_PASSWORD=... glimwatch agent --server https://status.example.com --token <token> --config /etc/glimwatch/agent.toml
+   PG_PASSWORD=... owlee agent --server https://status.example.com --token <token> --config /etc/owlee/agent.toml
    ```
 
-   The command also reads `GLIMWATCH_AGENT_SERVER`, `GLIMWATCH_AGENT_TOKEN`, and `GLIMWATCH_AGENT_CONFIG`. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
+   The command also reads `OWLEE_AGENT_SERVER`, `OWLEE_AGENT_TOKEN`, and `OWLEE_AGENT_CONFIG`. With Docker, run the image with the `agent` command and `--no-healthcheck`, mount the config file, and attach the container to the network of the targets.
 
 When the agent starts, it sends its list of checks to the server, without secrets. The server creates a monitor for each new check name, updates the monitors that already exist, and pauses the monitors of checks that are no longer in the file. History stays. To change a check, edit the file and restart the agent. The agent stops at once when the server rejects the token or the config, and it shows the reason.
 
-The server records each result with the agent name as the region, and opens or resolves incidents as it does for its own checks. In the dashboard you can pause, resume, and delete agent monitors, and add them to status pages, but you cannot edit them or run them. The agent sends a heartbeat every 15 seconds. It shows as offline when the server has not heard from it for 30 seconds. While an agent is offline, its monitors keep their last state. The agent uses `GLIMWATCH_CONNECTIVITY_TARGETS` in the same way as the server: when its own host has no network, it does not send failed checks.
+The server records each result with the agent name as the region, and opens or resolves incidents as it does for its own checks. In the dashboard you can pause, resume, and delete agent monitors, and add them to status pages, but you cannot edit them or run them. The agent sends a heartbeat every 15 seconds. It shows as offline when the server has not heard from it for 30 seconds. While an agent is offline, its monitors keep their last state. The agent uses `OWLEE_CONNECTIVITY_TARGETS` in the same way as the server: when its own host has no network, it does not send failed checks.
 
 You cannot delete an agent while it has monitors.
 
@@ -214,21 +212,21 @@ SDKs post to `/api/<project_id>/envelope/` and `/api/<project_id>/store/` (with 
 
 `examples/` has PHP, Node, browser, and Rust SDK programs. Set `SENTRY_DSN` to the project DSN.
 
-Short-link hostnames only take over a request when the `Host` is a configured link domain and not Glimwatch's own origin, and only after `/api` and `/go` have already been routed. Sentry ingest stays on `/api/...`.
+Short-link hostnames only take over a request when the `Host` is a configured link domain and not Owlee's own origin, and only after `/api` and `/go` have already been routed. Sentry ingest stays on `/api/...`.
 
 ## Analytics
 
 Add a site in **Sites**, then paste the snippet from **Tracker**:
 
 ```html
-<script defer src="https://glimwatch.example.com/data.js" data-site="YOUR_PUBLIC_ID"></script>
+<script defer src="https://owlee.example.com/data.js" data-site="YOUR_PUBLIC_ID"></script>
 ```
 
-The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.glimwatchEvent(name, data)` records a custom event. `window.beaconEvent` is the same function, so a snippet written for [Beacon](https://github.com/ShadowArcanist/beacons) still works.
+The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.owleeEvent(name, data)` records a custom event.
 
-Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `GLIMWATCH_PROXY_HOPS` when Glimwatch sits behind a reverse proxy (`1` for one proxy, `2` when Cloudflare is in front, which also enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). Point `GLIMWATCH_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
+Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `OWLEE_PROXY_HOPS` when Owlee sits behind a reverse proxy (`1` for one proxy, `2` when Cloudflare is in front, which also enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). Point `OWLEE_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
 
-Short links redirect with `307` or `308` and `Cache-Control: no-store`. On Glimwatch's own hostname use `/go/{slug}`. On any other hostname that you added under **Links**, the path is the slug. `HEAD` requests and known bots follow the redirect and are not counted.
+Short links redirect with `307` or `308` and `Cache-Control: no-store`. On Owlee's own hostname use `/go/{slug}`. On any other hostname that you added under **Links**, the path is the slug. `HEAD` requests and known bots follow the redirect and are not counted.
 
 When public sharing is on, these routes need no session. Counts below the site's threshold are folded into **Other**:
 
@@ -243,22 +241,22 @@ The matching pages are `/share/sites/{slug}` and `/share/links/{slug}`.
 
 ## How this maps to Orbit
 
-Glimwatch follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves out its realtime stack (websockets, live sync, collaborative editing).
+Owlee follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves out its realtime stack (websockets, live sync, collaborative editing).
 
-| Orbit | Glimwatch |
+| Orbit | Owlee |
 | --- | --- |
-| `apps/server` binary embeds the web app | `apps/server`, binary name `glimwatch` |
+| `apps/server` binary embeds the web app | `apps/server`, binary name `owlee` |
 | `crates/platform` (config, db, auth, migrations) | `crates/platform` |
 | `crates/orbit` domain rules | `crates/status` |
 | `apps/web` Vite, React, Tailwind | `apps/web` |
-| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `GLIMWATCH_DATABASE_URL` / `DATABASE_URL` |
+| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `OWLEE_DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
 | Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then the root user opens registration in Settings after SMTP |
 | `platform::jobs` worker | `scheduler`: a lease row plus the check loop |
 | `justfile`, multi-stage Dockerfile, `deploy/compose.yaml` | same roles |
 
-The domain follows [OpenStatus](https://github.com/openstatusHQ/openstatus): monitors, check history, status pages and components, incident timelines, maintenance, and a notification provider list. Hosted regions and billing are not in this MVP. The Glimwatch process runs its own checks with `region = local`. [Agents](#agents) are the private locations: their results use the agent name as the region.
+The domain follows [OpenStatus](https://github.com/openstatusHQ/openstatus): monitors, check history, status pages and components, incident timelines, maintenance, and a notification provider list. Hosted regions and billing are not in this MVP. The Owlee process runs its own checks with `region = local`. [Agents](#agents) are the private locations: their results use the agent name as the region.
 
 The interface takes Coolify's dark shell with a blue accent in place of Coolify's purple. The public page takes the OpenStatus layout: one banner, a component list with uptime bars, maintenance, and incidents.
 
@@ -278,38 +276,9 @@ examples        PHP, JavaScript, and Rust programs that send errors
 
 ## Attribution
 
-Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is wire-compatible with Beacon's tracker and also defines `window.glimwatchEvent`. See [NOTICE](NOTICE).
+Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is wire-compatible with Beacon's tracker and also defines `window.owleeEvent`. See [NOTICE](NOTICE).
 
-## Upgrading from older names
-
-Glimwatch was called Haruvo, and before that Status. `HARUVO_*` and `STATUS_*` are not read. Rename them to the `GLIMWATCH_` prefix: `HARUVO_DATABASE_URL` and `STATUS_DATABASE_URL` become `GLIMWATCH_DATABASE_URL`, and the same replacement applies to every other setting (`ENV`, `BIND`, `PORT`, `PUBLIC_ORIGIN`, `DATABASE_PATH`, `SMTP_*`, `AGENT_*`, and the rest).
-
-| Current | Still accepted |
-| --- | --- |
-| `GLIMWATCH_DATABASE_URL` | `DATABASE_URL`, when `GLIMWATCH_DATABASE_URL` is unset |
-| `glimwatch_session` cookie | `status_session`, until the next login replaces it |
-| `window.glimwatchEvent` | `window.beaconEvent` |
-| `X-Glimwatch-Signature` | `X-Status-Signature` is sent with the same value |
-| `data/glimwatch.sqlite`, `/var/lib/glimwatch/glimwatch.sqlite` | `status.sqlite` in the same directory, then `data/status.sqlite`, then `/var/lib/glimwatch/status.sqlite`, when the Glimwatch file is absent and the path is a default |
-
-The container image sets `GLIMWATCH_ENV`, `GLIMWATCH_BIND`, `GLIMWATCH_PORT`, `GLIMWATCH_DATABASE_PATH`, and `GLIMWATCH_PUBLIC_ORIGIN`.
-
-A Haruvo or Statixo database is not found automatically. Point Glimwatch at the file:
-
-```bash
-export GLIMWATCH_DATABASE_PATH=/var/lib/haruvo/haruvo.sqlite
-```
-
-Or copy it onto the Glimwatch path:
-
-```bash
-docker run --rm -v haruvo-data:/from -v glimwatch-data:/to alpine \
-  cp -a /from/haruvo.sqlite /to/glimwatch.sqlite
-```
-
-After a rename, users sign in again, and webhook receivers check `X-Glimwatch-Signature`.
-
-Point Coolify at `ghcr.io/coollabsio/glimwatch`. `GLIMWATCH_IMAGE` is the compose override. The source repository is `https://github.com/coollabsio/glimwatch`. API problem URLs use `https://glimwatch.io/problems/...`.
+Point Coolify at `ghcr.io/coollabsio/owlee`. `OWLEE_IMAGE` is the compose override. The source repository is `https://github.com/coollabsio/glimwatch`. API problem URLs use `https://owlee.io/problems/...`.
 
 ## License
 

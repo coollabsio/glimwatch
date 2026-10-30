@@ -15,7 +15,7 @@ impl Error for ExampleError {}
 
 fn main() {
     let dsn = std::env::var("SENTRY_DSN").unwrap_or_else(|_| {
-        eprintln!("Set SENTRY_DSN to the project DSN from the Glimwatch UI.");
+        eprintln!("Set SENTRY_DSN to the project DSN from the Owlee UI.");
         std::process::exit(1);
     });
 

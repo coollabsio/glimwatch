@@ -7,7 +7,7 @@
 
 use std::ops::DerefMut;
 
-use glimwatch_platform::{Database, Id, TimestampMillis, generate_token, hash_token};
+use owlee_platform::{Database, Id, TimestampMillis, generate_token, hash_token};
 use sqlx::{Any, Row, Transaction};
 use thiserror::Error;
 
@@ -249,7 +249,7 @@ async fn ensure_state(tx: &mut Transaction<'_, Any>) -> Result<(), sqlx::Error> 
 }
 
 async fn lock_state(tx: &mut Transaction<'_, Any>, db: &Database) -> Result<(), sqlx::Error> {
-    if db.backend() == glimwatch_platform::Backend::Postgres {
+    if db.backend() == owlee_platform::Backend::Postgres {
         sqlx::query("SELECT initialized FROM installation_state WHERE id = 1 FOR UPDATE")
             .fetch_one(tx.deref_mut())
             .await?;

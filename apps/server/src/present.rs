@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
-use glimwatch_domain::{
+use owlee_domain::{
     Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
     JobType, MonitorState, PageBanner, summarize,
 };
-use glimwatch_platform::{Id, TimestampMillis};
+use owlee_platform::{Id, TimestampMillis};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -185,7 +185,7 @@ fn average(sum: i64, count: i64) -> Option<i64> {
     if count <= 0 { None } else { Some(sum / count) }
 }
 
-fn bar(bucket: glimwatch_domain::DayBucket) -> BarResponse {
+fn bar(bucket: owlee_domain::DayBucket) -> BarResponse {
     BarResponse {
         day: day_label(bucket.day),
         status: bucket.status.as_str().to_owned(),

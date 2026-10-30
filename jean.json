@@ -7,11 +7,11 @@
   "ports": [
     {
       "port": 43123,
-      "label": "Glimwatch web (Vite)"
+      "label": "Owlee web (Vite)"
     },
     {
       "port": 43124,
-      "label": "Glimwatch API"
+      "label": "Owlee API"
     }
   ]
 }

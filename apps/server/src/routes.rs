@@ -7,12 +7,12 @@ use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post, put};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
-use glimwatch_domain::{
+use owlee_domain::{
     Assertion, CheckType, HeaderPair, IncidentImpact, IncidentStatus, JobType, MonitorInput,
     MonitorState, NotificationEvent, NotificationPayload, OpenIncident, page_banner,
     resolved_at_after_update, validate_monitor, validate_slug,
 };
-use glimwatch_platform::{
+use owlee_platform::{
     Id, PasswordError, TimestampMillis, generate_token, hash_token, normalize_email,
 };
 use serde::Deserialize;
@@ -31,13 +31,7 @@ use crate::seed::{DEMO_EMAIL, DEMO_PASSWORD};
 use crate::setup::{self, NewOwner};
 use crate::state::{self, AppState};
 
-const COOKIE: &str = "glimwatch_session";
-/// Older session cookies. A later login replaces them with `glimwatch_session`.
-const LEGACY_COOKIES: &[&str] = &["status_session"];
-
-fn session_cookie_names() -> impl Iterator<Item = &'static str> {
-    std::iter::once(COOKIE).chain(LEGACY_COOKIES.iter().copied())
-}
+const COOKIE: &str = "owlee_session";
 const DAY_MS: i64 = 86_400_000;
 
 pub fn router(state: AppState) -> Router {
@@ -297,18 +291,12 @@ async fn logout(
     State(state): State<AppState>,
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    for name in session_cookie_names() {
-        if let Some(token) = jar.get(name).map(|cookie| cookie.value().to_owned()) {
-            repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
-        }
+    if let Some(token) = jar.get(COOKIE).map(|cookie| cookie.value().to_owned()) {
+        repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
     }
-    let mut jar = jar;
-    for name in session_cookie_names() {
-        let mut expired = Cookie::from(name);
-        expired.set_path("/");
-        jar = jar.remove(expired);
-    }
-    Ok((jar, StatusCode::NO_CONTENT))
+    let mut expired = Cookie::from(COOKIE);
+    expired.set_path("/");
+    Ok((jar.remove(expired), StatusCode::NO_CONTENT))
 }
 
 async fn me(
@@ -494,7 +482,7 @@ async fn settings_body(state: &AppState) -> Result<Value, AppError> {
 
 fn smtp_body(
     settings: &instance_settings::InstanceView,
-    env: Option<&glimwatch_platform::SmtpConfig>,
+    env: Option<&owlee_platform::SmtpConfig>,
 ) -> Value {
     if let Some(smtp) = &settings.smtp {
         return json!({
@@ -1433,7 +1421,7 @@ async fn test_channel(
         monitor: None,
         check: None,
         incident: None,
-        message: Some("This is a test notification from Glimwatch.".to_owned()),
+        message: Some("This is a test notification from Owlee.".to_owned()),
     };
     notify::deliver(&state, &channel, &payload, None, None).await;
     Ok(Json(channel_view(&state, channel).await?))
@@ -1572,14 +1560,14 @@ async fn notify_incident(state: &AppState, incident: &Incident, message: &str) {
     let payload = NotificationPayload {
         event: NotificationEvent::IncidentUpdated.as_str().to_owned(),
         sent_at: TimestampMillis::now().to_string(),
-        monitor: monitor.map(|monitor| glimwatch_domain::PayloadMonitor {
+        monitor: monitor.map(|monitor| owlee_domain::PayloadMonitor {
             id: monitor.id.to_string(),
             name: monitor.name,
             url: monitor.url,
             state: monitor.state,
         }),
         check: None,
-        incident: Some(glimwatch_domain::PayloadIncident {
+        incident: Some(owlee_domain::PayloadIncident {
             id: incident.id.to_string(),
             title: incident.title.clone(),
             status: incident.status,
@@ -1861,9 +1849,7 @@ async fn require_installation_admin(state: &AppState, jar: &CookieJar) -> Result
 }
 
 pub(crate) async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
-    let Some(token) = session_cookie_names()
-        .find_map(|name| jar.get(name).map(|cookie| cookie.value().to_owned()))
-    else {
+    let Some(token) = jar.get(COOKIE).map(|cookie| cookie.value().to_owned()) else {
         return Err(AppError::Unauthorized);
     };
     repo::authenticate(&state.db, &hash_token(&token), TimestampMillis::now())
@@ -1900,13 +1886,7 @@ fn session_jar(state: &AppState, jar: CookieJar, token: String) -> CookieJar {
         .path("/")
         .secure(state.config.secure_cookies())
         .build();
-    let mut jar = jar.add(cookie);
-    for name in LEGACY_COOKIES {
-        let mut legacy = Cookie::from(*name);
-        legacy.set_path("/");
-        jar = jar.remove(legacy);
-    }
-    jar
+    jar.add(cookie)
 }
 
 struct AccountFields {

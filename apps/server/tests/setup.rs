@@ -1,8 +1,8 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use glimwatch_platform::TimestampMillis;
-use glimwatch_server::{
+use owlee_platform::TimestampMillis;
+use owlee_server::{
     SetupError, boot, initialize_setup_token, rotate_setup_token, router, testing_config,
 };
 use http_body_util::BodyExt;
@@ -258,7 +258,7 @@ async fn rotate_issues_a_new_unused_token_and_refuses_after_setup() {
 }
 
 #[tokio::test]
-async fn legacy_session_cookies_still_authenticate() {
+async fn session_cookie_authenticates() {
     let (app, token) = started(false).await;
     let (status, _, cookie) = call(
         &app,
@@ -270,19 +270,9 @@ async fn legacy_session_cookies_still_authenticate() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
     let cookie = cookie.expect("session cookie");
-    assert!(cookie.starts_with("glimwatch_session="), "{cookie}");
-    let value = cookie.split_once('=').unwrap().1;
-    for name in ["status_session"] {
-        let (status, me, _) = call(
-            &app,
-            "GET",
-            "/api/auth/me",
-            None,
-            Some(&format!("{name}={value}")),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{name} {me}");
-    }
+    assert!(cookie.starts_with("owlee_session="), "{cookie}");
+    let (status, me, _) = call(&app, "GET", "/api/auth/me", None, Some(&cookie)).await;
+    assert_eq!(status, StatusCode::OK, "{me}");
 }
 
 fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
@@ -295,7 +285,7 @@ fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
     pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("glimwatch_session="))
+        .find(|value| value.starts_with("owlee_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned)
 }
