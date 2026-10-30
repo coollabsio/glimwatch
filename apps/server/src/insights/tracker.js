@@ -160,6 +160,4 @@
   send('pageview')
   const track = (name, data) => send(name, { data })
   window.owleeEvent = track
-  window.glimwatchEvent = track
-  window.beaconEvent = track
 })()

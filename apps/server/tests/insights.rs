@@ -110,9 +110,7 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
     assert_eq!(status, StatusCode::OK);
     let script = script.as_str().unwrap_or("");
     assert!(script.contains("/api/receive"), "{script}");
-    assert!(script.contains("owleeEvent"), "{script}");
-    assert!(script.contains("glimwatchEvent"), "{script}");
-    assert!(script.contains("beaconEvent"), "{script}");
+    assert!(script.contains("window.owleeEvent"), "{script}");
 
     let (status, site, _, _) = call(
         &app,

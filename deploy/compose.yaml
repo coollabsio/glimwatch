@@ -11,8 +11,7 @@ services:
       OWLEE_PORT: 8080
       # Used in the one-time Initial setup URL printed to stderr on a fresh database.
       OWLEE_PUBLIC_ORIGIN: ${OWLEE_PUBLIC_ORIGIN:-http://localhost:8080}
-      # Stock path. If this file is missing, an older glimwatch.sqlite or
-      # status.sqlite in this directory is kept. To keep a volume mounted elsewhere, set this to that file.
+      # SQLite file inside the volume. Set this to another path to use a different file.
       OWLEE_DATABASE_PATH: /var/lib/owlee/owlee.sqlite
       # Public sign-up stays closed after the owner is created from that URL.
       # The root user opens it in Settings after SMTP is configured.

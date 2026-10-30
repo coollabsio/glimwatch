@@ -17,7 +17,7 @@ async fn app() -> (Router, Option<String>) {
 
 async fn app_with_targets(connectivity_targets: Vec<String>) -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("status.sqlite");
+    let path = dir.path().join("owlee.sqlite");
     // Leak the temp dir so the sqlite file outlives the router.
     let _keep = Box::leak(Box::new(dir));
     let mut config = testing_config(path);

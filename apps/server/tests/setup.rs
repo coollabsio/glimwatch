@@ -258,7 +258,7 @@ async fn rotate_issues_a_new_unused_token_and_refuses_after_setup() {
 }
 
 #[tokio::test]
-async fn legacy_session_cookies_still_authenticate() {
+async fn session_cookie_authenticates() {
     let (app, token) = started(false).await;
     let (status, _, cookie) = call(
         &app,
@@ -271,18 +271,8 @@ async fn legacy_session_cookies_still_authenticate() {
     assert_eq!(status, StatusCode::CREATED);
     let cookie = cookie.expect("session cookie");
     assert!(cookie.starts_with("owlee_session="), "{cookie}");
-    let value = cookie.split_once('=').unwrap().1;
-    for name in ["glimwatch_session", "status_session"] {
-        let (status, me, _) = call(
-            &app,
-            "GET",
-            "/api/auth/me",
-            None,
-            Some(&format!("{name}={value}")),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{name} {me}");
-    }
+    let (status, me, _) = call(&app, "GET", "/api/auth/me", None, Some(&cookie)).await;
+    assert_eq!(status, StatusCode::OK, "{me}");
 }
 
 fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {

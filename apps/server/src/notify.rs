@@ -94,10 +94,7 @@ async fn send(
                 if !secret.is_empty() {
                     let signature = sign_body(secret, &body);
                     let header = format!("sha256={signature}");
-                    request = request
-                        .header("x-owlee-signature", header.clone())
-                        .header("x-glimwatch-signature", header.clone())
-                        .header("x-status-signature", header);
+                    request = request.header("x-owlee-signature", header);
                 }
             }
             let response = request

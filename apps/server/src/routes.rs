@@ -32,12 +32,6 @@ use crate::setup::{self, NewOwner};
 use crate::state::{self, AppState};
 
 const COOKIE: &str = "owlee_session";
-/// Older session cookies. A later login replaces them with `owlee_session`.
-const LEGACY_COOKIES: &[&str] = &["glimwatch_session", "status_session"];
-
-fn session_cookie_names() -> impl Iterator<Item = &'static str> {
-    std::iter::once(COOKIE).chain(LEGACY_COOKIES.iter().copied())
-}
 const DAY_MS: i64 = 86_400_000;
 
 pub fn router(state: AppState) -> Router {
@@ -297,18 +291,12 @@ async fn logout(
     State(state): State<AppState>,
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    for name in session_cookie_names() {
-        if let Some(token) = jar.get(name).map(|cookie| cookie.value().to_owned()) {
-            repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
-        }
+    if let Some(token) = jar.get(COOKIE).map(|cookie| cookie.value().to_owned()) {
+        repo::revoke_token(&state.db, &hash_token(&token), TimestampMillis::now()).await?;
     }
-    let mut jar = jar;
-    for name in session_cookie_names() {
-        let mut expired = Cookie::from(name);
-        expired.set_path("/");
-        jar = jar.remove(expired);
-    }
-    Ok((jar, StatusCode::NO_CONTENT))
+    let mut expired = Cookie::from(COOKIE);
+    expired.set_path("/");
+    Ok((jar.remove(expired), StatusCode::NO_CONTENT))
 }
 
 async fn me(
@@ -1861,9 +1849,7 @@ async fn require_installation_admin(state: &AppState, jar: &CookieJar) -> Result
 }
 
 pub(crate) async fn require_user(state: &AppState, jar: &CookieJar) -> Result<User, AppError> {
-    let Some(token) = session_cookie_names()
-        .find_map(|name| jar.get(name).map(|cookie| cookie.value().to_owned()))
-    else {
+    let Some(token) = jar.get(COOKIE).map(|cookie| cookie.value().to_owned()) else {
         return Err(AppError::Unauthorized);
     };
     repo::authenticate(&state.db, &hash_token(&token), TimestampMillis::now())
@@ -1900,13 +1886,7 @@ fn session_jar(state: &AppState, jar: CookieJar, token: String) -> CookieJar {
         .path("/")
         .secure(state.config.secure_cookies())
         .build();
-    let mut jar = jar.add(cookie);
-    for name in LEGACY_COOKIES {
-        let mut legacy = Cookie::from(*name);
-        legacy.set_path("/");
-        jar = jar.remove(legacy);
-    }
-    jar
+    jar.add(cookie)
 }
 
 struct AccountFields {

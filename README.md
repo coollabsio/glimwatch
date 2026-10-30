@@ -39,13 +39,13 @@ Open http://127.0.0.1:43123.
 
 `just dev` runs `seed` before it starts the server. Production does not. A fresh database uses the setup URL below, not this password.
 
-The database file is `data/owlee.sqlite`. If that file is missing, Owlee opens an existing `glimwatch.sqlite` or `status.sqlite` in the same directory, then `data/glimwatch.sqlite`, `/var/lib/glimwatch/glimwatch.sqlite`, `data/status.sqlite`, and `/var/lib/glimwatch/status.sqlite`. The Docker default `/var/lib/owlee/owlee.sqlite` checks those files too, and also `glimwatch.sqlite` and `status.sqlite` beside itself. This applies only to these two default paths. A custom `OWLEE_DATABASE_PATH` is used as written. Migrations run on startup.
+The database file is `data/owlee.sqlite`. The Docker default is `/var/lib/owlee/owlee.sqlite`. A custom `OWLEE_DATABASE_PATH` is used as written. Migrations run on startup.
 
 Without Bun on the PATH, `cargo test` still works. `apps/server/build.rs` writes a placeholder page when `apps/web/dist` is missing, so the binary compiles before the UI is built.
 
 ### Postgres
 
-Leave the SQLite path in place (it is unused for data) and set a URL. `DATABASE_URL` is accepted when `OWLEE_DATABASE_URL` is unset.
+Leave the SQLite path in place (it is unused for data) and set `OWLEE_DATABASE_URL`.
 
 ```bash
 export OWLEE_DATABASE_URL=postgres://owlee:owlee@127.0.0.1:5432/owlee
@@ -64,7 +64,7 @@ export OWLEE_SMTP_PORT=587
 export OWLEE_SMTP_FROM=status@example.com
 ```
 
-Webhook channels can set a secret. The body is posted as JSON with `X-Owlee-Signature: sha256=<hmac-sha256>`. `X-Status-Signature` is sent with the same value.
+Webhook channels can set a secret. The body is posted as JSON with `X-Owlee-Signature: sha256=<hmac-sha256>`.
 
 ### First-run setup
 
@@ -86,8 +86,6 @@ owlee setup-token rotate
 `setup-token init` prints a URL only when setup is unfinished and no unused token is stored. Rotation invalidates the previous unused token.
 
 The root user opens registration in Settings. It stays closed until a mail server is saved there, or `OWLEE_SMTP_HOST` and `OWLEE_SMTP_FROM` are set, and the root user turns Open registration on. Clearing the saved mail server closes registration again. `OWLEE_OPEN_SIGNUP` is ignored. Owlee does not email a sign-up link; a person who can open `/register` chooses their own password. The root user can also mark another account as an installation admin. The root account itself cannot be changed.
-
-Older `GLIMWATCH_*`, `HARUVO_*`, and `STATUS_*` names are not read. See [Upgrading from older names](#upgrading-from-older-names).
 
 When a check cannot connect (DNS, connect, or timeout error), Owlee first tries a TCP connection to `1.1.1.1:443`, `8.8.8.8:443` and `9.9.9.9:443`. If none of them answer, the problem is the Owlee host's own network. Owlee then does not record the check, does not change the monitor state, and sends no alert. The result is cached for 10 seconds. If the host cannot reach the internet by design, set hosts that it can always reach, or turn the check off:
 
@@ -224,7 +222,7 @@ Add a site in **Sites**, then paste the snippet from **Tracker**:
 <script defer src="https://owlee.example.com/data.js" data-site="YOUR_PUBLIC_ID"></script>
 ```
 
-The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.owleeEvent(name, data)` records a custom event. `window.glimwatchEvent` and `window.beaconEvent` are the same function, so a snippet written for Glimwatch or for [Beacon](https://github.com/ShadowArcanist/beacons) still works.
+The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.owleeEvent(name, data)` records a custom event.
 
 Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `OWLEE_PROXY_HOPS` when Owlee sits behind a reverse proxy (`1` for one proxy, `2` when Cloudflare is in front, which also enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). Point `OWLEE_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
 
@@ -251,7 +249,7 @@ Owlee follows [Orbit](https://github.com/coollabsio/orbit)'s layout and leaves o
 | `crates/platform` (config, db, auth, migrations) | `crates/platform` |
 | `crates/orbit` domain rules | `crates/status` |
 | `apps/web` Vite, React, Tailwind | `apps/web` |
-| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `OWLEE_DATABASE_URL` / `DATABASE_URL` |
+| SQLite file, or Postgres via `ORBIT_DATABASE_URL` | SQLite file, or Postgres via `OWLEE_DATABASE_URL` |
 | `MigrationRunner`, checksums in `schema_migrations` | same |
 | Argon2id passwords, random session tokens | same, sessions stored in the database |
 | Initial setup URL, `setup-token rotate`, closed registration | same: one-time `/setup?token=`, then the root user opens registration in Settings after SMTP |
@@ -279,35 +277,6 @@ examples        PHP, JavaScript, and Rust programs that send errors
 ## Attribution
 
 Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is wire-compatible with Beacon's tracker and also defines `window.owleeEvent`. See [NOTICE](NOTICE).
-
-## Upgrading from older names
-
-Owlee was called Glimwatch, and before that Haruvo and Status. Rename GLIMWATCH_*, STATUS_*, and HARUVO_* to OWLEE_*. Owlee does not read those names. `GLIMWATCH_DATABASE_URL` becomes `OWLEE_DATABASE_URL`, and the same replacement applies to every other setting (`ENV`, `BIND`, `PORT`, `PUBLIC_ORIGIN`, `DATABASE_PATH`, `SMTP_*`, `AGENT_*`, and the rest).
-
-| Current | Still accepted |
-| --- | --- |
-| `OWLEE_DATABASE_URL` | `DATABASE_URL`, when `OWLEE_DATABASE_URL` is unset |
-| `owlee_session` cookie | `glimwatch_session` and `status_session`, until the next login replaces them |
-| `window.owleeEvent` | `window.glimwatchEvent` and `window.beaconEvent` |
-| `X-Owlee-Signature` | `X-Glimwatch-Signature` and `X-Status-Signature`, sent with the same value |
-| `data/owlee.sqlite`, `/var/lib/owlee/owlee.sqlite` | `glimwatch.sqlite`, then `status.sqlite`, on the default paths above, when the Owlee file is absent |
-
-The container image sets `OWLEE_ENV`, `OWLEE_BIND`, `OWLEE_PORT`, `OWLEE_DATABASE_PATH`, and `OWLEE_PUBLIC_ORIGIN`.
-
-A Haruvo or Statixo database is not found automatically. Point Owlee at the file:
-
-```bash
-export OWLEE_DATABASE_PATH=/var/lib/haruvo/haruvo.sqlite
-```
-
-Or copy it onto the Owlee path:
-
-```bash
-docker run --rm -v haruvo-data:/from -v owlee-data:/to alpine \
-  cp -a /from/haruvo.sqlite /to/owlee.sqlite
-```
-
-After a rename, the next login replaces `glimwatch_session`. Webhook receivers can check `X-Owlee-Signature`. `X-Glimwatch-Signature` and `X-Status-Signature` still carry the same value.
 
 Point Coolify at `ghcr.io/coollabsio/owlee`. `OWLEE_IMAGE` is the compose override. The source repository is `https://github.com/coollabsio/glimwatch`. API problem URLs use `https://owlee.io/problems/...`.
 
