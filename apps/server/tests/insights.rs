@@ -1,15 +1,15 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use glimwatch_platform::TimestampMillis;
-use glimwatch_server::{boot, initialize_setup_token, permit_signup, router, testing_config};
+use owlee_platform::TimestampMillis;
+use owlee_server::{boot, initialize_setup_token, permit_signup, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
 async fn app() -> (Router, Option<String>) {
     let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("glimwatch.sqlite");
+    let path = dir.path().join("owlee.sqlite");
     let _keep = Box::leak(Box::new(dir));
     let state = boot(testing_config(path)).await.unwrap();
     let token = initialize_setup_token(&state.db, TimestampMillis::now())
@@ -75,7 +75,7 @@ fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
     pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("glimwatch_session="))
+        .find(|value| value.starts_with("owlee_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned)
 }
@@ -110,6 +110,7 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
     assert_eq!(status, StatusCode::OK);
     let script = script.as_str().unwrap_or("");
     assert!(script.contains("/api/receive"), "{script}");
+    assert!(script.contains("owleeEvent"), "{script}");
     assert!(script.contains("glimwatchEvent"), "{script}");
     assert!(script.contains("beaconEvent"), "{script}");
 
@@ -195,7 +196,7 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
         &app,
         "POST",
         "/api/domains",
-        Some(json!({"hostname": "go.glimwatch.test", "enabled": true})),
+        Some(json!({"hostname": "go.owlee.test", "enabled": true})),
         Some(&cookie),
         Some(BROWSER),
     )
@@ -235,7 +236,7 @@ async fn sqlite_collects_pageviews_and_counts_short_link_clicks() {
 
 #[tokio::test]
 async fn postgres_collects_a_pageview_when_configured() {
-    let Some(url) = std::env::var("GLIMWATCH_APP_POSTGRES_URL")
+    let Some(url) = std::env::var("OWLEE_APP_POSTGRES_URL")
         .ok()
         .filter(|url| !url.is_empty())
     else {
@@ -254,7 +255,7 @@ async fn postgres_collects_a_pageview_when_configured() {
         permit_signup(&state.db).await.unwrap();
     }
     let app = router(state);
-    let email = format!("insights-{}@coollabs.io", glimwatch_platform::Id::new());
+    let email = format!("insights-{}@coollabs.io", owlee_platform::Id::new());
     let (status, _user, cookie, _) = if let Some(token) = token {
         call(
             &app,
@@ -291,7 +292,7 @@ async fn postgres_collects_a_pageview_when_configured() {
         &app,
         "POST",
         "/api/sites",
-        Some(json!({"name": "PG", "domain": "postgres.glimwatch.test"})),
+        Some(json!({"name": "PG", "domain": "postgres.owlee.test"})),
         Some(&cookie),
         Some(BROWSER),
     )
@@ -304,7 +305,7 @@ async fn postgres_collects_a_pageview_when_configured() {
         Some(json!({
             "site": site["public_id"],
             "type": "pageview",
-            "url": "https://postgres.glimwatch.test/ready"
+            "url": "https://postgres.owlee.test/ready"
         })),
         None,
         Some(BROWSER),

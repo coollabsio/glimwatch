@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum_extra::extract::cookie::CookieJar;
-use glimwatch_errors::normalize_event;
+use owlee_errors::normalize_event;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

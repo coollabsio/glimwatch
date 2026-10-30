@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use glimwatch_platform::TimestampMillis;
+use owlee_platform::TimestampMillis;
 
 use crate::engine;
 use crate::error::AppError;

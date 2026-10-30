@@ -3,11 +3,11 @@
 
 use std::ops::DerefMut;
 
-use glimwatch_domain::{
+use owlee_domain::{
     Assertion, CheckStatus, CheckType, DailyCount, HeaderPair, IncidentImpact, IncidentStatus,
     JobType, MonitorState,
 };
-use glimwatch_platform::{Database, Id, ParseIdError, TimestampMillis};
+use owlee_platform::{Database, Id, ParseIdError, TimestampMillis};
 use serde::de::DeserializeOwned;
 use sqlx::{Any, Row, Transaction};
 

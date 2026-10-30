@@ -17,9 +17,9 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  # The GitHub repository is coollabsio/glimwatch. This publishes
-  # ghcr.io/<owner>/glimwatch.
-  IMAGE: ghcr.io/${{ github.repository_owner }}/glimwatch
+  # The GitHub repository is still coollabsio/glimwatch. This publishes
+  # ghcr.io/<owner>/owlee.
+  IMAGE: ghcr.io/${{ github.repository_owner }}/owlee
 
 jobs:
   build-push:

@@ -18,24 +18,24 @@ COPY rust-toolchain.toml Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY apps/server/ apps/server/
 COPY --from=web /src/apps/web/dist/ apps/web/dist/
-RUN cargo build --locked --release -p glimwatch-server
+RUN cargo build --locked --release -p owlee-server
 
 FROM debian:bookworm-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --uid 65532 --user-group --create-home --home-dir /var/lib/glimwatch glimwatch \
-    && mkdir -p /var/lib/glimwatch \
-    && chown -R 65532:65532 /var/lib/glimwatch
-COPY --from=server /src/target/release/glimwatch /glimwatch
-ENV GLIMWATCH_ENV=production \
-    GLIMWATCH_BIND=0.0.0.0 \
-    GLIMWATCH_PORT=8080 \
-    GLIMWATCH_DATABASE_PATH=/var/lib/glimwatch/glimwatch.sqlite \
-    GLIMWATCH_PUBLIC_ORIGIN=http://127.0.0.1:8080
+    && useradd --uid 65532 --user-group --create-home --home-dir /var/lib/owlee owlee \
+    && mkdir -p /var/lib/owlee \
+    && chown -R 65532:65532 /var/lib/owlee
+COPY --from=server /src/target/release/owlee /owlee
+ENV OWLEE_ENV=production \
+    OWLEE_BIND=0.0.0.0 \
+    OWLEE_PORT=8080 \
+    OWLEE_DATABASE_PATH=/var/lib/owlee/owlee.sqlite \
+    OWLEE_PUBLIC_ORIGIN=http://127.0.0.1:8080
 USER 65532:65532
-VOLUME ["/var/lib/glimwatch"]
+VOLUME ["/var/lib/owlee"]
 EXPOSE 8080
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD ["/glimwatch", "healthcheck"]
-ENTRYPOINT ["/glimwatch"]
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=10 CMD ["/owlee", "healthcheck"]
+ENTRYPOINT ["/owlee"]
 CMD ["serve"]

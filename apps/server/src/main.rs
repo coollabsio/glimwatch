@@ -1,9 +1,9 @@
 use std::process::ExitCode;
 
-use glimwatch_platform::{TracingFormat, init_tracing};
+use owlee_platform::{TracingFormat, init_tracing};
 
 fn main() -> ExitCode {
-    let environment = std::env::var("GLIMWATCH_ENV");
+    let environment = std::env::var("OWLEE_ENV");
     let format = match environment.as_deref() {
         Ok("production") => TracingFormat::Json,
         _ => TracingFormat::Compact,
@@ -13,10 +13,10 @@ fn main() -> ExitCode {
         .enable_all()
         .build()
         .expect("tokio runtime");
-    match runtime.block_on(glimwatch_server::run()) {
+    match runtime.block_on(owlee_server::run()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("glimwatch: {error}");
+            eprintln!("owlee: {error}");
             ExitCode::FAILURE
         }
     }

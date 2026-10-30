@@ -250,7 +250,7 @@ export function Shell() {
           )}
         >
           {collapsed ? (
-            <NavLink to="/" title="Glimwatch">
+            <NavLink to="/" title="Owlee">
               <Logo className="size-5" />
             </NavLink>
           ) : (
@@ -265,7 +265,7 @@ export function Shell() {
           <span className="mobile-logo-tile">
             <Logo className="size-[18px]" />
           </span>
-          <span className="truncate">Glimwatch</span>
+          <span className="truncate">Owlee</span>
         </NavLink>
         <div className="flex shrink-0 items-center gap-1">
           <ProfileMenu user={me.data} onLogout={() => void logout()} compact />
@@ -364,10 +364,12 @@ export function Shell() {
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 352 352" className={cn("size-6 shrink-0", className)} role="img" aria-label="Glimwatch">
-      <path d="M0 0h320v64H64v192h192v-64h-96v-64h160v192H0Z" transform="translate(32 32)" fill="#1e3a8a" />
-      <path d="M0 0h320v64H64v192h192v-64h-96v-64h160v192H0Z" fill="#2b7fff" />
-    </svg>
+    <img
+      src="/favicon.svg"
+      alt="Owlee"
+      draggable={false}
+      className={cn("size-6 shrink-0", className)}
+    />
   );
 }
 
@@ -375,7 +377,7 @@ function Wordmark({ version, onClick }: { version: string; onClick?: () => void 
   return (
     <span className="flex min-w-0 items-baseline gap-1.5">
       <NavLink to="/" onClick={onClick} className="text-[15px] font-semibold tracking-tight text-[var(--ui-fg)]">
-        Glimwatch
+        Owlee
       </NavLink>
       <span className="truncate text-[10.5px] font-medium text-[var(--ui-fg-faint)]">v{version}</span>
     </span>

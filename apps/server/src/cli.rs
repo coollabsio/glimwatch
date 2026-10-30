@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
-use glimwatch_platform::{Config, TimestampMillis};
+use owlee_platform::{Config, TimestampMillis};
 
 use crate::agent;
 use crate::connectivity::Connectivity;
@@ -15,9 +15,9 @@ use crate::state::{self, BootError};
 
 #[derive(Parser)]
 #[command(
-    name = "glimwatch",
+    name = "owlee",
     version,
-    about = "Glimwatch status pages, incidents, and uptime monitoring"
+    about = "Owlee status pages, incidents, and uptime monitoring"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -55,16 +55,16 @@ enum Command {
         #[command(subcommand)]
         command: SetupTokenCommand,
     },
-    /// Run the checks in a config file from this network and report them to a Glimwatch server.
+    /// Run the checks in a config file from this network and report them to a Owlee server.
     Agent {
-        /// Glimwatch server URL, for example https://status.example.com.
-        #[arg(long, env = "GLIMWATCH_AGENT_SERVER")]
+        /// Owlee server URL, for example https://status.example.com.
+        #[arg(long, env = "OWLEE_AGENT_SERVER")]
         server: String,
         /// Token shown once when the agent was created.
-        #[arg(long, env = "GLIMWATCH_AGENT_TOKEN", hide_env_values = true)]
+        #[arg(long, env = "OWLEE_AGENT_TOKEN", hide_env_values = true)]
         token: String,
         /// TOML file with [[check]] entries.
-        #[arg(long, env = "GLIMWATCH_AGENT_CONFIG")]
+        #[arg(long, env = "OWLEE_AGENT_CONFIG")]
         config: PathBuf,
     },
 }
@@ -73,14 +73,14 @@ enum Command {
 enum SetupTokenCommand {
     /// Print a setup URL when setup is unfinished and no unused token is stored.
     Init {
-        /// Public origin to put in the URL. Defaults to GLIMWATCH_PUBLIC_ORIGIN.
+        /// Public origin to put in the URL. Defaults to OWLEE_PUBLIC_ORIGIN.
         #[arg(long)]
         origin: Option<String>,
     },
     /// Replace the unused setup token. Refuses after setup is complete.
-    /// On SQLite, stop Glimwatch first. On Postgres, this can run while Glimwatch is up.
+    /// On SQLite, stop Owlee first. On Postgres, this can run while Owlee is up.
     Rotate {
-        /// Public origin to put in the URL. Defaults to GLIMWATCH_PUBLIC_ORIGIN.
+        /// Public origin to put in the URL. Defaults to OWLEE_PUBLIC_ORIGIN.
         #[arg(long)]
         origin: Option<String>,
     },
@@ -106,7 +106,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             scheduler::spawn(state.clone());
             let listener = tokio::net::TcpListener::bind(addr).await?;
             let bound = listener.local_addr()?;
-            tracing::info!("Glimwatch listening on http://{bound}");
+            tracing::info!("Owlee listening on http://{bound}");
             axum::serve(listener, crate::routes::router(state))
                 .with_graceful_shutdown(async {
                     let _ = tokio::signal::ctrl_c().await;
@@ -180,7 +180,7 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// SQLite is owned by one Glimwatch process. Postgres stays unlocked so `setup-token`
+/// SQLite is owned by one Owlee process. Postgres stays unlocked so `setup-token`
 /// can run while the server is up, matching Orbit.
 fn sqlite_owner(config: &Config) -> Result<Option<ownership::Guard>, BootError> {
     if config.database_url.is_some() {
@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn parses_setup_token_rotate() {
         let cli = Cli::try_parse_from([
-            "glimwatch",
+            "owlee",
             "setup-token",
             "rotate",
             "--origin",

@@ -3,17 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Glimwatch</title>
+    <title>Owlee</title>
     <meta
       name="description"
       content="Status pages, incidents, and uptime monitoring from coolLabs."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <script>
       // Applies the saved appearance (src/lib/theme.ts) before the first paint.
       (function () {
         var a = {};
-        try { a = JSON.parse(localStorage.getItem("glimwatch-appearance")) || {}; } catch (e) {}
+        try { a = JSON.parse(localStorage.getItem("owlee-appearance")) || {}; } catch (e) {}
         var root = document.documentElement;
         var theme = a.theme || "dark";
         var vars = theme === "custom" ? a.vars : null;

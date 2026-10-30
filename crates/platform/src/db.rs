@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::auth::hex_encode;
 use crate::time::TimestampMillis;
 
-/// Which engine an open [`Database`] is speaking. Queries in Glimwatch are
+/// Which engine an open [`Database`] is speaking. Queries in Owlee are
 /// written once and run on both; integer columns are `BIGINT` so sqlx's Any
 /// driver decodes them as `i64` on SQLite and Postgres.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,7 +39,7 @@ impl DatabaseConfig {
     #[must_use]
     pub fn postgres(url: impl Into<String>) -> Self {
         Self {
-            path: PathBuf::from("data/glimwatch.sqlite"),
+            path: PathBuf::from("data/owlee.sqlite"),
             postgres_url: Some(url.into()),
             max_connections: 16,
         }
@@ -308,7 +308,7 @@ impl MigrationRunner {
     }
 }
 
-/// Splits a migration into statements. Glimwatch migrations keep semicolons
+/// Splits a migration into statements. Owlee migrations keep semicolons
 /// at the end of statements only, and use `--` for full-line comments.
 pub fn statements(sql: &str) -> Vec<String> {
     let mut statements = Vec::new();
@@ -408,7 +408,7 @@ CREATE TABLE widgets (
 
     #[tokio::test]
     async fn postgres_migrations_when_configured() {
-        let url = match std::env::var("GLIMWATCH_TEST_POSTGRES_URL") {
+        let url = match std::env::var("OWLEE_TEST_POSTGRES_URL") {
             Ok(url) if url.starts_with("postgres") => url,
             _ => return,
         };

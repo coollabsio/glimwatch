@@ -16,13 +16,13 @@ export type Appearance = {
   chartTimes: "local" | "utc";
 };
 
-const KEY = "glimwatch-appearance";
-const EVENT = "glimwatch-appearance";
+const KEY = "owlee-appearance";
+const EVENT = "owlee-appearance";
 const customKeys = ["sidebar", "selected", "accent", "background"] as const;
 
 export const customThemePresets: { name: string; theme: CustomTheme | null; swatch?: CustomTheme }[] = [
   // The built-in Dark theme, not a custom theme. Its colors start the fields when you edit it.
-  { name: "Glimwatch", theme: null, swatch: { sidebar: "#111a2e", selected: "#1c1c1c", accent: "#2563eb", background: "#0a0a0a" } },
+  { name: "Owlee", theme: null, swatch: { sidebar: "#111a2e", selected: "#1c1c1c", accent: "#2563eb", background: "#0a0a0a" } },
   { name: "Midnight", theme: { sidebar: "#0f172a", selected: "#2e4a7d", accent: "#f2458f", background: "#1a2338" } },
   { name: "Forest", theme: { sidebar: "#12342b", selected: "#2c6e57", accent: "#f4b860", background: "#1b2a25" } },
   { name: "Ember", theme: { sidebar: "#3b1410", selected: "#8f2d1f", accent: "#ffb86b", background: "#241816" } },

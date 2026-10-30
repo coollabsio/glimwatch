@@ -1,5 +1,5 @@
-//! Demo error project and a few grouped events for `glimwatch seed`.
-use glimwatch_errors::normalize_event;
+//! Demo error project and a few grouped events for `owlee seed`.
+use owlee_errors::normalize_event;
 use serde_json::{Value, json};
 
 use super::store;

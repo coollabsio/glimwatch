@@ -1,8 +1,8 @@
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use glimwatch_platform::{SmtpConfig, TimestampMillis};
-use glimwatch_server::{boot, initialize_setup_token, router, testing_config};
+use owlee_platform::{SmtpConfig, TimestampMillis};
+use owlee_server::{boot, initialize_setup_token, router, testing_config};
 use http_body_util::BodyExt;
 use serde_json::Value;
 use tower::ServiceExt;
@@ -69,7 +69,7 @@ async fn call(
     let cookie = pairs
         .iter()
         .copied()
-        .find(|value| value.starts_with("glimwatch_session="))
+        .find(|value| value.starts_with("owlee_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned);
     let bytes = response.into_body().collect().await.unwrap().to_bytes();

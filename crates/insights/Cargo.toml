@@ -1,9 +1,9 @@
 [package]
-name = "glimwatch-insights"
+name = "owlee-insights"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
-description = "Cookieless web analytics and link-shortener rules for Glimwatch"
+description = "Cookieless web analytics and link-shortener rules for Owlee"
 
 [dependencies]
 serde.workspace = true
