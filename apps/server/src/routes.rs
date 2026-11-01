@@ -51,6 +51,7 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/users", get(admin_users))
         .route("/admin/users/{id}/admin", put(set_installation_admin))
         .route("/overview", get(overview))
+        .route("/dashboard", get(crate::dashboard::show))
         .route("/monitors", get(list_monitors).post(create_monitor))
         .route(
             "/monitors/{id}",

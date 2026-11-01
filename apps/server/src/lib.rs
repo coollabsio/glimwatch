@@ -7,6 +7,7 @@ mod agent;
 mod checker;
 mod cli;
 mod connectivity;
+mod dashboard;
 mod engine;
 mod error;
 mod errors;

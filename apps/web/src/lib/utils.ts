@@ -10,6 +10,18 @@ export function percent(value?: number | null) {
   return `${(value * 100).toFixed(2)}%`;
 }
 
+export function duration(iso?: string | null) {
+  if (!iso) return "-";
+  const delta = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(delta) || delta < 0) return "just now";
+  const minutes = Math.round(delta / 60_000);
+  if (minutes < 1) return "<1m";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
 export function timeAgo(iso?: string | null) {
   if (!iso) return "never";
   const delta = Date.now() - new Date(iso).getTime();
@@ -54,6 +66,9 @@ export const stateLabel: Record<string, string> = {
   up: "Operational",
   degraded: "Degraded",
   down: "Down",
+  operational: "Operational",
+  partial_outage: "Partial outage",
+  major_outage: "Major outage",
   success: "Up",
   failure: "Down",
   maintenance: "Maintenance",

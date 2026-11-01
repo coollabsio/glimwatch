@@ -216,6 +216,84 @@ export type Audit = {
 
 export type Overview = { monitors: Monitor[]; incidents: Incident[]; activity: Audit[] };
 
+export type DashboardFailing = {
+  id: string;
+  name: string;
+  url: string;
+  state: string;
+  since: string | null;
+  uptime_today: number | null;
+  avg_latency_ms: number | null;
+};
+
+export type DashboardIncident = {
+  id: string;
+  title: string;
+  status: string;
+  impact: string;
+  started_at: string;
+};
+
+export type DashboardPageRow = {
+  id: string;
+  title: string;
+  slug: string;
+  published: boolean;
+  banner: string;
+};
+
+export type DashboardIssue = {
+  id: string;
+  short_id: string | null;
+  title: string;
+  project_name: string;
+  level: string;
+  event_count: number;
+  last_seen: string;
+};
+
+export type DashboardSite = {
+  id: string;
+  name: string;
+  domain: string;
+  visitors: number;
+  pageviews: number;
+};
+
+export type Dashboard = {
+  monitors: {
+    up: number;
+    down: number;
+    degraded: number;
+    pending: number;
+    paused: number;
+    uptime_today: number | null;
+    avg_latency_ms: number | null;
+    failing: DashboardFailing[];
+  };
+  incidents: { open: number; items: DashboardIncident[] };
+  pages: DashboardPageRow[];
+  errors: {
+    projects: number;
+    unresolved: number;
+    new_24h: number;
+    events_24h: number[];
+    issues: DashboardIssue[];
+  };
+  analytics: {
+    sites: number;
+    links: number;
+    days: number;
+    visitors: number;
+    pageviews: number;
+    previous_visitors: number;
+    previous_pageviews: number;
+    clicks: number;
+    previous_clicks: number;
+    top_sites: DashboardSite[];
+  };
+};
+
 export type PublicComponent = {
   id: string;
   name: string;
