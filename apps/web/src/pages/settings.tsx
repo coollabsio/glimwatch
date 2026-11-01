@@ -53,6 +53,11 @@ export function SettingsPage() {
 }
 
 function QuotaCard({ settings }: { settings?: InstanceSettings }) {
+  const key = settings ? `${settings.error_daily_quota}:${settings.analytics_daily_quota}` : "loading";
+  return <QuotaForm key={key} settings={settings} />;
+}
+
+function QuotaForm({ settings }: { settings?: InstanceSettings }) {
   const client = useQueryClient();
   const [errorQuota, setErrorQuota] = useState(settings ? String(settings.error_daily_quota) : "10000");
   const [analyticsQuota, setAnalyticsQuota] = useState(settings ? String(settings.analytics_daily_quota) : "100000");
