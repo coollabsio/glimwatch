@@ -17,7 +17,15 @@ pub async fn seed_demo(state: &AppState) -> Result<(), AppError> {
         let mut event = base.clone();
         event["event_id"] = json!(id);
         event["exception"]["values"][0]["value"] = json!(message);
-        store::ingest_event(&state.db, &project, &normalize_event(event)).await?;
+        store::ingest_event(
+            &state.db,
+            &project,
+            &normalize_event(event),
+            1_000_000,
+            state.config.ingest.error_keep_first,
+            state.config.ingest.error_sample_window_secs,
+        )
+        .await?;
     }
     let mut rust = json!({
         "event_id": "dddddddddddddddddddddddddddddddd",
@@ -46,7 +54,15 @@ pub async fn seed_demo(state: &AppState) -> Result<(), AppError> {
     });
     rust["event_id"] = json!("dddddddddddddddddddddddddddddddd");
     let rust_project = store::create_project(&state.db, "API", "rust").await?;
-    store::ingest_event(&state.db, &rust_project, &normalize_event(rust)).await?;
+    store::ingest_event(
+        &state.db,
+        &rust_project,
+        &normalize_event(rust),
+        1_000_000,
+        state.config.ingest.error_keep_first,
+        state.config.ingest.error_sample_window_secs,
+    )
+    .await?;
     let _ = project;
     Ok(())
 }

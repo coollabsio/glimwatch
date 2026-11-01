@@ -287,7 +287,10 @@ async fn dashboard_aggregates_monitors_errors_and_traffic() {
             "title": "Docs"
         })),
         None,
-        &[("user-agent", BROWSER)],
+        &[
+            ("user-agent", BROWSER),
+            ("origin", "https://coolify.io"),
+        ],
     )
     .await;
     assert_eq!(status, StatusCode::ACCEPTED);

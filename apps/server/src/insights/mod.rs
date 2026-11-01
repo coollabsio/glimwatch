@@ -23,7 +23,6 @@ pub use seed::seed_demo;
 
 pub struct Runtime {
     pub secret: String,
-    pub collector_limit: Arc<RateLimiter>,
     pub public_limit: Arc<RateLimiter>,
     pub geo: Option<Arc<Reader<Vec<u8>>>>,
 }
@@ -31,7 +30,6 @@ pub struct Runtime {
 pub async fn prepare(db: &Database, config: &Config) -> Result<Runtime, sqlx::Error> {
     Ok(Runtime {
         secret: ensure_secret(db).await?,
-        collector_limit: Arc::new(RateLimiter::new(40, Duration::from_secs(60))),
         public_limit: Arc::new(RateLimiter::new(60, Duration::from_secs(60))),
         geo: config
             .geoip_path

@@ -230,7 +230,10 @@ CREATE TABLE insight_sites (
     public_enabled BIGINT NOT NULL DEFAULT 0,
     public_threshold BIGINT NOT NULL DEFAULT 5,
     public_sections TEXT NOT NULL,
-    created_at BIGINT NOT NULL
+    created_at BIGINT NOT NULL,
+    verified BIGINT NOT NULL DEFAULT 0,
+    verify_token TEXT NOT NULL DEFAULT '',
+    verified_at BIGINT
 );
 
 CREATE TABLE insight_domains (
@@ -293,6 +296,9 @@ CREATE TABLE insight_events (
     ttfb DOUBLE PRECISION,
     CHECK (site_id IS NOT NULL OR link_id IS NOT NULL)
 );
+
+-- Raw pageviews and link clicks share this table. Retention deletes by timestamp.
+CREATE INDEX insight_events_timestamp ON insight_events (timestamp);
 
 CREATE INDEX insight_events_site_time ON insight_events (site_id, timestamp);
 CREATE INDEX insight_events_link_time ON insight_events (link_id, timestamp);
@@ -414,6 +420,8 @@ CREATE TABLE issues (
     event_count BIGINT NOT NULL DEFAULT 0,
     short_id TEXT,
     unhandled BIGINT NOT NULL DEFAULT 0,
+    stored_count BIGINT NOT NULL DEFAULT 0,
+    sample_window_start TEXT,
     UNIQUE (project_id, fingerprint)
 );
 
@@ -437,6 +445,9 @@ CREATE TABLE events (
 );
 
 CREATE INDEX events_issue_timestamp ON events (issue_id, timestamp);
+
+-- Retention deletes and the 24h trend (`WHERE timestamp >= ?`) both scan by time.
+CREATE INDEX events_timestamp ON events (timestamp);
 
 CREATE INDEX events_project ON events (project_id);
 
@@ -471,7 +482,18 @@ CREATE TABLE instance_settings (
     smtp_username TEXT,
     smtp_password TEXT,
     smtp_from TEXT,
-    updated_at BIGINT
+    updated_at BIGINT,
+    error_daily_quota BIGINT NOT NULL DEFAULT 10000,
+    analytics_daily_quota BIGINT NOT NULL DEFAULT 100000,
+    quotas_updated_at BIGINT
+);
+
+CREATE TABLE ingest_usage (
+    kind TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    count BIGINT NOT NULL,
+    PRIMARY KEY (kind, subject_id, day)
 );
 
 INSERT INTO instance_settings (id, registration_open) VALUES (1, 0);

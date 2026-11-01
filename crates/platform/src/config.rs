@@ -21,6 +21,86 @@ const ARGON_MEMORY: &str = "OWLEE_ARGON_MEMORY_KIB";
 const CONNECTIVITY_TARGETS: &str = "OWLEE_CONNECTIVITY_TARGETS";
 const PROXY_HOPS: &str = "OWLEE_PROXY_HOPS";
 const GEOIP_PATH: &str = "OWLEE_GEOIP_PATH";
+const ERROR_MAX_BODY: &str = "OWLEE_ERROR_MAX_BODY_BYTES";
+const ANALYTICS_MAX_BODY: &str = "OWLEE_ANALYTICS_MAX_BODY_BYTES";
+const ERROR_RATE_PROJECT: &str = "OWLEE_ERROR_RATE_PROJECT_PER_MIN";
+const ERROR_BURST_PROJECT: &str = "OWLEE_ERROR_RATE_PROJECT_BURST";
+const ERROR_RATE_IP: &str = "OWLEE_ERROR_RATE_IP_PER_MIN";
+const ERROR_BURST_IP: &str = "OWLEE_ERROR_RATE_IP_BURST";
+const ANALYTICS_RATE_SITE: &str = "OWLEE_ANALYTICS_RATE_SITE_PER_MIN";
+const ANALYTICS_BURST_SITE: &str = "OWLEE_ANALYTICS_RATE_SITE_BURST";
+const ANALYTICS_RATE_IP: &str = "OWLEE_ANALYTICS_RATE_IP_PER_MIN";
+const ANALYTICS_BURST_IP: &str = "OWLEE_ANALYTICS_RATE_IP_BURST";
+const ERROR_RETENTION: &str = "OWLEE_ERROR_RETENTION_DAYS";
+const ANALYTICS_RETENTION: &str = "OWLEE_ANALYTICS_RETENTION_DAYS";
+const ERROR_KEEP_FIRST: &str = "OWLEE_ERROR_KEEP_FIRST";
+const ERROR_SAMPLE_WINDOW: &str = "OWLEE_ERROR_SAMPLE_WINDOW_SECS";
+const ALLOW_LOCALHOST: &str = "OWLEE_INGEST_ALLOW_LOCALHOST";
+const DOMAIN_RECHECK: &str = "OWLEE_DOMAIN_RECHECK_SECS";
+const ERROR_DAILY_QUOTA: &str = "OWLEE_ERROR_DAILY_QUOTA";
+const ANALYTICS_DAILY_QUOTA: &str = "OWLEE_ANALYTICS_DAILY_QUOTA";
+const LOGIN_RATE_IP: &str = "OWLEE_LOGIN_RATE_IP_PER_MIN";
+const LOGIN_BURST_IP: &str = "OWLEE_LOGIN_RATE_IP_BURST";
+const LOGIN_RATE_ACCOUNT: &str = "OWLEE_LOGIN_RATE_ACCOUNT_PER_MIN";
+const LOGIN_BURST_ACCOUNT: &str = "OWLEE_LOGIN_RATE_ACCOUNT_BURST";
+
+/// Limits for the public error and analytics ingest endpoints.
+#[derive(Clone, Debug)]
+pub struct IngestConfig {
+    pub error_max_body_bytes: usize,
+    pub analytics_max_body_bytes: usize,
+    pub error_rate_project_per_min: u32,
+    pub error_rate_project_burst: u32,
+    pub error_rate_ip_per_min: u32,
+    pub error_rate_ip_burst: u32,
+    pub analytics_rate_site_per_min: u32,
+    pub analytics_rate_site_burst: u32,
+    pub analytics_rate_ip_per_min: u32,
+    pub analytics_rate_ip_burst: u32,
+    pub error_retention_days: i64,
+    pub analytics_retention_days: i64,
+    pub error_keep_first: i64,
+    pub error_sample_window_secs: i64,
+    /// Accept `localhost` / `127.0.0.1` analytics origins in addition to the site domain.
+    pub allow_localhost: bool,
+    pub domain_recheck_secs: i64,
+    /// `None` leaves the Settings value. Set until the root user saves quotas.
+    pub error_daily_quota: Option<i64>,
+    pub analytics_daily_quota: Option<i64>,
+    pub login_rate_ip_per_min: u32,
+    pub login_rate_ip_burst: u32,
+    pub login_rate_account_per_min: u32,
+    pub login_rate_account_burst: u32,
+}
+
+impl Default for IngestConfig {
+    fn default() -> Self {
+        Self {
+            error_max_body_bytes: 1024 * 1024,
+            analytics_max_body_bytes: 8 * 1024,
+            error_rate_project_per_min: 120,
+            error_rate_project_burst: 30,
+            error_rate_ip_per_min: 60,
+            error_rate_ip_burst: 20,
+            analytics_rate_site_per_min: 240,
+            analytics_rate_site_burst: 60,
+            analytics_rate_ip_per_min: 60,
+            analytics_rate_ip_burst: 30,
+            error_retention_days: 30,
+            analytics_retention_days: 90,
+            error_keep_first: 5,
+            error_sample_window_secs: 3600,
+            allow_localhost: true,
+            domain_recheck_secs: 3600,
+            error_daily_quota: None,
+            analytics_daily_quota: None,
+            login_rate_ip_per_min: 30,
+            login_rate_ip_burst: 10,
+            login_rate_account_per_min: 10,
+            login_rate_account_burst: 5,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -40,6 +120,7 @@ pub struct Config {
     pub proxy_hops: usize,
     /// Optional MaxMind or DB-IP city database (`.mmdb`) for analytics geolocation.
     pub geoip_path: Option<PathBuf>,
+    pub ingest: IngestConfig,
 }
 
 impl Config {
@@ -60,6 +141,7 @@ impl Config {
                 .to_vec(),
             proxy_hops: 0,
             geoip_path: None,
+            ingest: IngestConfig::default(),
         }
     }
 
@@ -80,6 +162,7 @@ impl Config {
         if environment == EnvironmentMode::Production {
             config.open_signup = false;
             config.bind = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+            config.ingest.allow_localhost = false;
         }
         if let Some(bind) = optional(BIND) {
             config.bind = bind.parse().map_err(|_| ConfigError::Invalid {
@@ -154,6 +237,7 @@ impl Config {
         if let Some(path) = optional(GEOIP_PATH) {
             config.geoip_path = Some(PathBuf::from(path));
         }
+        apply_ingest_env(&mut config)?;
         Ok(config)
     }
 
@@ -244,6 +328,108 @@ fn parse_targets(value: &str) -> Option<Vec<String>> {
             (!host.is_empty() && port.parse::<u16>().is_ok()).then(|| target.to_owned())
         })
         .collect()
+}
+
+fn apply_ingest_env(config: &mut Config) -> Result<(), ConfigError> {
+    let ingest = &mut config.ingest;
+    if let Some(value) = optional(ERROR_MAX_BODY) {
+        ingest.error_max_body_bytes = parse_usize(ERROR_MAX_BODY, &value)?;
+    }
+    if let Some(value) = optional(ANALYTICS_MAX_BODY) {
+        ingest.analytics_max_body_bytes = parse_usize(ANALYTICS_MAX_BODY, &value)?;
+    }
+    if let Some(value) = optional(ERROR_RATE_PROJECT) {
+        ingest.error_rate_project_per_min = parse_u32(ERROR_RATE_PROJECT, &value)?;
+    }
+    if let Some(value) = optional(ERROR_BURST_PROJECT) {
+        ingest.error_rate_project_burst = parse_u32(ERROR_BURST_PROJECT, &value)?;
+    }
+    if let Some(value) = optional(ERROR_RATE_IP) {
+        ingest.error_rate_ip_per_min = parse_u32(ERROR_RATE_IP, &value)?;
+    }
+    if let Some(value) = optional(ERROR_BURST_IP) {
+        ingest.error_rate_ip_burst = parse_u32(ERROR_BURST_IP, &value)?;
+    }
+    if let Some(value) = optional(ANALYTICS_RATE_SITE) {
+        ingest.analytics_rate_site_per_min = parse_u32(ANALYTICS_RATE_SITE, &value)?;
+    }
+    if let Some(value) = optional(ANALYTICS_BURST_SITE) {
+        ingest.analytics_rate_site_burst = parse_u32(ANALYTICS_BURST_SITE, &value)?;
+    }
+    if let Some(value) = optional(ANALYTICS_RATE_IP) {
+        ingest.analytics_rate_ip_per_min = parse_u32(ANALYTICS_RATE_IP, &value)?;
+    }
+    if let Some(value) = optional(ANALYTICS_BURST_IP) {
+        ingest.analytics_rate_ip_burst = parse_u32(ANALYTICS_BURST_IP, &value)?;
+    }
+    if let Some(value) = optional(ERROR_RETENTION) {
+        ingest.error_retention_days = parse_i64(ERROR_RETENTION, &value)?;
+    }
+    if let Some(value) = optional(ANALYTICS_RETENTION) {
+        ingest.analytics_retention_days = parse_i64(ANALYTICS_RETENTION, &value)?;
+    }
+    if let Some(value) = optional(ERROR_KEEP_FIRST) {
+        ingest.error_keep_first = parse_i64(ERROR_KEEP_FIRST, &value)?.max(1);
+    }
+    if let Some(value) = optional(ERROR_SAMPLE_WINDOW) {
+        ingest.error_sample_window_secs = parse_i64(ERROR_SAMPLE_WINDOW, &value)?.max(1);
+    }
+    if let Some(value) = optional(ALLOW_LOCALHOST) {
+        ingest.allow_localhost = parse_bool(&value).ok_or(ConfigError::Invalid {
+            name: ALLOW_LOCALHOST,
+            value,
+        })?;
+    }
+    if let Some(value) = optional(DOMAIN_RECHECK) {
+        ingest.domain_recheck_secs = parse_i64(DOMAIN_RECHECK, &value)?.max(60);
+    }
+    if let Some(value) = optional(ERROR_DAILY_QUOTA) {
+        ingest.error_daily_quota = Some(parse_i64(ERROR_DAILY_QUOTA, &value)?);
+    }
+    if let Some(value) = optional(ANALYTICS_DAILY_QUOTA) {
+        ingest.analytics_daily_quota = Some(parse_i64(ANALYTICS_DAILY_QUOTA, &value)?);
+    }
+    if let Some(value) = optional(LOGIN_RATE_IP) {
+        ingest.login_rate_ip_per_min = parse_u32(LOGIN_RATE_IP, &value)?;
+    }
+    if let Some(value) = optional(LOGIN_BURST_IP) {
+        ingest.login_rate_ip_burst = parse_u32(LOGIN_BURST_IP, &value)?;
+    }
+    if let Some(value) = optional(LOGIN_RATE_ACCOUNT) {
+        ingest.login_rate_account_per_min = parse_u32(LOGIN_RATE_ACCOUNT, &value)?;
+    }
+    if let Some(value) = optional(LOGIN_BURST_ACCOUNT) {
+        ingest.login_rate_account_burst = parse_u32(LOGIN_BURST_ACCOUNT, &value)?;
+    }
+    Ok(())
+}
+
+fn parse_u32(name: &'static str, value: &str) -> Result<u32, ConfigError> {
+    value.parse().map_err(|_| ConfigError::Invalid {
+        name,
+        value: value.to_owned(),
+    })
+}
+
+fn parse_usize(name: &'static str, value: &str) -> Result<usize, ConfigError> {
+    value.parse().map_err(|_| ConfigError::Invalid {
+        name,
+        value: value.to_owned(),
+    })
+}
+
+fn parse_i64(name: &'static str, value: &str) -> Result<i64, ConfigError> {
+    let parsed = value.parse::<i64>().map_err(|_| ConfigError::Invalid {
+        name,
+        value: value.to_owned(),
+    })?;
+    if parsed < 1 {
+        return Err(ConfigError::Invalid {
+            name,
+            value: value.to_owned(),
+        });
+    }
+    Ok(parsed)
 }
 
 fn parse_bool(value: &str) -> Option<bool> {

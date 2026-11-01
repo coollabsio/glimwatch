@@ -37,6 +37,9 @@ async fn call(
     if let Some(user_agent) = user_agent {
         request = request.header("user-agent", user_agent);
     }
+    if let Some(origin) = body.as_ref().and_then(origin_for) {
+        request = request.header("origin", origin);
+    }
     let response = app
         .clone()
         .oneshot(
@@ -78,6 +81,17 @@ fn session_cookie(headers: &axum::http::HeaderMap) -> Option<String> {
         .find(|value| value.starts_with("owlee_session="))
         .or_else(|| pairs.first().copied())
         .map(str::to_owned)
+}
+
+fn origin_for(body: &Value) -> Option<String> {
+    let url = body.get("url")?.as_str()?;
+    let (scheme, rest) = url.split_once("://")?;
+    let host = rest.split(['/', '?', '#']).next()?;
+    if host.is_empty() {
+        None
+    } else {
+        Some(format!("{scheme}://{host}"))
+    }
 }
 
 const BROWSER: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 Chrome/128.0.0.0 Safari/537.36";

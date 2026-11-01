@@ -46,8 +46,70 @@ export function SettingsPage() {
         {settings.error && root ? <ErrorText error={settings.error} /> : null}
       </LayerCard>
       {root ? <EmailCard settings={settings.data} /> : null}
+      {root ? <QuotaCard settings={settings.data} /> : null}
       {installationAdmin ? <UsersCard users={users.data} error={users.error} canChange={root} /> : null}
     </div>
+  );
+}
+
+function QuotaCard({ settings }: { settings?: InstanceSettings }) {
+  const client = useQueryClient();
+  const [errorQuota, setErrorQuota] = useState(settings ? String(settings.error_daily_quota) : "10000");
+  const [analyticsQuota, setAnalyticsQuota] = useState(settings ? String(settings.analytics_daily_quota) : "100000");
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: () =>
+      api<InstanceSettings>("/api/admin/settings/quotas", {
+        method: "PUT",
+        body: JSON.stringify({
+          error_daily: Number(errorQuota),
+          analytics_daily: Number(analyticsQuota),
+        }),
+      }),
+    onSuccess: (data) => {
+      client.setQueryData(["instance-settings"], data);
+      setErrorQuota(String(data.error_daily_quota));
+      setAnalyticsQuota(String(data.analytics_daily_quota));
+      setFields({});
+    },
+    onError: (error) => setFields(error instanceof ApiError ? (error.fields ?? {}) : {}),
+  });
+  return (
+    <LayerCard
+      title="Ingest quotas"
+      description="Each error project and each analytics site has its own counter. These are the daily caps."
+    >
+      <form
+        className="grid gap-3 sm:grid-cols-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save.mutate();
+        }}
+      >
+        <Field label="Errors per project per day" error={fields.error_daily}>
+          <Input
+            inputMode="numeric"
+            value={errorQuota}
+            onChange={(event) => setErrorQuota(event.target.value)}
+            required
+          />
+        </Field>
+        <Field label="Analytics events per site per day" error={fields.analytics_daily}>
+          <Input
+            inputMode="numeric"
+            value={analyticsQuota}
+            onChange={(event) => setAnalyticsQuota(event.target.value)}
+            required
+          />
+        </Field>
+        <div className="sm:col-span-2">
+          <Button variant="primary" type="submit" disabled={save.isPending || !settings}>
+            Save quotas
+          </Button>
+          <ErrorText error={save.error} />
+        </div>
+      </form>
+    </LayerCard>
   );
 }
 

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router";
 import { BarList, DailyBars, Stat } from "@/components/charts";
-import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select } from "@/components/ui";
+import { Button, Dialog, Empty, ErrorText, Field, Input, LayerCard, PageHeader, Select, StatusBadge } from "@/components/ui";
 import { api, type InsightOverview, type InsightRow, type InsightSite } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +82,14 @@ function SiteList({ sites, loading, error }: { sites: InsightSite[]; loading: bo
                   return (
                     <tr key={site.id} className="clickable-row">
                       <td className="cell-link"><Link className="row-link" to={to}>{site.name}</Link>{rowCover(to)}</td>
-                      <td className="cell-link">{rowCover(to)}{site.domain}</td>
+                      <td className="cell-link">
+                        {rowCover(to)}
+                        <span className="inline-flex items-center gap-2">
+                          {site.domain}
+                          <StatusBadge tone={site.verified ? "success" : "warning"}>{site.verified ? "Verified" : "Unverified"}</StatusBadge>
+                          {site.quota_exceeded ? <StatusBadge tone="error">Quota reached</StatusBadge> : null}
+                        </span>
+                      </td>
                       <td className="cell-link hidden font-mono text-[12px] sm:table-cell">{rowCover(to)}{site.public_id}</td>
                     </tr>
                   );
@@ -128,6 +135,7 @@ function SiteDetail({ siteId, site }: { siteId: string; site?: InsightSite }) {
           active underline covers that rule. Putting the overlap on the
           buttons, inside overflow-x-auto, computes overflow-y to auto and
           the extra pixel shows a scrollbar even when the tabs fit. */}
+      {site ? <DomainCard site={site} /> : null}
       <div className="-mt-2 min-w-0 border-b border-[var(--ui-divider)]">
         <nav className="-mb-px flex gap-1 overflow-x-auto overflow-y-hidden" aria-label="Site sections">
           {tabs.map((item) => (
@@ -440,6 +448,51 @@ export function VisitorPage() {
         )}
       </LayerCard>
     </div>
+  );
+}
+
+function DomainCard({ site }: { site: InsightSite }) {
+  const client = useQueryClient();
+  const verify = useMutation({
+    mutationFn: () => api<InsightSite>(`/api/sites/${site.id}/verify`, { method: "POST" }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ["sites"] });
+    },
+  });
+  return (
+    <LayerCard
+      title="Domain verification"
+      description="Add this TXT record at your DNS host, then verify. Owlee re-checks verified domains about once an hour."
+      actions={
+        <StatusBadge tone={site.verified ? "success" : "warning"}>{site.verified ? "Verified" : "Unverified"}</StatusBadge>
+      }
+    >
+      {site.quota_exceeded ? (
+        <p className="mb-3 text-[13px] text-[var(--ui-error)]">
+          Daily quota reached ({site.used_today} / {site.daily_quota}). Events are rejected until 00:00 UTC. The cap is in Settings.
+        </p>
+      ) : (
+        <p className="mb-3 text-[13px] text-[var(--ui-fg-faint)]">{site.used_today} / {site.daily_quota} events today.</p>
+      )}
+      {!site.verified && site.ingest_open ? (
+        <p className="mb-3 text-[13px] text-[var(--ui-fg-dim)]">
+          This install is in development, so events from the configured domain are still accepted. Production refuses them until the TXT record verifies.
+        </p>
+      ) : null}
+      {!site.verified && !site.ingest_open ? (
+        <p className="mb-3 text-[13px] text-[var(--ui-fg-dim)]">
+          Events are rejected until this domain is verified.
+        </p>
+      ) : null}
+      <p className="mb-1 text-[11px] font-medium text-[var(--ui-fg-faint)]">Name</p>
+      <pre className="mb-3 overflow-x-auto rounded-lg border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] p-3 font-mono text-[12px] text-[var(--ui-fg)]">{site.verify_name}</pre>
+      <p className="mb-1 text-[11px] font-medium text-[var(--ui-fg-faint)]">Value</p>
+      <pre className="mb-3 overflow-x-auto rounded-lg border border-[var(--ui-control-border)] bg-[var(--ui-control-bg)] p-3 font-mono text-[12px] text-[var(--ui-fg)]">{site.verify_value}</pre>
+      <Button variant="primary" type="button" disabled={verify.isPending} onClick={() => verify.mutate()}>
+        Verify
+      </Button>
+      <ErrorText error={verify.error} />
+    </LayerCard>
   );
 }
 

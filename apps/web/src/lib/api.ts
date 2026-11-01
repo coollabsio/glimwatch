@@ -195,6 +195,8 @@ export type InstanceSettings = {
   initialized: boolean;
   version: string;
   database: string;
+  error_daily_quota: number;
+  analytics_daily_quota: number;
 };
 
 export type AdminUser = {
@@ -334,6 +336,14 @@ export type InsightSite = {
   public_threshold: number;
   public_sections: string[];
   created_at: number;
+  verified: boolean;
+  verified_at: number | null;
+  verify_name: string;
+  verify_value: string;
+  ingest_open: boolean;
+  daily_quota: number;
+  used_today: number;
+  quota_exceeded: boolean;
 };
 
 export type InsightPoint = {
@@ -414,6 +424,9 @@ export type Project = {
   publicKey: string;
   dsn: string;
   createdAt: string;
+  dailyQuota: number;
+  usedToday: number;
+  quotaExceeded: boolean;
 };
 
 export type Issue = {

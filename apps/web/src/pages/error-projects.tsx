@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/issue-badge";
-import { Button, Field, Input, LayerCard, PageHeader, Select } from "@/components/ui";
+import { Button, Field, Input, LayerCard, PageHeader, Select, StatusBadge } from "@/components/ui";
 import { api, type Project } from "@/lib/api";
 
 export function ErrorProjectsPage() {
@@ -81,6 +81,9 @@ export function ErrorProjectsPage() {
                       <Link className="row-link" to={`/error-projects/${project.id}`} onClick={(event) => event.stopPropagation()}>
                         {project.name}
                       </Link>
+                      {project.quotaExceeded ? (
+                        <StatusBadge tone="error">Daily quota reached ({project.usedToday}/{project.dailyQuota})</StatusBadge>
+                      ) : null}
                     </td>
                     <td>
                       <Badge>{platformLabel(project.platform)}</Badge>
@@ -144,6 +147,13 @@ export function ProjectDetailPage() {
           }
         />
       </div>
+      {data.quotaExceeded ? (
+        <LayerCard title="Daily quota reached" description={`${data.usedToday} of ${data.dailyQuota} errors were accepted today. Further events are rejected until 00:00 UTC. Raise the cap in Settings.`}>
+          <StatusBadge tone="error">Quota reached</StatusBadge>
+        </LayerCard>
+      ) : (
+        <p className="text-[13px] text-[var(--ui-fg-faint)]">{data.usedToday} of {data.dailyQuota} errors accepted today.</p>
+      )}
       <LayerCard
         title="Sentry DSN"
         description="Use this with any official Sentry SDK. The public key identifies the project. It is not a secret, which is why browser SDKs can ship it."
