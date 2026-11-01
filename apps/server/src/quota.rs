@@ -16,7 +16,9 @@ pub const ANALYTICS: &str = "analytics";
 pub struct Charge {
     pub allowed: bool,
     pub retry_after_secs: u64,
+    #[allow(dead_code)]
     pub used: i64,
+    #[allow(dead_code)]
     pub quota: i64,
 }
 

@@ -11,7 +11,6 @@
 use owlee_insights::now_secs;
 use sqlx::Row;
 
-use crate::dns::TxtResolver;
 use crate::error::AppError;
 use crate::state::AppState;
 

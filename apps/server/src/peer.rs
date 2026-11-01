@@ -53,7 +53,7 @@ pub fn client_ip(headers: &HeaderMap, proxy_hops: usize, peer: Option<IpAddr>) -
         .unwrap_or_else(|| "0.0.0.0".to_owned())
 }
 
-pub fn peer_addr(extensions: &http::Extensions) -> Option<IpAddr> {
+pub fn peer_addr(extensions: &axum::http::Extensions) -> Option<IpAddr> {
     extensions
         .get::<ConnectInfo<SocketAddr>>()
         .map(|info| info.0.ip())

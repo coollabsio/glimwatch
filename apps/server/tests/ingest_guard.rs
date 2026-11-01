@@ -25,7 +25,12 @@ struct Hit {
     cookie: Option<String>,
 }
 
-async fn boot_app(config: Config) -> (Router, AppState, Option<String>) {
+async fn boot_app(mut config: Config) -> (Router, AppState, Option<String>) {
+    if config.database_url.is_none() {
+        let dir = tempfile::tempdir().unwrap();
+        config.database_path = dir.path().join("owlee.sqlite");
+        let _keep = Box::leak(Box::new(dir));
+    }
     let state = boot(config).await.expect("boot");
     let token = initialize_setup_token(&state.db, TimestampMillis::now())
         .await
@@ -38,6 +43,11 @@ async fn boot_app(config: Config) -> (Router, AppState, Option<String>) {
     (app, state, token)
 }
 
+fn site_host() -> String {
+    let raw = owlee_platform::Id::new().to_string().replace('-', "");
+    format!("d{}.example", &raw[..12])
+}
+
 fn sqlite_config() -> Config {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("owlee.sqlite");
@@ -45,7 +55,7 @@ fn sqlite_config() -> Config {
     testing_config(path)
 }
 
-async fn hit(
+async fn send(
     app: &Router,
     method: &str,
     uri: &str,
@@ -118,7 +128,7 @@ async fn owner(app: &Router, setup_token: Option<&str>) -> String {
             }),
         )
     };
-    let hit = hit(
+    let hit = send(
         app,
         "POST",
         path,
@@ -140,6 +150,10 @@ fn envelope(event_json: &str) -> Vec<u8> {
     body
 }
 
+fn event_id() -> String {
+    owlee_platform::Id::new().to_string().replace('-', "")
+}
+
 fn event(id: &str, message: &str) -> Value {
     json!({
         "event_id": id,
@@ -156,7 +170,7 @@ fn event(id: &str, message: &str) -> Value {
 }
 
 async fn project(app: &Router, cookie: &str) -> (String, String) {
-    let hit = hit(
+    let hit = send(
         app,
         "POST",
         "/api/error-projects",
@@ -175,7 +189,7 @@ async fn project(app: &Router, cookie: &str) -> (String, String) {
 }
 
 async fn post_event(app: &Router, id: &str, key: &str, body: Vec<u8>) -> Hit {
-    hit(
+    send(
         app,
         "POST",
         &format!("/api/{id}/envelope/?sentry_key={key}"),
@@ -214,11 +228,11 @@ async fn oversized_body(config: &Config) {
 
     let (app, _, token) = boot_app(config.clone()).await;
     let cookie = owner(&app, token.as_deref()).await;
-    let created = hit(
+    let created = send(
         &app,
         "POST",
         "/api/sites",
-        json!({"name": "Docs", "domain": "docs.example"})
+        json!({"name": "Docs", "domain": site_host()})
             .to_string()
             .into_bytes(),
         Some(&cookie),
@@ -229,7 +243,7 @@ async fn oversized_body(config: &Config) {
     let public_id = created.body["public_id"].as_str().unwrap();
     let fat = "y".repeat(config.ingest.analytics_max_body_bytes + 8);
     let body = format!(r#"{{"site":"{public_id}","type":"pageview","url":"https://docs.example/","pad":"{fat}"}}"#);
-    let rejected = hit(
+    let rejected = send(
         &app,
         "POST",
         "/api/receive",
@@ -253,7 +267,7 @@ async fn burst_is_429(mut config: Config) {
     let cookie = owner(&app, token.as_deref()).await;
     let (id, key) = project(&app, &cookie).await;
     for index in 0..2 {
-        let body = envelope(&event(&format!("{index:032x}"), "disk full").to_string());
+        let body = envelope(&event(&event_id(), "disk full").to_string());
         let hit = post_event(&app, &id, &key, body).await;
         assert_eq!(hit.status, StatusCode::OK, "{}", hit.body);
     }
@@ -261,7 +275,7 @@ async fn burst_is_429(mut config: Config) {
         &app,
         &id,
         &key,
-        envelope(&event(&format!("{:032x}", 3), "disk full").to_string()),
+        envelope(&event(&event_id(), "disk full").to_string()),
     )
     .await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS, "{}", blocked.body);
@@ -281,19 +295,20 @@ async fn burst_is_429(mut config: Config) {
 async fn wrong_origin(config: Config) {
     let (app, state, token) = boot_app(config).await;
     let cookie = owner(&app, token.as_deref()).await;
-    let created = hit(
+    let created = send(
         &app,
         "POST",
         "/api/sites",
-        json!({"name": "Docs", "domain": "docs.example"})
+        json!({"name": "Docs", "domain": site_host()})
             .to_string()
             .into_bytes(),
         Some(&cookie),
         &[("content-type", "application/json")],
     )
     .await;
-    let public_id = created.body["public_id"].as_str().unwrap();
-    let site_id = created.body["id"].as_str().unwrap();
+    let public_id = created.body["public_id"].as_str().unwrap().to_owned();
+    let site_id = created.body["id"].as_str().unwrap().to_owned();
+    let domain = created.body["domain"].as_str().unwrap().to_owned();
     let payload = json!({
         "site": public_id,
         "type": "pageview",
@@ -301,7 +316,7 @@ async fn wrong_origin(config: Config) {
     })
     .to_string()
     .into_bytes();
-    let rejected = hit(
+    let rejected = send(
         &app,
         "POST",
         "/api/receive",
@@ -315,24 +330,24 @@ async fn wrong_origin(config: Config) {
     )
     .await;
     assert_eq!(rejected.status, StatusCode::FORBIDDEN, "{}", rejected.body);
-    let accepted = hit(
+    let accepted = send(
         &app,
         "POST",
         "/api/receive",
-        json!({"site": public_id, "type": "pageview", "url": "https://docs.example/guide"})
+        json!({"site": public_id, "type": "pageview", "url": format!("https://{domain}/guide")})
             .to_string()
             .into_bytes(),
         None,
         &[
             ("content-type", "application/json"),
-            ("origin", "https://docs.example"),
+            ("origin", &format!("https://{domain}")),
             ("user-agent", BROWSER),
         ],
     )
     .await;
     assert_eq!(accepted.status, StatusCode::ACCEPTED, "{}", accepted.body);
     let rows = sqlx::query("SELECT COUNT(*) AS n FROM insight_events WHERE site_id = $1")
-        .bind(site_id)
+        .bind(&site_id)
         .fetch_one(state.db.pool())
         .await
         .unwrap();
@@ -345,14 +360,14 @@ async fn flood_is_capped(config: Config) {
     let (app, _, token) = boot_app(config).await;
     let cookie = owner(&app, token.as_deref()).await;
     let (id, key) = project(&app, &cookie).await;
-    for index in 0..8 {
+    for _ in 0..8 {
         let body = envelope(
-            &event(&format!("{:032x}", index + 10), "disk full on volume 3").to_string(),
+            &event(&event_id(), "disk full on volume 3").to_string(),
         );
         let hit = post_event(&app, &id, &key, body).await;
         assert_eq!(hit.status, StatusCode::OK, "{}", hit.body);
     }
-    let feed = hit(
+    let feed = send(
         &app,
         "GET",
         &format!("/api/error-issues?project_id={id}"),
@@ -365,7 +380,7 @@ async fn flood_is_capped(config: Config) {
     assert_eq!(feed.body["issues"].as_array().unwrap().len(), 1);
     assert_eq!(feed.body["issues"][0]["eventCount"], 8);
     let issue_id = feed.body["issues"][0]["id"].as_str().unwrap();
-    let detail = hit(
+    let detail = send(
         &app,
         "GET",
         &format!("/api/error-issues/{issue_id}"),
@@ -387,7 +402,7 @@ async fn retention_keeps_rollups(config: Config) {
         &app,
         &id,
         &key,
-        envelope(&event(&format!("{:032x}", 20), "old failure").to_string()),
+        envelope(&event(&event_id(), "old failure").to_string()),
     )
     .await;
     assert_eq!(first.status, StatusCode::OK, "{}", first.body);
@@ -395,15 +410,15 @@ async fn retention_keeps_rollups(config: Config) {
         &app,
         &id,
         &key,
-        envelope(&event(&format!("{:032x}", 21), "old failure").to_string()),
+        envelope(&event(&event_id(), "old failure").to_string()),
     )
     .await;
     assert_eq!(second.status, StatusCode::OK, "{}", second.body);
-    let created = hit(
+    let created = send(
         &app,
         "POST",
         "/api/sites",
-        json!({"name": "Docs", "domain": "docs.example"})
+        json!({"name": "Docs", "domain": site_host()})
             .to_string()
             .into_bytes(),
         Some(&cookie),
@@ -411,18 +426,19 @@ async fn retention_keeps_rollups(config: Config) {
     )
     .await;
     let public_id = created.body["public_id"].as_str().unwrap();
-    let site_id = created.body["id"].as_str().unwrap();
-    let viewed = hit(
+    let site_id = created.body["id"].as_str().unwrap().to_owned();
+    let domain = created.body["domain"].as_str().unwrap().to_owned();
+    let viewed = send(
         &app,
         "POST",
         "/api/receive",
-        json!({"site": public_id, "type": "pageview", "url": "https://docs.example/"})
+        json!({"site": public_id, "type": "pageview", "url": format!("https://{domain}/")})
             .to_string()
             .into_bytes(),
         None,
         &[
             ("content-type", "application/json"),
-            ("origin", "https://docs.example"),
+            ("origin", &format!("https://{domain}")),
             ("user-agent", BROWSER),
         ],
     )
@@ -435,7 +451,7 @@ async fn retention_keeps_rollups(config: Config) {
         .await
         .unwrap();
     sqlx::query("UPDATE insight_events SET timestamp = 10 WHERE site_id = $1")
-        .bind(site_id)
+        .bind(&site_id)
         .execute(state.db.pool())
         .await
         .unwrap();
@@ -444,7 +460,7 @@ async fn retention_keeps_rollups(config: Config) {
         .unwrap();
     assert!(stats.error_events >= 1);
     assert!(stats.analytics_events >= 1);
-    let feed = hit(
+    let feed = send(
         &app,
         "GET",
         &format!("/api/error-issues?project_id={id}"),
@@ -455,7 +471,7 @@ async fn retention_keeps_rollups(config: Config) {
     .await;
     assert_eq!(feed.body["issues"][0]["eventCount"], 2);
     let issue_id = feed.body["issues"][0]["id"].as_str().unwrap();
-    let detail = hit(
+    let detail = send(
         &app,
         "GET",
         &format!("/api/error-issues/{issue_id}"),
@@ -465,7 +481,7 @@ async fn retention_keeps_rollups(config: Config) {
     )
     .await;
     assert_eq!(detail.body["events"].as_array().unwrap().len(), 1);
-    let overview = hit(
+    let overview = send(
         &app,
         "GET",
         &format!("/api/sites/{site_id}/overview"),
@@ -477,7 +493,7 @@ async fn retention_keeps_rollups(config: Config) {
     assert_eq!(overview.status, StatusCode::OK, "{}", overview.body);
     assert_eq!(overview.body["pageviews"], 1);
     let left = sqlx::query("SELECT COUNT(*) AS n FROM insight_events WHERE site_id = $1")
-        .bind(site_id)
+        .bind(&site_id)
         .fetch_one(state.db.pool())
         .await
         .unwrap();
@@ -486,44 +502,59 @@ async fn retention_keeps_rollups(config: Config) {
 
 async fn quota_is_enforced(config: Config) {
     let (app, state, token) = boot_app(config).await;
+    let root = token.is_some();
     let cookie = owner(&app, token.as_deref()).await;
     let (id, key) = project(&app, &cookie).await;
-    let before = hit(
+    if root {
+        let before = send(
+            &app,
+            "GET",
+            "/api/admin/settings",
+            Vec::new(),
+            Some(&cookie),
+            &[],
+        )
+        .await;
+        assert_eq!(before.status, StatusCode::OK, "{}", before.body);
+        let error_quota = before.body["error_daily_quota"].as_i64().unwrap();
+        let analytics_quota = before.body["analytics_daily_quota"].as_i64().unwrap();
+        let updated = send(
+            &app,
+            "PUT",
+            "/api/admin/settings/quotas",
+            json!({"error_daily": error_quota, "analytics_daily": analytics_quota + 1})
+                .to_string()
+                .into_bytes(),
+            Some(&cookie),
+            &[("content-type", "application/json")],
+        )
+        .await;
+        assert_eq!(updated.status, StatusCode::OK, "{}", updated.body);
+        assert_eq!(updated.body["analytics_daily_quota"], analytics_quota + 1);
+        let restored = send(
+            &app,
+            "PUT",
+            "/api/admin/settings/quotas",
+            json!({"error_daily": error_quota, "analytics_daily": analytics_quota})
+                .to_string()
+                .into_bytes(),
+            Some(&cookie),
+            &[("content-type", "application/json")],
+        )
+        .await;
+        assert_eq!(restored.status, StatusCode::OK, "{}", restored.body);
+    }
+    let current = send(
         &app,
         "GET",
-        "/api/admin/settings",
+        &format!("/api/error-projects/{id}"),
         Vec::new(),
         Some(&cookie),
         &[],
     )
     .await;
-    assert_eq!(before.status, StatusCode::OK, "{}", before.body);
-    let error_quota = before.body["error_daily_quota"].as_i64().unwrap();
-    let analytics_quota = before.body["analytics_daily_quota"].as_i64().unwrap();
-    let updated = hit(
-        &app,
-        "PUT",
-        "/api/admin/settings/quotas",
-        json!({"error_daily": error_quota, "analytics_daily": analytics_quota + 1})
-            .to_string()
-            .into_bytes(),
-        Some(&cookie),
-        &[("content-type", "application/json")],
-    )
-    .await;
-    assert_eq!(updated.status, StatusCode::OK, "{}", updated.body);
-    assert_eq!(updated.body["analytics_daily_quota"], analytics_quota + 1);
-    let _ = hit(
-        &app,
-        "PUT",
-        "/api/admin/settings/quotas",
-        json!({"error_daily": error_quota, "analytics_daily": analytics_quota})
-            .to_string()
-            .into_bytes(),
-        Some(&cookie),
-        &[("content-type", "application/json")],
-    )
-    .await;
+    assert_eq!(current.status, StatusCode::OK, "{}", current.body);
+    let error_quota = current.body["dailyQuota"].as_i64().unwrap();
     sqlx::query(
         "INSERT INTO ingest_usage (kind, subject_id, day, count) VALUES ('error', $1, $2, $3) \
          ON CONFLICT (kind, subject_id, day) DO UPDATE SET count = $3",
@@ -538,7 +569,7 @@ async fn quota_is_enforced(config: Config) {
         &app,
         &id,
         &key,
-        envelope(&event(&format!("{:032x}", 30), "over quota").to_string()),
+        envelope(&event(&event_id(), "over quota").to_string()),
     )
     .await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS, "{}", blocked.body);
@@ -552,7 +583,7 @@ async fn quota_is_enforced(config: Config) {
         "{:?}",
         blocked.rate_limits
     );
-    let listed = hit(
+    let listed = send(
         &app,
         "GET",
         "/api/error-projects",
@@ -591,11 +622,12 @@ async fn txt_verification(mut config: Config) {
     }
     let app = router(state.clone());
     let cookie = owner(&app, token.as_deref()).await;
-    let created = hit(
+    let domain = site_host();
+    let created = send(
         &app,
         "POST",
         "/api/sites",
-        json!({"name": "Example", "domain": "example.com"})
+        json!({"name": "Example", "domain": domain.clone()})
             .to_string()
             .into_bytes(),
         Some(&cookie),
@@ -609,13 +641,14 @@ async fn txt_verification(mut config: Config) {
     let public_id = created.body["public_id"].as_str().unwrap();
     let name = created.body["verify_name"].as_str().unwrap().to_owned();
     let value = created.body["verify_value"].as_str().unwrap().to_owned();
-    assert_eq!(name, "_owlee-verify.example.com");
+    let origin = format!("https://{domain}");
+    assert_eq!(name, format!("_owlee-verify.{domain}"));
     assert!(value.starts_with("owlee-verify="));
-    let early = receive(&app, public_id, "https://example.com").await;
+    let early = receive(&app, public_id, &origin).await;
     assert_eq!(early.status, StatusCode::FORBIDDEN, "{}", early.body);
 
     dns.set(&name, vec!["unrelated".into()]);
-    let failed = hit(
+    let failed = send(
         &app,
         "POST",
         &format!("/api/sites/{site_id}/verify"),
@@ -629,7 +662,7 @@ async fn txt_verification(mut config: Config) {
     assert_eq!(still["verified"], false);
 
     dns.set(&name, vec![value.clone()]);
-    let ok = hit(
+    let ok = send(
         &app,
         "POST",
         &format!("/api/sites/{site_id}/verify"),
@@ -640,7 +673,7 @@ async fn txt_verification(mut config: Config) {
     .await;
     assert_eq!(ok.status, StatusCode::OK, "{}", ok.body);
     assert_eq!(ok.body["verified"], true);
-    let accepted = receive(&app, public_id, "https://example.com").await;
+    let accepted = receive(&app, public_id, &origin).await;
     assert_eq!(accepted.status, StatusCode::ACCEPTED, "{}", accepted.body);
 
     dns.set(&name, Vec::new());
@@ -648,12 +681,12 @@ async fn txt_verification(mut config: Config) {
     assert_eq!(cleared, 1);
     let after = get_site(&app, site_id, &cookie).await;
     assert_eq!(after["verified"], false);
-    let again = receive(&app, public_id, "https://example.com").await;
+    let again = receive(&app, public_id, &origin).await;
     assert_eq!(again.status, StatusCode::FORBIDDEN, "{}", again.body);
 }
 
 async fn receive(app: &Router, public_id: &str, origin: &str) -> Hit {
-    hit(
+    send(
         app,
         "POST",
         "/api/receive",
@@ -671,7 +704,7 @@ async fn receive(app: &Router, public_id: &str, origin: &str) -> Hit {
 }
 
 async fn get_site(app: &Router, id: &str, cookie: &str) -> Value {
-    let hit = hit(
+    let hit = send(
         app,
         "GET",
         &format!("/api/sites/{id}"),
@@ -696,7 +729,7 @@ async fn login_is_limited(mut config: Config) {
         .to_string()
         .into_bytes();
     for index in 0..2 {
-        let attempt = hit(
+        let attempt = send(
             &app,
             "POST",
             "/api/auth/login",
@@ -710,7 +743,7 @@ async fn login_is_limited(mut config: Config) {
         .await;
         assert_eq!(attempt.status, StatusCode::UNAUTHORIZED, "{index}");
     }
-    let blocked = hit(
+    let blocked = send(
         &app,
         "POST",
         "/api/auth/login",
@@ -724,7 +757,7 @@ async fn login_is_limited(mut config: Config) {
     .await;
     assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS, "{}", blocked.body);
     assert!(blocked.retry_after.is_some());
-    let other_ip = hit(
+    let other_ip = send(
         &app,
         "POST",
         "/api/auth/login",
@@ -757,6 +790,15 @@ async fn postgres_ingest_guards() {
         return;
     };
     let mut config = sqlite_config();
+    // Own database so this test's owner is root and it does not share
+    // instance_settings with the other Postgres suites.
+    let url = url.trim_end_matches('/').rsplit_once('/').map_or(url.clone(), |(base, _)| {
+        format!("{base}/owlee_ingest")
+    });
+    let admin = url.replacen("owlee_ingest", "postgres", 1);
+    let _ = sqlx::query("CREATE DATABASE owlee_ingest")
+        .execute(&sqlx::postgres::PgPoolOptions::new().connect(&admin).await.unwrap())
+        .await;
     config.database_url = Some(url);
     exercise(config).await;
 }

@@ -368,6 +368,8 @@ mod tests {
             }),
             initialized: true,
             root_user: None,
+            error_daily_quota: 10_000,
+            analytics_daily_quota: 100_000,
         }
     }
 
