@@ -16,6 +16,8 @@ pub struct Project {
     pub public_key: String,
     pub platform: String,
     pub created_at: String,
+    /// `None` means this project uses the instance default.
+    pub daily_quota: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,7 +91,7 @@ fn now() -> String {
 pub async fn list_projects(db: &Database) -> Result<Vec<Project>, AppError> {
     let sql = statement(
         db,
-        "SELECT id, name, slug, public_key, platform, created_at FROM projects ORDER BY created_at ASC",
+        "SELECT id, name, slug, public_key, platform, created_at, daily_quota FROM projects ORDER BY created_at ASC",
     );
     let rows = sqlx::query(&sql).fetch_all(db.pool()).await?;
     rows.iter().map(project_from_row).collect()
@@ -98,7 +100,7 @@ pub async fn list_projects(db: &Database) -> Result<Vec<Project>, AppError> {
 pub async fn get_project(db: &Database, id: &str) -> Result<Project, AppError> {
     let sql = statement(
         db,
-        "SELECT id, name, slug, public_key, platform, created_at FROM projects WHERE id = ?",
+        "SELECT id, name, slug, public_key, platform, created_at, daily_quota FROM projects WHERE id = ?",
     );
     let row = sqlx::query(&sql).bind(id).fetch_optional(db.pool()).await?;
     match row {
@@ -165,6 +167,7 @@ pub async fn create_project(
         public_key,
         platform,
         created_at,
+        daily_quota: None,
     })
 }
 
@@ -539,7 +542,25 @@ fn project_from_row(row: &sqlx::any::AnyRow) -> Result<Project, AppError> {
         public_key: row.try_get("public_key")?,
         platform: row.try_get("platform")?,
         created_at: row.try_get("created_at")?,
+        daily_quota: row.try_get("daily_quota")?,
     })
+}
+
+pub async fn set_daily_quota(
+    db: &Database,
+    id: &str,
+    quota: Option<i64>,
+) -> Result<Project, AppError> {
+    let sql = statement(db, "UPDATE projects SET daily_quota = ? WHERE id = ?");
+    let result = sqlx::query(&sql)
+        .bind(quota)
+        .bind(id)
+        .execute(db.pool())
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    get_project(db, id).await
 }
 
 fn issue_from_row(row: &sqlx::any::AnyRow) -> Result<IssueRow, AppError> {

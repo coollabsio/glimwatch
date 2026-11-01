@@ -467,13 +467,7 @@ function DomainCard({ site }: { site: InsightSite }) {
         <StatusBadge tone={site.verified ? "success" : "warning"}>{site.verified ? "Verified" : "Unverified"}</StatusBadge>
       }
     >
-      {site.quota_exceeded ? (
-        <p className="mb-3 text-[13px] text-[var(--ui-error)]">
-          Daily quota reached ({site.used_today} / {site.daily_quota}). Events are rejected until 00:00 UTC. The cap is in Settings.
-        </p>
-      ) : (
-        <p className="mb-3 text-[13px] text-[var(--ui-fg-faint)]">{site.used_today} / {site.daily_quota} events today.</p>
-      )}
+      <SiteQuota key={String(site.quota_override ?? "inherit")} site={site} />
       {!site.verified && site.ingest_open ? (
         <p className="mb-3 text-[13px] text-[var(--ui-fg-dim)]">
           This install is in development, so events from the configured domain are still accepted. Production refuses them until the TXT record verifies.
@@ -493,6 +487,57 @@ function DomainCard({ site }: { site: InsightSite }) {
       </Button>
       <ErrorText error={verify.error} />
     </LayerCard>
+  );
+}
+
+function resetWhen(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "00:00 UTC";
+  return `${date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
+}
+
+function SiteQuota({ site }: { site: InsightSite }) {
+  const client = useQueryClient();
+  const [value, setValue] = useState(site.quota_override == null ? "" : String(site.quota_override));
+  const save = useMutation({
+    mutationFn: (daily: number | null) =>
+      api<InsightSite>(`/api/sites/${site.id}/quota`, {
+        method: "PUT",
+        body: JSON.stringify({ daily_quota: daily }),
+      }),
+    onSuccess: async (data) => {
+      setValue(data.quota_override == null ? "" : String(data.quota_override));
+      await client.invalidateQueries({ queryKey: ["sites"] });
+      await client.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+  return (
+    <div className="mb-4 border-b border-[var(--ui-divider)] pb-4">
+      <p className={`mb-3 text-[13px] ${site.quota_exceeded ? "text-[var(--ui-error)]" : "text-[var(--ui-fg-faint)]"}`}>
+        {site.used_today.toLocaleString()} of {site.daily_quota.toLocaleString()} events today
+        {site.quota_override == null ? " (instance default)" : " (this site)"}
+        {site.quota_exceeded ? ". Further events are rejected until the counter resets." : "."} Resets {resetWhen(site.resets_at)}.
+      </p>
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const trimmed = value.trim();
+          save.mutate(trimmed === "" ? null : Number(trimmed));
+        }}
+      >
+        <div className="sm:w-56">
+          <Field label="Events per day">
+            <Input inputMode="numeric" placeholder="Inherit" value={value} onChange={(event) => setValue(event.target.value)} />
+          </Field>
+        </div>
+        <Button variant="primary" type="submit" disabled={save.isPending}>Save cap</Button>
+        {site.quota_override != null ? (
+          <Button type="button" disabled={save.isPending} onClick={() => save.mutate(null)}>Inherit</Button>
+        ) : null}
+      </form>
+      <ErrorText error={save.error} />
+    </div>
   );
 }
 

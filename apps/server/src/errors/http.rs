@@ -28,8 +28,10 @@ pub struct ProjectView {
     pub dsn: String,
     pub created_at: String,
     pub daily_quota: i64,
+    pub quota_override: Option<i64>,
     pub used_today: i64,
     pub quota_exceeded: bool,
+    pub resets_at: String,
 }
 
 pub async fn list_projects(
@@ -66,6 +68,30 @@ pub async fn get_project(
     ))
 }
 
+#[derive(Deserialize)]
+pub struct QuotaBody {
+    pub daily_quota: Option<i64>,
+}
+
+pub async fn set_project_quota(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<String>,
+    Json(body): Json<QuotaBody>,
+) -> Result<Json<ProjectView>, AppError> {
+    require_user(&state, &jar).await?;
+    if let Some(quota) = body.daily_quota {
+        if !(1..=100_000_000).contains(&quota) {
+            return Err(AppError::field(
+                "daily_quota",
+                "Use a daily cap from 1 to 100000000, or leave it empty to inherit.",
+            ));
+        }
+    }
+    let project = store::set_daily_quota(&state.db, &id, body.daily_quota).await?;
+    Ok(Json(project_view(&state, project).await?))
+}
+
 pub async fn delete_project(
     State(state): State<AppState>,
     jar: CookieJar,
@@ -77,7 +103,8 @@ pub async fn delete_project(
 }
 
 async fn project_view(state: &AppState, project: Project) -> Result<ProjectView, AppError> {
-    let daily_quota = crate::quota::error_quota(&state.db).await?;
+    let global = crate::quota::error_quota(&state.db).await?;
+    let daily_quota = crate::quota::effective(global, project.daily_quota);
     let used_today = crate::quota::used(&state.db, crate::quota::ERROR, &project.id).await?;
     Ok(ProjectView {
         dsn: store::build_dsn(
@@ -86,6 +113,8 @@ async fn project_view(state: &AppState, project: Project) -> Result<ProjectView,
             &project.id,
         ),
         quota_exceeded: used_today >= daily_quota,
+        quota_override: project.daily_quota,
+        resets_at: crate::quota::resets_at(),
         daily_quota,
         used_today,
         id: project.id,

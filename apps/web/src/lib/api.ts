@@ -262,6 +262,15 @@ export type DashboardSite = {
   pageviews: number;
 };
 
+export type QuotaHit = {
+  kind: "error" | "analytics";
+  id: string;
+  name: string;
+  used: number;
+  quota: number;
+  resets_at: string;
+};
+
 export type Dashboard = {
   monitors: {
     up: number;
@@ -294,6 +303,7 @@ export type Dashboard = {
     previous_clicks: number;
     top_sites: DashboardSite[];
   };
+  quota_hits: QuotaHit[];
 };
 
 export type PublicComponent = {
@@ -342,8 +352,10 @@ export type InsightSite = {
   verify_value: string;
   ingest_open: boolean;
   daily_quota: number;
+  quota_override: number | null;
   used_today: number;
   quota_exceeded: boolean;
+  resets_at: string;
 };
 
 export type InsightPoint = {
@@ -425,8 +437,10 @@ export type Project = {
   dsn: string;
   createdAt: string;
   dailyQuota: number;
+  quotaOverride: number | null;
   usedToday: number;
   quotaExceeded: boolean;
+  resetsAt: string;
 };
 
 export type Issue = {

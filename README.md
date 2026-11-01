@@ -214,7 +214,7 @@ An envelope is rejected with `413` above `OWLEE_ERROR_MAX_BODY_BYTES` (1 MiB). S
 
 Issues still group on a fingerprint. `event_count` increases for every accepted event. The full payload is kept for the first `OWLEE_ERROR_KEEP_FIRST` events (5), then one more per `OWLEE_ERROR_SAMPLE_WINDOW_SECS` (1 hour). The issue row is the aggregate the feed shows. A background pass deletes raw `events` older than `OWLEE_ERROR_RETENTION_DAYS` (30) in batches of 500. The issue, including `event_count`, stays. `events(timestamp)` is indexed for that delete and for the 24-hour trend query.
 
-Each project may accept `OWLEE_ERROR_DAILY_QUOTA` events per UTC day (10,000) until the root user sets another number under Settings → Ingest quotas. The projects list shows when today's counter has hit that cap.
+Each project may accept `OWLEE_ERROR_DAILY_QUOTA` events per UTC day (100,000) until the root user sets another number under Settings → Ingest quotas, or the project sets its own cap. One error a second all day is about 86,400, so normal use does not reach 100,000. The projects list and the dashboard show when today's counter has hit that cap, and when it resets (00:00 UTC).
 
 `examples/` has PHP, Node, browser, and Rust SDK programs. Set `SENTRY_DSN` to the project DSN.
 
@@ -232,7 +232,7 @@ The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. I
 
 Events are accepted only when `Origin` (or `Referer`, if `Origin` is missing) matches the site domain or a subdomain of it, or an enabled link domain attached to that site. In development, `localhost` and `127.0.0.1` are also accepted (`OWLEE_INGEST_ALLOW_LOCALHOST`, on in development and off in production). A new site is unverified. Development still collects, and the site page says so. Production returns `403` until you add the TXT record shown on the site (`_owlee-verify.example.com` TXT `owlee-verify=<token>`) and press Verify. Owlee re-checks verified domains every `OWLEE_DOMAIN_RECHECK_SECS` (1 hour) and clears the flag when DNS answers without the token. A lookup error does not clear it. Status pages have no custom hostname, so there is nothing to verify there.
 
-The same site key and the same client IP each have a token bucket. A full bucket or a full daily quota (`OWLEE_ANALYTICS_DAILY_QUOTA`, 100,000 per site until Settings changes it) answers `429` with `Retry-After`. `window.owleeEvent(name, data)` records a custom event.
+The same site key and the same client IP each have a token bucket. A full bucket or a full daily quota answers `429` with `Retry-After`. The default is `OWLEE_ANALYTICS_DAILY_QUOTA` (1,000,000 per site). A million pageviews a day is a large site for this install; a site can set a lower or higher cap of its own. The counter resets at 00:00 UTC. `window.owleeEvent(name, data)` records a custom event.
 
 Raw `insight_events` rows, including link clicks, older than `OWLEE_ANALYTICS_RETENTION_DAYS` (90) are deleted in batches. Daily rollups (`insight_daily`, `insight_link_daily`, and the dimension tables) stay, and those are what the overview reads. `insight_events(timestamp)` is indexed for the delete.
 

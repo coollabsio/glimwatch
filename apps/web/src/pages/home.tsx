@@ -61,6 +61,7 @@ export function HomePage() {
     <div className="flex flex-col gap-6">
       <PageHeader title="Dashboard" description="Monitors, incidents, errors, and traffic." />
       <ErrorText error={home.error} />
+      <QuotaNotice hits={data.quota_hits} />
       <MonitorsCard data={data} />
       <div className="grid items-start gap-6 lg:grid-cols-2">
         <IncidentsCard incidents={data.incidents} />
@@ -71,6 +72,35 @@ export function HomePage() {
         <TrafficCard analytics={data.analytics} />
       </div>
     </div>
+  );
+}
+
+function resetWhen(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "00:00 UTC";
+  return `${date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
+}
+
+function QuotaNotice({ hits }: { hits: Dashboard["quota_hits"] }) {
+  if (hits.length === 0) return null;
+  return (
+    <LayerCard title="Ingest stopped" description="A project or site reached its daily cap. New events are rejected until the counter resets.">
+      <ul className="space-y-2">
+        {hits.map((hit) => {
+          const to = hit.kind === "error" ? `/error-projects/${hit.id}` : `/analytics/${hit.id}`;
+          const noun = hit.kind === "error" ? "errors" : "events";
+          return (
+            <li key={`${hit.kind}-${hit.id}`} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+              <StatusBadge tone="error">Cap reached</StatusBadge>
+              <Link className="font-medium text-[var(--ui-fg)] hover:underline" to={to}>{hit.name}</Link>
+              <span className="text-[var(--ui-fg-faint)]">
+                {hit.used.toLocaleString()} / {hit.quota.toLocaleString()} {noun}. Resets {resetWhen(hit.resets_at)}.
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </LayerCard>
   );
 }
 

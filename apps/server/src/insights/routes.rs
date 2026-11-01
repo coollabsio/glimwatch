@@ -41,6 +41,7 @@ pub fn api_routes() -> Router<AppState> {
                 .delete(delete_site),
         )
         .route("/sites/{id}/verify", axum::routing::post(verify_site))
+        .route("/sites/{id}/quota", axum::routing::put(set_site_quota))
         .route("/sites/{id}/analytics", axum::routing::delete(reset_site))
         .route("/sites/{id}/public", axum::routing::put(update_site_public))
         .route("/sites/{id}/overview", axum::routing::get(site_overview))
@@ -210,7 +211,7 @@ async fn accept_event(
         return Err(AppError::field("type", "Invalid event type."));
     }
     let site = sqlx::query(
-        "SELECT id, domain, verified FROM insight_sites WHERE public_id = $1",
+        "SELECT id, domain, verified, daily_quota FROM insight_sites WHERE public_id = $1",
     )
     .bind(&payload.site)
     .fetch_optional(state.db.pool())
@@ -221,6 +222,7 @@ async fn accept_event(
     let site_id: String = site.try_get("id")?;
     let domain: String = site.try_get("domain")?;
     let verified: i64 = site.try_get("verified")?;
+    let custom_quota: Option<i64> = site.try_get("daily_quota")?;
     let allowed = allowed_hosts(&state.db, &site_id, &domain).await?;
     if !origin_allowed(
         header_text(headers, header::ORIGIN),
@@ -244,7 +246,8 @@ async fn accept_event(
     if ua.is_empty() || bots().is_bot(ua) {
         return Ok(StatusCode::ACCEPTED);
     }
-    let daily = quota::analytics_quota(&state.db).await?;
+    let global = quota::analytics_quota(&state.db).await?;
+    let daily = quota::effective(global, custom_quota);
     let charge = quota::charge(&state.db, quota::ANALYTICS, &site_id, daily).await?;
     if !charge.allowed {
         return Err(AppError::limited(charge.retry_after_secs));
@@ -492,7 +495,7 @@ async fn list_sites(
     require_user(&state, &jar).await?;
     let rows = sqlx::query(
         "SELECT id, public_id, name, domain, color, public_slug, public_enabled, public_threshold, public_sections, created_at, \
-         verified, verify_token, verified_at \
+         verified, verify_token, verified_at, daily_quota \
          FROM insight_sites ORDER BY created_at",
     )
     .fetch_all(state.db.pool())
@@ -1606,7 +1609,7 @@ fn redirect_type(value: Option<&str>) -> Result<&'static str, AppError> {
 async fn fetch_site(state: &AppState, id: &str) -> Result<Value, AppError> {
     let row = sqlx::query(
         "SELECT id, public_id, name, domain, color, public_slug, public_enabled, public_threshold, public_sections, created_at, \
-         verified, verify_token, verified_at \
+         verified, verify_token, verified_at, daily_quota \
          FROM insight_sites WHERE id = $1",
     )
     .bind(id)
@@ -1631,7 +1634,9 @@ async fn site_json(state: &AppState, row: &sqlx::any::AnyRow) -> Result<Value, A
         .await?;
     }
     let verified = row.try_get::<i64, _>("verified")? != 0;
-    let quota = quota::analytics_quota(&state.db).await?;
+    let custom: Option<i64> = row.try_get("daily_quota")?;
+    let global = quota::analytics_quota(&state.db).await?;
+    let quota = quota::effective(global, custom);
     let used = quota::used(&state.db, quota::ANALYTICS, &id).await?;
     let dev = state.config.environment == EnvironmentMode::Development;
     let verify_name = crate::verify::record_name(&domain);
@@ -1654,9 +1659,43 @@ async fn site_json(state: &AppState, row: &sqlx::any::AnyRow) -> Result<Value, A
         "verify_value": verify_value,
         "ingest_open": verified || dev,
         "daily_quota": quota,
+        "quota_override": custom,
         "used_today": used,
         "quota_exceeded": used >= quota,
+        "resets_at": quota::resets_at(),
     }))
+}
+
+#[derive(Deserialize)]
+struct QuotaBody {
+    daily_quota: Option<i64>,
+}
+
+async fn set_site_quota(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<String>,
+    Json(body): Json<QuotaBody>,
+) -> Result<Json<Value>, AppError> {
+    require_user(&state, &jar).await?;
+    if let Some(quota) = body.daily_quota {
+        if !(1..=100_000_000).contains(&quota) {
+            return Err(AppError::field(
+                "daily_quota",
+                "Use a daily cap from 1 to 100000000, or leave it empty to inherit.",
+            ));
+        }
+    }
+    let changed = sqlx::query("UPDATE insight_sites SET daily_quota = $1 WHERE id = $2")
+        .bind(body.daily_quota)
+        .bind(&id)
+        .execute(state.db.pool())
+        .await?
+        .rows_affected();
+    if changed == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(fetch_site(&state, &id).await?))
 }
 
 async fn verify_site(

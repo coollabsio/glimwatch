@@ -233,7 +233,9 @@ CREATE TABLE insight_sites (
     created_at BIGINT NOT NULL,
     verified BIGINT NOT NULL DEFAULT 0,
     verify_token TEXT NOT NULL DEFAULT '',
-    verified_at BIGINT
+    verified_at BIGINT,
+    -- NULL inherits the instance analytics cap.
+    daily_quota BIGINT
 );
 
 CREATE TABLE insight_domains (
@@ -394,7 +396,9 @@ CREATE TABLE projects (
     public_key TEXT NOT NULL UNIQUE,
     platform TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    next_issue BIGINT NOT NULL DEFAULT 1
+    next_issue BIGINT NOT NULL DEFAULT 1,
+    -- NULL inherits the instance error cap.
+    daily_quota BIGINT
 );
 
 CREATE TABLE project_counters (
@@ -483,8 +487,10 @@ CREATE TABLE instance_settings (
     smtp_password TEXT,
     smtp_from TEXT,
     updated_at BIGINT,
-    error_daily_quota BIGINT NOT NULL DEFAULT 10000,
-    analytics_daily_quota BIGINT NOT NULL DEFAULT 100000,
+    -- Safety valve, not a bill. One error a second all day is about 86,400.
+    error_daily_quota BIGINT NOT NULL DEFAULT 100000,
+    -- A million pageviews a day is a large site for a self-hosted install.
+    analytics_daily_quota BIGINT NOT NULL DEFAULT 1000000,
     quotas_updated_at BIGINT
 );
 

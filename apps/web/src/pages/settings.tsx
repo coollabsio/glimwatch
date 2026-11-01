@@ -82,7 +82,7 @@ function QuotaForm({ settings }: { settings?: InstanceSettings }) {
   return (
     <LayerCard
       title="Ingest quotas"
-      description="Each error project and each analytics site has its own counter. These are the daily caps."
+      description="A safety valve so a runaway client cannot fill the disk. Each project and site uses this number unless that project or site sets its own cap. Normal traffic should not reach it."
     >
       <form
         className="grid gap-3 sm:grid-cols-2"

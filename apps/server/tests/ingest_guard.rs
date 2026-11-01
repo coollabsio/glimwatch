@@ -213,6 +213,7 @@ async fn exercise(config: Config) {
     flood_is_capped(config.clone()).await;
     retention_keeps_rollups(config.clone()).await;
     quota_is_enforced(config.clone()).await;
+    override_replaces_the_global_cap(config.clone()).await;
     txt_verification(config.clone()).await;
     login_is_limited(config).await;
 }
@@ -605,6 +606,124 @@ async fn quota_is_enforced(config: Config) {
         .execute(state.db.pool())
         .await
         .unwrap();
+}
+
+async fn override_replaces_the_global_cap(config: Config) {
+    let (app, _, token) = boot_app(config).await;
+    let cookie = owner(&app, token.as_deref()).await;
+    let (id, key) = project(&app, &cookie).await;
+    let first = send(
+        &app,
+        "GET",
+        &format!("/api/error-projects/{id}"),
+        Vec::new(),
+        Some(&cookie),
+        &[],
+    )
+    .await;
+    assert_eq!(first.status, StatusCode::OK, "{}", first.body);
+    assert!(first.body["quotaOverride"].is_null());
+    let inherited = first.body["dailyQuota"].as_i64().unwrap();
+    assert!(inherited > 1, "global cap {inherited} should be above the override");
+    assert!(!first.body["resetsAt"].as_str().unwrap_or("").is_empty());
+
+    let set = send(
+        &app,
+        "PUT",
+        &format!("/api/error-projects/{id}/quota"),
+        json!({"daily_quota": 1}).to_string().into_bytes(),
+        Some(&cookie),
+        &[("content-type", "application/json")],
+    )
+    .await;
+    assert_eq!(set.status, StatusCode::OK, "{}", set.body);
+    assert_eq!(set.body["dailyQuota"], 1);
+    assert_eq!(set.body["quotaOverride"], 1);
+
+    let accepted = post_event(
+        &app,
+        &id,
+        &key,
+        envelope(&event(&event_id(), "over the project cap").to_string()),
+    )
+    .await;
+    assert_eq!(accepted.status, StatusCode::OK, "{}", accepted.body);
+    let blocked = post_event(
+        &app,
+        &id,
+        &key,
+        envelope(&event(&event_id(), "over the project cap").to_string()),
+    )
+    .await;
+    assert_eq!(blocked.status, StatusCode::TOO_MANY_REQUESTS, "{}", blocked.body);
+    assert!(
+        blocked.rate_limits.as_deref().unwrap_or("").contains("quota_exceeded"),
+        "{:?}",
+        blocked.rate_limits
+    );
+
+    let home = send(&app, "GET", "/api/dashboard", Vec::new(), Some(&cookie), &[]).await;
+    assert_eq!(home.status, StatusCode::OK, "{}", home.body);
+    let hits = home.body["quota_hits"].as_array().unwrap();
+    assert!(
+        hits.iter().any(|hit| hit["kind"] == "error" && hit["id"] == id),
+        "{hits:?}"
+    );
+    assert!(!hits[0]["resets_at"].as_str().unwrap_or("").is_empty());
+
+    let cleared = send(
+        &app,
+        "PUT",
+        &format!("/api/error-projects/{id}/quota"),
+        json!({"daily_quota": null}).to_string().into_bytes(),
+        Some(&cookie),
+        &[("content-type", "application/json")],
+    )
+    .await;
+    assert_eq!(cleared.status, StatusCode::OK, "{}", cleared.body);
+    assert!(cleared.body["quotaOverride"].is_null());
+    assert_eq!(cleared.body["dailyQuota"], inherited);
+
+    let domain = site_host();
+    let created = send(
+        &app,
+        "POST",
+        "/api/sites",
+        json!({"name": "Docs", "domain": domain.clone()}).to_string().into_bytes(),
+        Some(&cookie),
+        &[("content-type", "application/json")],
+    )
+    .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    assert!(created.body["quota_override"].is_null());
+    let site_inherited = created.body["daily_quota"].as_i64().unwrap();
+    assert!(site_inherited > 1);
+    let site_id = created.body["id"].as_str().unwrap().to_owned();
+    let public_id = created.body["public_id"].as_str().unwrap().to_owned();
+    let set_site = send(
+        &app,
+        "PUT",
+        &format!("/api/sites/{site_id}/quota"),
+        json!({"daily_quota": 1}).to_string().into_bytes(),
+        Some(&cookie),
+        &[("content-type", "application/json")],
+    )
+    .await;
+    assert_eq!(set_site.status, StatusCode::OK, "{}", set_site.body);
+    assert_eq!(set_site.body["daily_quota"], 1);
+    assert_eq!(set_site.body["quota_override"], 1);
+    let origin = format!("https://{domain}");
+    let first_view = receive(&app, &public_id, &origin).await;
+    assert_eq!(first_view.status, StatusCode::ACCEPTED, "{}", first_view.body);
+    let second_view = receive(&app, &public_id, &origin).await;
+    assert_eq!(second_view.status, StatusCode::TOO_MANY_REQUESTS, "{}", second_view.body);
+    assert!(second_view.retry_after.is_some());
+    let again = send(&app, "GET", "/api/dashboard", Vec::new(), Some(&cookie), &[]).await;
+    let site_hits = again.body["quota_hits"].as_array().unwrap();
+    assert!(
+        site_hits.iter().any(|hit| hit["kind"] == "analytics" && hit["id"] == site_id),
+        "{site_hits:?}"
+    );
 }
 
 async fn txt_verification(mut config: Config) {

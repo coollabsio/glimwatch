@@ -219,9 +219,10 @@ async fn accept_event(
     project: &store::Project,
     event: &owlee_errors::NormalizedEvent,
 ) -> Result<Accepted, String> {
-    let quota = quota::error_quota(&state.db)
+    let global = quota::error_quota(&state.db)
         .await
         .map_err(|error| error.to_string())?;
+    let quota = quota::effective(global, project.daily_quota);
     let ingested = store::ingest_event(
         &state.db,
         project,

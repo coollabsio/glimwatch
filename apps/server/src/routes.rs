@@ -508,16 +508,16 @@ async fn set_quotas(
     Json(body): Json<QuotaBody>,
 ) -> Result<Json<Value>, AppError> {
     let actor = require_root(&state, &jar).await?;
-    if !(1..=10_000_000).contains(&body.error_daily) {
+    if !(1..=100_000_000).contains(&body.error_daily) {
         return Err(AppError::field(
             "error_daily",
-            "Use a daily error quota from 1 to 10000000.",
+            "Use a daily error cap from 1 to 100000000.",
         ));
     }
-    if !(1..=10_000_000).contains(&body.analytics_daily) {
+    if !(1..=100_000_000).contains(&body.analytics_daily) {
         return Err(AppError::field(
             "analytics_daily",
-            "Use a daily analytics quota from 1 to 10000000.",
+            "Use a daily analytics cap from 1 to 100000000.",
         ));
     }
     let now = TimestampMillis::now();

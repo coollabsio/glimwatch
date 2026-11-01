@@ -1,8 +1,8 @@
 //! Per-project and per-site daily ingest quotas.
 //!
-//! The number is the instance setting (Settings, or `OWLEE_*_DAILY_QUOTA`
-//! until that row is saved). The counter is per subject, so one project
-//! cannot spend another's allowance.
+//! The instance number is the default for every project and site. A subject
+//! with its own `daily_quota` uses that instead. The counter is still per
+//! subject, so one project cannot spend another's allowance.
 
 use chrono::{Duration, Utc};
 use owlee_platform::Database;
@@ -20,6 +20,19 @@ pub struct Charge {
     pub used: i64,
     #[allow(dead_code)]
     pub quota: i64,
+}
+
+pub struct UsageHit {
+    pub kind: &'static str,
+    pub id: String,
+    pub name: String,
+    pub used: i64,
+    pub quota: i64,
+}
+
+/// `custom` replaces `global` when the project or site set its own cap.
+pub fn effective(global: i64, custom: Option<i64>) -> i64 {
+    custom.unwrap_or(global)
 }
 
 pub async fn error_quota(db: &Database) -> Result<i64, AppError> {
@@ -107,8 +120,65 @@ pub async fn charge(
     })
 }
 
+pub async fn hits(db: &Database) -> Result<Vec<UsageHit>, AppError> {
+    let day = today();
+    let mut hits = Vec::new();
+    let errors = sqlx::query(
+        "SELECT p.id, p.name, u.count AS used, \
+                COALESCE(p.daily_quota, s.error_daily_quota) AS quota \
+         FROM projects p \
+         JOIN instance_settings s ON s.id = 1 \
+         JOIN ingest_usage u ON u.kind = 'error' AND u.subject_id = p.id AND u.day = $1 \
+         WHERE u.count >= COALESCE(p.daily_quota, s.error_daily_quota) \
+         ORDER BY p.name",
+    )
+    .bind(&day)
+    .fetch_all(db.pool())
+    .await?;
+    for row in &errors {
+        hits.push(UsageHit {
+            kind: ERROR,
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            used: row.try_get("used")?,
+            quota: row.try_get("quota")?,
+        });
+    }
+    let sites = sqlx::query(
+        "SELECT p.id, p.name, u.count AS used, \
+                COALESCE(p.daily_quota, s.analytics_daily_quota) AS quota \
+         FROM insight_sites p \
+         JOIN instance_settings s ON s.id = 1 \
+         JOIN ingest_usage u ON u.kind = 'analytics' AND u.subject_id = p.id AND u.day = $1 \
+         WHERE u.count >= COALESCE(p.daily_quota, s.analytics_daily_quota) \
+         ORDER BY p.name",
+    )
+    .bind(&day)
+    .fetch_all(db.pool())
+    .await?;
+    for row in &sites {
+        hits.push(UsageHit {
+            kind: ANALYTICS,
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            used: row.try_get("used")?,
+            quota: row.try_get("quota")?,
+        });
+    }
+    Ok(hits)
+}
+
 pub fn today() -> String {
     Utc::now().format("%Y-%m-%d").to_string()
+}
+
+/// Next UTC midnight, when today's counters are discarded.
+pub fn resets_at() -> String {
+    let now = Utc::now();
+    let next = (now.date_naive() + Duration::days(1))
+        .and_hms_opt(0, 0, 0)
+        .unwrap_or(now.naive_utc());
+    next.and_utc().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
 }
 
 pub fn secs_until_utc_midnight() -> u64 {
