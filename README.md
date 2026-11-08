@@ -278,7 +278,7 @@ examples        PHP, JavaScript, and Rust programs that send errors
 
 Cookieless analytics and the link shortener reimplement [Beacon](https://github.com/ShadowArcanist/beacons) by ShadowArcanist, which is MIT licensed. Copyright (c) 2026 ShadowArcanist. The tracker in `apps/server/src/insights/tracker.js` is wire-compatible with Beacon's tracker and also defines `window.owleeEvent`. See [NOTICE](NOTICE).
 
-Point Coolify at `ghcr.io/coollabsio/owlee`. `OWLEE_IMAGE` is the compose override. The source repository is `https://github.com/coollabsio/glimwatch`. API problem URLs use `https://owlee.io/problems/...`.
+Point Coolify at `ghcr.io/coollabsio/owlee`. `OWLEE_IMAGE` is the compose override. The source repository is `https://github.com/coollabsio/owlee`. API problem URLs use `https://owlee.io/problems/...`.
 
 ## License
 
