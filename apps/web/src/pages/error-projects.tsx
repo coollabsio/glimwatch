@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/issue-badge";
-import { Button, Field, Input, LayerCard, PageHeader, Select } from "@/components/ui";
+import { Button, Field, Input, LayerCard, PageHeader, Select, StatusBadge } from "@/components/ui";
 import { api, type Project } from "@/lib/api";
 
 export function ErrorProjectsPage() {
@@ -81,6 +81,9 @@ export function ErrorProjectsPage() {
                       <Link className="row-link" to={`/error-projects/${project.id}`} onClick={(event) => event.stopPropagation()}>
                         {project.name}
                       </Link>
+                      {project.quotaExceeded ? (
+                        <StatusBadge tone="error">Daily quota reached ({project.usedToday}/{project.dailyQuota})</StatusBadge>
+                      ) : null}
                     </td>
                     <td>
                       <Badge>{platformLabel(project.platform)}</Badge>
@@ -144,6 +147,7 @@ export function ProjectDetailPage() {
           }
         />
       </div>
+      <ProjectQuota key={String(data.quotaOverride ?? "inherit")} project={data} />
       <LayerCard
         title="Sentry DSN"
         description="Use this with any official Sentry SDK. The public key identifies the project. It is not a secret, which is why browser SDKs can ship it."
@@ -184,6 +188,62 @@ const platforms = [
   { value: "python", label: "Python" },
   { value: "other", label: "Other" },
 ];
+
+function resetWhen(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "00:00 UTC";
+  return `${date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
+}
+
+function ProjectQuota({ project }: { project: Project }) {
+  const client = useQueryClient();
+  const [value, setValue] = useState(project.quotaOverride == null ? "" : String(project.quotaOverride));
+  const save = useMutation({
+    mutationFn: (daily: number | null) =>
+      api<Project>(`/api/error-projects/${project.id}/quota`, {
+        method: "PUT",
+        body: JSON.stringify({ daily_quota: daily }),
+      }),
+    onSuccess: (data) => {
+      client.setQueryData(["project", project.id], data);
+      setValue(data.quotaOverride == null ? "" : String(data.quotaOverride));
+      void client.invalidateQueries({ queryKey: ["projects"] });
+      void client.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+  const inherited = project.quotaOverride == null;
+  return (
+    <LayerCard
+      title="Daily cap"
+      description={inherited ? "Empty inherits the number from Settings → Ingest quotas." : "This project uses its own cap instead of the instance default."}
+      actions={project.quotaExceeded ? <StatusBadge tone="error">Cap reached</StatusBadge> : null}
+    >
+      <p className="mb-3 text-[13px] text-[var(--ui-fg-faint)]">
+        {project.usedToday.toLocaleString()} of {project.dailyQuota.toLocaleString()} errors accepted today.
+        {project.quotaExceeded ? " Further events are rejected until the counter resets." : ""} Resets {resetWhen(project.resetsAt)}.
+      </p>
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const trimmed = value.trim();
+          save.mutate(trimmed === "" ? null : Number(trimmed));
+        }}
+      >
+        <div className="sm:w-56">
+          <Field label="Errors per day">
+            <Input inputMode="numeric" placeholder="Inherit" value={value} onChange={(event) => setValue(event.target.value)} />
+          </Field>
+        </div>
+        <Button variant="highlighted" type="submit" disabled={save.isPending}>Save cap</Button>
+        {project.quotaOverride != null ? (
+          <Button type="button" disabled={save.isPending} onClick={() => save.mutate(null)}>Inherit</Button>
+        ) : null}
+      </form>
+      {save.error ? <p className="field-error">{(save.error as Error).message}</p> : null}
+    </LayerCard>
+  );
+}
 
 function platformLabel(platform: string) {
   return platforms.find((item) => item.value === platform)?.label ?? platform;

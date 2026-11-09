@@ -34,6 +34,7 @@ pub struct Dashboard {
     pub pages: Vec<PageRow>,
     pub errors: Errors,
     pub analytics: Analytics,
+    pub quota_hits: Vec<QuotaNotice>,
 }
 
 #[derive(Serialize)]
@@ -118,6 +119,16 @@ pub struct Analytics {
 }
 
 #[derive(Serialize)]
+pub struct QuotaNotice {
+    pub kind: String,
+    pub id: String,
+    pub name: String,
+    pub used: i64,
+    pub quota: i64,
+    pub resets_at: String,
+}
+
+#[derive(Serialize)]
 pub struct SiteTraffic {
     pub id: String,
     pub name: String,
@@ -138,7 +149,24 @@ pub async fn show(
         pages: pages(&state.db).await?,
         errors: errors(&state.db).await?,
         analytics: analytics(&state.db).await?,
+        quota_hits: quota_notices(&state.db).await?,
     }))
+}
+
+async fn quota_notices(db: &Database) -> Result<Vec<QuotaNotice>, AppError> {
+    let resets_at = crate::quota::resets_at();
+    Ok(crate::quota::hits(db)
+        .await?
+        .into_iter()
+        .map(|hit| QuotaNotice {
+            kind: hit.kind.to_owned(),
+            id: hit.id,
+            name: hit.name,
+            used: hit.used,
+            quota: hit.quota,
+            resets_at: resets_at.clone(),
+        })
+        .collect())
 }
 
 async fn monitors(db: &Database, now: TimestampMillis) -> Result<Monitors, AppError> {

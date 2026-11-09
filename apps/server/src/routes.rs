@@ -21,6 +21,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::engine;
 use crate::error::AppError;
+use crate::peer::ClientIp;
 use crate::instance_settings::{self, SmtpInput};
 use crate::notify;
 use crate::present::{self, Stats};
@@ -47,6 +48,7 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/me", get(me))
         .route("/admin/settings", get(admin_settings))
         .route("/admin/settings/registration", put(set_registration))
+        .route("/admin/settings/quotas", put(set_quotas))
         .route("/admin/settings/smtp", put(save_smtp).delete(delete_smtp))
         .route("/admin/users", get(admin_users))
         .route("/admin/users/{id}/admin", put(set_installation_admin))
@@ -261,10 +263,21 @@ async fn setup_complete(
 
 async fn login(
     State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
     jar: CookieJar,
     Json(body): Json<AuthBody>,
 ) -> Result<(CookieJar, Json<present::UserResponse>), AppError> {
     let normalized = normalize_email(&body.email);
+    let ip_limit = state.login_ip_limit.check(&format!("login-ip:{ip}"));
+    if !ip_limit.allowed {
+        return Err(AppError::limited(ip_limit.retry_after_secs));
+    }
+    let account_limit = state
+        .login_account_limit
+        .check(&format!("login-account:{normalized}"));
+    if !account_limit.allowed {
+        return Err(AppError::limited(account_limit.retry_after_secs));
+    }
     let Some(user) = repo::user_by_email(&state.db, &normalized).await? else {
         return Err(AppError::InvalidLogin);
     };
@@ -478,7 +491,47 @@ async fn settings_body(state: &AppState) -> Result<Value, AppError> {
         "initialized": settings.initialized,
         "version": env!("CARGO_PKG_VERSION"),
         "database": state.config.backend_name(),
+        "error_daily_quota": settings.error_daily_quota,
+        "analytics_daily_quota": settings.analytics_daily_quota,
     }))
+}
+
+#[derive(Deserialize)]
+struct QuotaBody {
+    error_daily: i64,
+    analytics_daily: i64,
+}
+
+async fn set_quotas(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(body): Json<QuotaBody>,
+) -> Result<Json<Value>, AppError> {
+    let actor = require_root(&state, &jar).await?;
+    if !(1..=100_000_000).contains(&body.error_daily) {
+        return Err(AppError::field(
+            "error_daily",
+            "Use a daily error cap from 1 to 100000000.",
+        ));
+    }
+    if !(1..=100_000_000).contains(&body.analytics_daily) {
+        return Err(AppError::field(
+            "analytics_daily",
+            "Use a daily analytics cap from 1 to 100000000.",
+        ));
+    }
+    let now = TimestampMillis::now();
+    instance_settings::set_quotas(&state.db, body.error_daily, body.analytics_daily, now).await?;
+    let _ = repo::insert_audit(
+        &state.db,
+        Some(actor.id),
+        "instance.quotas_updated",
+        "installation",
+        None,
+        now,
+    )
+    .await;
+    Ok(Json(settings_body(&state).await?))
 }
 
 fn smtp_body(

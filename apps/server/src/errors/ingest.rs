@@ -1,18 +1,20 @@
+use std::net::SocketAddr;
+
 use axum::body::Body;
-use axum::extract::{Path, Query, Request, State};
+use axum::extract::{ConnectInfo, Path, Query, Request, State};
 use axum::http::StatusCode;
 use axum::http::header::{self, HeaderMap, HeaderValue};
 use axum::response::Response;
-use owlee_errors::{decode_body, normalize_event, parse_envelope};
 use http_body_util::BodyExt;
+use owlee_errors::{decode_body, normalize_event, parse_envelope};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::store;
 use crate::error::AppError;
+use crate::peer::{self, client_ip};
+use crate::quota;
 use crate::state::AppState;
-
-const MAX_BODY: usize = 20 * 1024 * 1024;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct SentryQuery {
@@ -35,7 +37,9 @@ pub async fn ingest_envelope(
     headers: HeaderMap,
     request: Request,
 ) -> Response {
-    let bytes = match read_body(request).await {
+    let max_body = state.config.ingest.error_max_body_bytes;
+    let peer = peer_of(&request);
+    let bytes = match read_limited(request, max_body, &headers).await {
         Ok(bytes) => bytes,
         Err(response) => return response,
     };
@@ -46,6 +50,9 @@ pub async fn ingest_envelope(
             return ingest_error(&headers, StatusCode::BAD_REQUEST, error.to_string());
         }
     };
+    if decoded.len() > max_body {
+        return too_large(&headers);
+    }
     let envelope = match parse_envelope(&decoded) {
         Ok(envelope) => envelope,
         Err(error) => {
@@ -66,14 +73,18 @@ pub async fn ingest_envelope(
         Ok(project) => project,
         Err(error) => return ingest_error_from(&headers, error),
     };
+    if let Some(response) = enforce_rate(&state, &headers, peer, &project.id) {
+        return response;
+    }
     let mut last_id = None;
     for item in &envelope.items {
         match item.item_type.as_str() {
             "event" => match serde_json::from_slice::<Value>(&item.payload) {
                 Ok(payload) => {
                     let event = normalize_event(payload);
-                    match store::ingest_event(&state.db, &project, &event).await {
-                        Ok(id) => last_id = Some(id),
+                    match accept_event(&state, &headers, &project, &event).await {
+                        Ok(Accepted::Stored(id)) => last_id = Some(id),
+                        Ok(Accepted::Limited(response)) => return response,
                         Err(error) => {
                             tracing::error!(error = %error, "failed to store sentry event");
                             return ingest_error(
@@ -111,7 +122,9 @@ pub async fn ingest_store(
     headers: HeaderMap,
     request: Request,
 ) -> Response {
-    let bytes = match read_body(request).await {
+    let max_body = state.config.ingest.error_max_body_bytes;
+    let peer = peer_of(&request);
+    let bytes = match read_limited(request, max_body, &headers).await {
         Ok(bytes) => bytes,
         Err(response) => return response,
     };
@@ -119,6 +132,9 @@ pub async fn ingest_store(
         Ok(decoded) => decoded,
         Err(error) => return ingest_error(&headers, StatusCode::BAD_REQUEST, error.to_string()),
     };
+    if decoded.len() > max_body {
+        return too_large(&headers);
+    }
     let payload: Value = match serde_json::from_slice(&decoded) {
         Ok(payload) => payload,
         Err(_) => {
@@ -137,9 +153,13 @@ pub async fn ingest_store(
         Ok(project) => project,
         Err(error) => return ingest_error_from(&headers, error),
     };
+    if let Some(response) = enforce_rate(&state, &headers, peer, &project.id) {
+        return response;
+    }
     let event = normalize_event(payload);
-    match store::ingest_event(&state.db, &project, &event).await {
-        Ok(id) => json_ok(&headers, json!({ "id": id })),
+    match accept_event(&state, &headers, &project, &event).await {
+        Ok(Accepted::Stored(id)) => json_ok(&headers, json!({ "id": id })),
+        Ok(Accepted::Limited(response)) => response,
         Err(error) => {
             tracing::error!(error = %error, "failed to store sentry event");
             ingest_error(
@@ -155,19 +175,139 @@ pub async fn ingest_security(headers: HeaderMap) -> Response {
     json_ok(&headers, json!({}))
 }
 
-async fn read_body(request: Request) -> Result<Vec<u8>, Response> {
-    let collected = request.into_body().collect().await;
-    match collected {
-        Ok(body) => {
-            let bytes = body.to_bytes();
-            if bytes.len() > MAX_BODY {
-                Err(plain(StatusCode::PAYLOAD_TOO_LARGE, "payload too large"))
-            } else {
-                Ok(bytes.to_vec())
-            }
-        }
-        Err(_) => Err(plain(StatusCode::PAYLOAD_TOO_LARGE, "payload too large")),
+enum Accepted {
+    Stored(String),
+    Limited(Response),
+}
+
+fn peer_of(request: &Request) -> Option<std::net::IpAddr> {
+    request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|info| info.0.ip())
+        .or_else(|| peer::peer_addr(request.extensions()))
+}
+
+fn enforce_rate(
+    state: &AppState,
+    headers: &HeaderMap,
+    peer: Option<std::net::IpAddr>,
+    project_id: &str,
+) -> Option<Response> {
+    let ip = client_ip(headers, state.config.proxy_hops, peer);
+    let ip_limit = state.error_ip_limit.check(&format!("error-ip:{ip}"));
+    if !ip_limit.allowed {
+        return Some(rate_limited(headers, ip_limit.retry_after_secs, "ip", ""));
     }
+    let project_limit = state
+        .error_project_limit
+        .check(&format!("error-project:{project_id}"));
+    if !project_limit.allowed {
+        return Some(rate_limited(
+            headers,
+            project_limit.retry_after_secs,
+            "key",
+            "",
+        ));
+    }
+    None
+}
+
+async fn accept_event(
+    state: &AppState,
+    headers: &HeaderMap,
+    project: &store::Project,
+    event: &owlee_errors::NormalizedEvent,
+) -> Result<Accepted, String> {
+    let global = quota::error_quota(&state.db)
+        .await
+        .map_err(|error| error.to_string())?;
+    let quota = quota::effective(global, project.daily_quota);
+    let ingested = store::ingest_event(
+        &state.db,
+        project,
+        event,
+        quota,
+        state.config.ingest.error_keep_first,
+        state.config.ingest.error_sample_window_secs,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    if ingested.quota_exceeded {
+        return Ok(Accepted::Limited(rate_limited(
+            headers,
+            ingested.retry_after_secs,
+            "organization",
+            "quota_exceeded",
+        )));
+    }
+    Ok(Accepted::Stored(ingested.id))
+}
+
+async fn read_limited(
+    request: Request,
+    max: usize,
+    headers: &HeaderMap,
+) -> Result<Vec<u8>, Response> {
+    if let Some(length) = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok())
+    {
+        if length > max {
+            return Err(too_large(headers));
+        }
+    }
+    let mut body = request.into_body();
+    let mut bytes = Vec::new();
+    while let Some(frame) = body.frame().await {
+        let frame = match frame {
+            Ok(frame) => frame,
+            Err(_) => return Err(too_large(headers)),
+        };
+        let Ok(data) = frame.into_data() else {
+            continue;
+        };
+        if bytes.len().saturating_add(data.len()) > max {
+            return Err(too_large(headers));
+        }
+        bytes.extend_from_slice(&data);
+    }
+    Ok(bytes)
+}
+
+fn too_large(request_headers: &HeaderMap) -> Response {
+    ingest_error(
+        request_headers,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "payload too large".into(),
+    )
+}
+
+fn rate_limited(request_headers: &HeaderMap, retry_after: u64, scope: &str, reason: &str) -> Response {
+    let retry_after = retry_after.max(1);
+    let mut response = ingest_error(
+        request_headers,
+        StatusCode::TOO_MANY_REQUESTS,
+        "rate limit exceeded".into(),
+    );
+    let headers = response.headers_mut();
+    if let Ok(value) = HeaderValue::from_str(&retry_after.to_string()) {
+        headers.insert(header::RETRY_AFTER, value);
+    }
+    let limit = if reason.is_empty() {
+        format!("{retry_after}:error:{scope}")
+    } else {
+        format!("{retry_after}:error:{scope}:{reason}")
+    };
+    if let Ok(value) = HeaderValue::from_str(&limit) {
+        headers.insert("x-sentry-rate-limits", value);
+    }
+    headers.insert(
+        header::ACCESS_CONTROL_EXPOSE_HEADERS,
+        HeaderValue::from_static("Retry-After, X-Sentry-Rate-Limits, X-Sentry-Error"),
+    );
+    response
 }
 
 fn auth_key(headers: &HeaderMap) -> Option<String> {
@@ -294,13 +434,6 @@ fn ingest_error_from(request_headers: &HeaderMap, error: AppError) -> Response {
         other => (StatusCode::INTERNAL_SERVER_ERROR, other.to_string()),
     };
     ingest_error(request_headers, status, message)
-}
-
-fn plain(status: StatusCode, message: &str) -> Response {
-    Response::builder()
-        .status(status)
-        .body(Body::from(message.to_owned()))
-        .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
 fn cors_response(

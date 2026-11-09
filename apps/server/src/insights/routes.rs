@@ -1,4 +1,3 @@
-use std::net::IpAddr;
 use std::sync::OnceLock;
 
 use axum::Json;
@@ -15,7 +14,7 @@ use owlee_insights::{
     parse_page, parse_user_agent, percentile, referrer_domain, same_site, sections_json,
     session_id, slugify,
 };
-use owlee_platform::{Database, Id, generate_token};
+use owlee_platform::{Database, EnvironmentMode, Id, generate_token};
 use http_body_util::BodyExt;
 use isbot::Bots;
 use serde::Deserialize;
@@ -25,6 +24,8 @@ use sqlx::Row;
 use super::geo;
 use super::record;
 use crate::error::AppError;
+use crate::peer::{self, client_ip};
+use crate::quota;
 use crate::routes::require_user;
 use crate::state::AppState;
 
@@ -39,6 +40,8 @@ pub fn api_routes() -> Router<AppState> {
                 .put(update_site)
                 .delete(delete_site),
         )
+        .route("/sites/{id}/verify", axum::routing::post(verify_site))
+        .route("/sites/{id}/quota", axum::routing::put(set_site_quota))
         .route("/sites/{id}/analytics", axum::routing::delete(reset_site))
         .route("/sites/{id}/public", axum::routing::put(update_site_public))
         .route("/sites/{id}/overview", axum::routing::get(site_overview))
@@ -140,20 +143,24 @@ async fn script() -> Response<Body> {
 
 async fn receive(State(state): State<AppState>, request: Request) -> Response<Body> {
     let headers = request.headers().clone();
-    let peer = request
-        .extensions()
-        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
-        .map(|info| info.0.ip());
+    let peer = peer::peer_addr(request.extensions());
     let ip = client_ip(&headers, state.config.proxy_hops, peer);
-    if !state.collector_limit.allow(&ip) {
-        return with_cors(AppError::TooManyRequests.into_response());
+    let max_body = state.config.ingest.analytics_max_body_bytes;
+    if let Some(length) = headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<usize>().ok())
+    {
+        if length > max_body {
+            return with_cors(payload_too_large());
+        }
     }
     let bytes = match request.into_body().collect().await {
         Ok(collected) => collected.to_bytes(),
-        Err(_) => return with_cors(AppError::field("body", "Unreadable body.").into_response()),
+        Err(_) => return with_cors(payload_too_large()),
     };
-    if bytes.len() > 16 * 1024 {
-        return with_cors(AppError::field("body", "Event is larger than 16 KiB.").into_response());
+    if bytes.len() > max_body {
+        return with_cors(payload_too_large());
     }
     let payload: EventPayload = match serde_json::from_slice(&bytes) {
         Ok(payload) => payload,
@@ -161,10 +168,31 @@ async fn receive(State(state): State<AppState>, request: Request) -> Response<Bo
             return with_cors(AppError::field("body", "Event JSON is invalid.").into_response());
         }
     };
+    let ip_limit = state.analytics_ip_limit.check(&format!("analytics-ip:{ip}"));
+    if !ip_limit.allowed {
+        return with_cors(AppError::limited(ip_limit.retry_after_secs).into_response());
+    }
+    let site_limit = state
+        .analytics_site_limit
+        .check(&format!("analytics-site:{}", payload.site));
+    if !site_limit.allowed {
+        return with_cors(AppError::limited(site_limit.retry_after_secs).into_response());
+    }
     match accept_event(&state, &headers, &ip, payload).await {
         Ok(status) => with_cors(status.into_response()),
         Err(error) => with_cors(error.into_response()),
     }
+}
+
+fn payload_too_large() -> Response<Body> {
+    let problem = json!({
+        "type": "https://owlee.io/problems/payload-too-large",
+        "title": "Payload too large",
+        "status": 413,
+        "code": "payload_too_large",
+        "detail": "Event is larger than the configured limit."
+    });
+    (StatusCode::PAYLOAD_TOO_LARGE, Json(problem)).into_response()
 }
 
 async fn accept_event(
@@ -182,21 +210,47 @@ async fn accept_event(
     {
         return Err(AppError::field("type", "Invalid event type."));
     }
-    let site = sqlx::query("SELECT id, domain FROM insight_sites WHERE public_id = $1")
-        .bind(&payload.site)
-        .fetch_optional(state.db.pool())
-        .await?;
+    let site = sqlx::query(
+        "SELECT id, domain, verified, daily_quota FROM insight_sites WHERE public_id = $1",
+    )
+    .bind(&payload.site)
+    .fetch_optional(state.db.pool())
+    .await?;
     let Some(site) = site else {
         return Err(AppError::field("site", "Unknown site."));
     };
     let site_id: String = site.try_get("id")?;
     let domain: String = site.try_get("domain")?;
+    let verified: i64 = site.try_get("verified")?;
+    let custom_quota: Option<i64> = site.try_get("daily_quota")?;
+    let allowed = allowed_hosts(&state.db, &site_id, &domain).await?;
+    if !origin_allowed(
+        header_text(headers, header::ORIGIN),
+        header_text(headers, header::REFERER),
+        &allowed,
+        state.config.ingest.allow_localhost,
+    ) {
+        return Err(AppError::Forbidden(
+            "Origin is not allowed for this site.",
+        ));
+    }
+    if verified == 0 && state.config.environment != EnvironmentMode::Development {
+        return Err(AppError::Forbidden(
+            "Verify this domain before it can collect analytics.",
+        ));
+    }
     let ua = headers
         .get(header::USER_AGENT)
         .and_then(|value| value.to_str().ok())
         .unwrap_or("");
     if ua.is_empty() || bots().is_bot(ua) {
         return Ok(StatusCode::ACCEPTED);
+    }
+    let global = quota::analytics_quota(&state.db).await?;
+    let daily = quota::effective(global, custom_quota);
+    let charge = quota::charge(&state.db, quota::ANALYTICS, &site_id, daily).await?;
+    if !charge.allowed {
+        return Err(AppError::limited(charge.retry_after_secs));
     }
     let page = payload.url.as_deref().and_then(parse_page);
     let referrer = payload
@@ -349,8 +403,7 @@ async fn resolve_slug(
         .and_then(|value| value.to_str().ok())
         .unwrap_or("");
     if method != Method::HEAD && !ua.is_empty() && !bots().is_bot(ua) {
-        let peer = None;
-        let ip = client_ip(headers, state.config.proxy_hops, peer);
+        let ip = client_ip(headers, state.config.proxy_hops, None);
         let (browser, os, device) = parse_user_agent(ua);
         let now = now_secs();
         let place = geo::locate(state.geo.as_deref(), headers, state.config.proxy_hops, &ip);
@@ -441,14 +494,17 @@ async fn list_sites(
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
     let rows = sqlx::query(
-        "SELECT id, public_id, name, domain, color, public_slug, public_enabled, public_threshold, public_sections, created_at \
+        "SELECT id, public_id, name, domain, color, public_slug, public_enabled, public_threshold, public_sections, created_at, \
+         verified, verify_token, verified_at, daily_quota \
          FROM insight_sites ORDER BY created_at",
     )
     .fetch_all(state.db.pool())
     .await?;
-    Ok(Json(Value::Array(
-        rows.iter().map(site_json).collect::<Result<Vec<_>, _>>()?,
-    )))
+    let mut sites = Vec::with_capacity(rows.len());
+    for row in &rows {
+        sites.push(site_json(&state, row).await?);
+    }
+    Ok(Json(Value::Array(sites)))
 }
 
 async fn create_site(
@@ -468,9 +524,10 @@ async fn create_site(
     let slug = format!("{}-{}", slugify(&name), &id[id.len().saturating_sub(6)..]);
     let slug = field("name", clean_public_slug(&slug))
         .unwrap_or_else(|_| format!("site-{}", &id[id.len().saturating_sub(6)..]));
+    let verify_token = generate_token();
     sqlx::query(
-        "INSERT INTO insight_sites (id, public_id, name, domain, color, public_slug, public_sections, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        "INSERT INTO insight_sites (id, public_id, name, domain, color, public_slug, public_sections, created_at, verify_token) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(&id)
     .bind(&public_id)
@@ -480,10 +537,11 @@ async fn create_site(
     .bind(&slug)
     .bind(sections_json(SITE_SECTIONS))
     .bind(now_secs())
+    .bind(&verify_token)
     .execute(state.db.pool())
     .await
     .map_err(map_db)?;
-    Ok((StatusCode::CREATED, Json(fetch_site(&state.db, &id).await?)))
+    Ok((StatusCode::CREATED, Json(fetch_site(&state, &id).await?)))
 }
 
 async fn get_site(
@@ -492,7 +550,7 @@ async fn get_site(
     Path(id): Path<String>,
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
-    Ok(Json(fetch_site(&state.db, &id).await?))
+    Ok(Json(fetch_site(&state, &id).await?))
 }
 
 async fn update_site(
@@ -508,12 +566,16 @@ async fn update_site(
         Some(color) => field("color", clean_color(&color))?,
         None => "#4f46e5".to_owned(),
     };
-    let changed =
-        sqlx::query("UPDATE insight_sites SET name = $1, domain = $2, color = $3 WHERE id = $4")
-            .bind(name)
-            .bind(domain)
-            .bind(color)
-            .bind(&id)
+    let changed = sqlx::query(
+        "UPDATE insight_sites SET name = $1, domain = $2, color = $3, \
+         verified = CASE WHEN domain = $2 THEN verified ELSE 0 END, \
+         verified_at = CASE WHEN domain = $2 THEN verified_at ELSE NULL END \
+         WHERE id = $4",
+    )
+    .bind(name)
+    .bind(domain)
+    .bind(color)
+    .bind(&id)
             .execute(state.db.pool())
             .await
             .map_err(map_db)?
@@ -521,7 +583,7 @@ async fn update_site(
     if changed == 0 {
         return Err(AppError::NotFound);
     }
-    Ok(Json(fetch_site(&state.db, &id).await?))
+    Ok(Json(fetch_site(&state, &id).await?))
 }
 
 async fn delete_site(
@@ -547,7 +609,7 @@ async fn reset_site(
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
     require_user(&state, &jar).await?;
-    fetch_site(&state.db, &id).await?;
+    fetch_site(&state, &id).await?;
     for sql in [
         "DELETE FROM insight_events WHERE site_id = $1",
         "DELETE FROM insight_visits WHERE site_id = $1",
@@ -575,7 +637,7 @@ async fn update_site_public(
         SITE_SECTIONS,
     )
     .await?;
-    Ok(Json(fetch_site(&state.db, &id).await?))
+    Ok(Json(fetch_site(&state, &id).await?))
 }
 
 async fn site_overview(
@@ -585,7 +647,7 @@ async fn site_overview(
     Query(range): Query<RangeQuery>,
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
-    fetch_site(&state.db, &id).await?;
+    fetch_site(&state, &id).await?;
     Ok(Json(site_totals(&state.db, &id, range).await?))
 }
 
@@ -596,7 +658,7 @@ async fn site_breakdown(
     Query(range): Query<RangeQuery>,
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
-    fetch_site(&state.db, &id).await?;
+    fetch_site(&state, &id).await?;
     Ok(Json(
         json!({ "rows": breakdown(&state.db, "site_id", &id, &dimension, range, "pageview").await? }),
     ))
@@ -608,7 +670,7 @@ async fn site_realtime(
     Path(id): Path<String>,
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
-    fetch_site(&state.db, &id).await?;
+    fetch_site(&state, &id).await?;
     let now = now_secs();
     let current: i64 = scalar(
         &state.db,
@@ -667,7 +729,7 @@ async fn site_vitals(
     Query(range): Query<RangeQuery>,
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
-    fetch_site(&state.db, &id).await?;
+    fetch_site(&state, &id).await?;
     let bounds = Bounds::resolve(range.from, range.to, now_secs());
     let rows = sqlx::query(
         "SELECT device, lcp, inp, cls, fcp, ttfb FROM insight_events \
@@ -715,7 +777,7 @@ async fn site_events(
     Query(range): Query<RangeQuery>,
 ) -> Result<Json<Value>, AppError> {
     require_user(&state, &jar).await?;
-    fetch_site(&state.db, &id).await?;
+    fetch_site(&state, &id).await?;
     let bounds = Bounds::resolve(range.from, range.to, now_secs());
     let rows = sqlx::query(
         "SELECT event_type AS name, CAST(COUNT(*) AS BIGINT) AS count, \
@@ -1467,7 +1529,7 @@ fn limit_public(state: &AppState, headers: &HeaderMap) -> Result<(), AppError> {
     if state.public_limit.allow(&ip) {
         Ok(())
     } else {
-        Err(AppError::TooManyRequests)
+        Err(AppError::limited(60))
     }
 }
 
@@ -1544,31 +1606,113 @@ fn redirect_type(value: Option<&str>) -> Result<&'static str, AppError> {
     }
 }
 
-async fn fetch_site(db: &Database, id: &str) -> Result<Value, AppError> {
+async fn fetch_site(state: &AppState, id: &str) -> Result<Value, AppError> {
     let row = sqlx::query(
-        "SELECT id, public_id, name, domain, color, public_slug, public_enabled, public_threshold, public_sections, created_at \
+        "SELECT id, public_id, name, domain, color, public_slug, public_enabled, public_threshold, public_sections, created_at, \
+         verified, verify_token, verified_at, daily_quota \
          FROM insight_sites WHERE id = $1",
     )
     .bind(id)
-    .fetch_optional(db.pool())
+    .fetch_optional(state.db.pool())
     .await?
     .ok_or(AppError::NotFound)?;
-    site_json(&row)
+    site_json(state, &row).await
 }
 
-fn site_json(row: &sqlx::any::AnyRow) -> Result<Value, AppError> {
+async fn site_json(state: &AppState, row: &sqlx::any::AnyRow) -> Result<Value, AppError> {
+    let id: String = row.try_get("id")?;
+    let domain: String = row.try_get("domain")?;
+    let mut token: String = row.try_get("verify_token")?;
+    if token.is_empty() {
+        token = generate_token();
+        sqlx::query(
+            "UPDATE insight_sites SET verify_token = $1 WHERE id = $2 AND verify_token = ''",
+        )
+        .bind(&token)
+        .bind(&id)
+        .execute(state.db.pool())
+        .await?;
+    }
+    let verified = row.try_get::<i64, _>("verified")? != 0;
+    let custom: Option<i64> = row.try_get("daily_quota")?;
+    let global = quota::analytics_quota(&state.db).await?;
+    let quota = quota::effective(global, custom);
+    let used = quota::used(&state.db, quota::ANALYTICS, &id).await?;
+    let dev = state.config.environment == EnvironmentMode::Development;
+    let verify_name = crate::verify::record_name(&domain);
+    let verify_value = crate::verify::record_value(&token);
+    let verified_at: Option<i64> = row.try_get("verified_at")?;
     Ok(json!({
-        "id": row.try_get::<String, _>("id")?,
+        "id": id,
         "public_id": row.try_get::<String, _>("public_id")?,
         "name": row.try_get::<String, _>("name")?,
-        "domain": row.try_get::<String, _>("domain")?,
+        "domain": domain,
         "color": row.try_get::<String, _>("color")?,
         "public_slug": row.try_get::<String, _>("public_slug")?,
         "public_enabled": row.try_get::<i64, _>("public_enabled")? != 0,
         "public_threshold": row.try_get::<i64, _>("public_threshold")?,
         "public_sections": serde_json::from_str::<Vec<String>>(&row.try_get::<String, _>("public_sections")?).unwrap_or_default(),
         "created_at": row.try_get::<i64, _>("created_at")?,
+        "verified": verified,
+        "verified_at": verified_at,
+        "verify_name": verify_name,
+        "verify_value": verify_value,
+        "ingest_open": verified || dev,
+        "daily_quota": quota,
+        "quota_override": custom,
+        "used_today": used,
+        "quota_exceeded": used >= quota,
+        "resets_at": quota::resets_at(),
     }))
+}
+
+#[derive(Deserialize)]
+struct QuotaBody {
+    daily_quota: Option<i64>,
+}
+
+async fn set_site_quota(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<String>,
+    Json(body): Json<QuotaBody>,
+) -> Result<Json<Value>, AppError> {
+    require_user(&state, &jar).await?;
+    if let Some(quota) = body.daily_quota {
+        if !(1..=100_000_000).contains(&quota) {
+            return Err(AppError::field(
+                "daily_quota",
+                "Use a daily cap from 1 to 100000000, or leave it empty to inherit.",
+            ));
+        }
+    }
+    let changed = sqlx::query("UPDATE insight_sites SET daily_quota = $1 WHERE id = $2")
+        .bind(body.daily_quota)
+        .bind(&id)
+        .execute(state.db.pool())
+        .await?
+        .rows_affected();
+    if changed == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(Json(fetch_site(&state, &id).await?))
+}
+
+async fn verify_site(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, AppError> {
+    require_user(&state, &jar).await?;
+    let ok = crate::verify::verify_site(&state, &id).await?;
+    let site = fetch_site(&state, &id).await?;
+    if ok {
+        Ok(Json(site))
+    } else {
+        Err(AppError::BadRequest(
+            "The TXT record does not match this site yet.".into(),
+        ))
+    }
 }
 
 async fn fetch_domain(db: &Database, id: &str) -> Result<Value, AppError> {
@@ -1691,24 +1835,60 @@ fn public_token() -> String {
     out
 }
 
-fn client_ip(headers: &HeaderMap, proxy_hops: usize, peer: Option<IpAddr>) -> String {
-    let forwarded = (proxy_hops > 0)
-        .then(|| {
-            headers
-                .get("x-forwarded-for")?
-                .to_str()
-                .ok()?
-                .split(',')
-                .rev()
-                .nth(proxy_hops - 1)
-        })
-        .flatten()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| clip(value, 64));
-    forwarded
-        .or_else(|| peer.map(|ip| ip.to_string()))
-        .unwrap_or_else(|| "0.0.0.0".to_owned())
+fn header_text<'a>(headers: &'a HeaderMap, name: impl header::AsHeaderName) -> Option<&'a str> {
+    headers.get(name)?.to_str().ok()
+}
+
+async fn allowed_hosts(db: &Database, site_id: &str, domain: &str) -> Result<Vec<String>, AppError> {
+    let mut hosts = vec![domain.to_owned()];
+    let rows = sqlx::query(
+        "SELECT hostname FROM insight_domains WHERE site_id = $1 AND enabled = 1",
+    )
+    .bind(site_id)
+    .fetch_all(db.pool())
+    .await?;
+    for row in &rows {
+        let hostname: String = row.try_get("hostname")?;
+        if !hosts.iter().any(|host| host == &hostname) {
+            hosts.push(hostname);
+        }
+    }
+    Ok(hosts)
+}
+
+fn origin_allowed(
+    origin: Option<&str>,
+    referer: Option<&str>,
+    allowed: &[String],
+    allow_localhost: bool,
+) -> bool {
+    let Some(host) = origin
+        .and_then(host_of)
+        .or_else(|| referer.and_then(host_of))
+    else {
+        return false;
+    };
+    if allow_localhost && is_local_host(&host) {
+        return true;
+    }
+    allowed.iter().any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
+}
+
+fn host_of(value: &str) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let rest = value.split_once("://").map(|(_, rest)| rest).unwrap_or(value);
+    let hostport = rest.split(['/', '?', '#']).next()?;
+    if let Some(host) = hostport.strip_prefix('[') {
+        return Some(host.split(']').next()?.to_ascii_lowercase());
+    }
+    clean_host(hostport).ok()
+}
+
+fn is_local_host(host: &str) -> bool {
+    matches!(host, "localhost" | "127.0.0.1" | "::1")
 }
 
 fn origin_host(origin: &str) -> Option<String> {

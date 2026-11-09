@@ -9,6 +9,12 @@ services:
       OWLEE_ENV: production
       OWLEE_BIND: 0.0.0.0
       OWLEE_PORT: 8080
+      # Coolify publishes this container through Traefik, which appends one
+      # X-Forwarded-For hop. Per-IP limits (ingest and login) read that hop.
+      # Set 0 only when the published port is reached with no proxy in front,
+      # or clients can spoof the header. Use 2 when Cloudflare sits in front
+      # of Traefik.
+      OWLEE_PROXY_HOPS: ${OWLEE_PROXY_HOPS:-1}
       # Used in the one-time Initial setup URL printed to stderr on a fresh database.
       OWLEE_PUBLIC_ORIGIN: ${OWLEE_PUBLIC_ORIGIN:-http://localhost:8080}
       # SQLite file inside the volume. Set this to another path to use a different file.

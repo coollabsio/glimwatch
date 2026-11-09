@@ -7,7 +7,7 @@ mod seed;
 mod store;
 
 use axum::Router;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 
 use crate::state::AppState;
 
@@ -22,6 +22,10 @@ pub fn api_routes() -> Router<AppState> {
         .route(
             "/error-projects/{id}",
             get(http::get_project).delete(http::delete_project),
+        )
+        .route(
+            "/error-projects/{id}/quota",
+            put(http::set_project_quota),
         )
         .route("/error-issues", get(http::list_issues))
         .route("/error-issues/bulk", post(http::bulk_update))

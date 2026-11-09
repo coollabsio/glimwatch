@@ -16,6 +16,8 @@ pub struct Project {
     pub public_key: String,
     pub platform: String,
     pub created_at: String,
+    /// `None` means this project uses the instance default.
+    pub daily_quota: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -89,7 +91,7 @@ fn now() -> String {
 pub async fn list_projects(db: &Database) -> Result<Vec<Project>, AppError> {
     let sql = statement(
         db,
-        "SELECT id, name, slug, public_key, platform, created_at FROM projects ORDER BY created_at ASC",
+        "SELECT id, name, slug, public_key, platform, created_at, daily_quota FROM projects ORDER BY created_at ASC",
     );
     let rows = sqlx::query(&sql).fetch_all(db.pool()).await?;
     rows.iter().map(project_from_row).collect()
@@ -98,7 +100,7 @@ pub async fn list_projects(db: &Database) -> Result<Vec<Project>, AppError> {
 pub async fn get_project(db: &Database, id: &str) -> Result<Project, AppError> {
     let sql = statement(
         db,
-        "SELECT id, name, slug, public_key, platform, created_at FROM projects WHERE id = ?",
+        "SELECT id, name, slug, public_key, platform, created_at, daily_quota FROM projects WHERE id = ?",
     );
     let row = sqlx::query(&sql).bind(id).fetch_optional(db.pool()).await?;
     match row {
@@ -165,6 +167,7 @@ pub async fn create_project(
         public_key,
         platform,
         created_at,
+        daily_quota: None,
     })
 }
 
@@ -366,11 +369,21 @@ pub async fn latest_event(db: &Database, issue_id: &str) -> Result<Option<Stored
     }))
 }
 
+pub struct Ingested {
+    pub id: String,
+    /// The daily quota was already spent. Nothing new was stored.
+    pub quota_exceeded: bool,
+    pub retry_after_secs: u64,
+}
+
 pub async fn ingest_event(
     db: &Database,
     project: &Project,
     event: &NormalizedEvent,
-) -> Result<String, AppError> {
+    quota: i64,
+    keep_first: i64,
+    window_secs: i64,
+) -> Result<Ingested, AppError> {
     let mut tx = db.pool().begin().await?;
     let sql = statement(db, "SELECT id FROM events WHERE id = ?");
     let existing = sqlx::query(&sql)
@@ -379,8 +392,40 @@ pub async fn ingest_event(
         .await?;
     if existing.is_some() {
         tx.commit().await?;
-        return Ok(event.event_id.clone());
+        return Ok(Ingested {
+            id: event.event_id.clone(),
+            quota_exceeded: false,
+            retry_after_secs: 0,
+        });
     }
+    let day = crate::quota::today();
+    let usage = sqlx::query(
+        "SELECT count FROM ingest_usage WHERE kind = 'error' AND subject_id = $1 AND day = $2",
+    )
+    .bind(&project.id)
+    .bind(&day)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let used = usage
+        .map(|row| row.try_get::<i64, _>("count"))
+        .transpose()?
+        .unwrap_or(0);
+    if used >= quota {
+        tx.commit().await?;
+        return Ok(Ingested {
+            id: String::new(),
+            quota_exceeded: true,
+            retry_after_secs: crate::quota::secs_until_utc_midnight(),
+        });
+    }
+    sqlx::query(
+        "INSERT INTO ingest_usage (kind, subject_id, day, count) VALUES ('error', $1, $2, 1) \
+         ON CONFLICT (kind, subject_id, day) DO UPDATE SET count = ingest_usage.count + 1",
+    )
+    .bind(&project.id)
+    .bind(&day)
+    .execute(&mut *tx)
+    .await?;
     let issue_id = Uuid::new_v4().to_string();
     let seq_sql = statement(
         db,
@@ -411,7 +456,7 @@ pub async fn ingest_event(
             event_count = issues.event_count + 1,
             unhandled = CASE WHEN excluded.unhandled = 1 THEN 1 ELSE issues.unhandled END,
             status = CASE WHEN issues.status = 'resolved' THEN 'unresolved' ELSE issues.status END
-         RETURNING id",
+         RETURNING id, stored_count, sample_window_start",
     );
     let row = sqlx::query(&sql)
         .bind(&issue_id)
@@ -430,28 +475,63 @@ pub async fn ingest_event(
         .fetch_one(&mut *tx)
         .await?;
     let issue_id: String = row.try_get("id")?;
-    let payload = serde_json::to_string(&event.raw).unwrap_or_else(|_| "{}".to_owned());
-    let insert_event = statement(
-        db,
-        "INSERT INTO events (
-            id, project_id, issue_id, timestamp, level, title, environment, release, user_key, payload
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    );
-    sqlx::query(&insert_event)
-        .bind(&event.event_id)
-        .bind(&project.id)
-        .bind(&issue_id)
-        .bind(&event.timestamp)
-        .bind(&event.level)
-        .bind(&event.title)
-        .bind(&event.environment)
-        .bind(&event.release)
-        .bind(user_key_of(event).unwrap_or_default())
-        .bind(payload)
-        .execute(&mut *tx)
-        .await?;
+    let stored_count: i64 = row.try_get("stored_count")?;
+    let window_start: Option<String> = row.try_get("sample_window_start")?;
+    let keep = window_secs.max(1);
+    let window_open = window_start
+        .as_deref()
+        .and_then(|start| DateTime::parse_from_rfc3339(start).ok())
+        .is_some_and(|start| {
+            Utc::now().signed_duration_since(start.with_timezone(&Utc))
+                < Duration::seconds(keep)
+        });
+    let store_payload = stored_count < keep_first.max(1) || !window_open;
+    if store_payload {
+        let mut raw = event.raw.clone();
+        owlee_errors::limit_raw_event(&mut raw);
+        let payload = serde_json::to_string(&raw).unwrap_or_else(|_| "{}".to_owned());
+        let insert_event = statement(
+            db,
+            "INSERT INTO events (
+                id, project_id, issue_id, timestamp, level, title, environment, release, user_key, payload
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        );
+        sqlx::query(&insert_event)
+            .bind(&event.event_id)
+            .bind(&project.id)
+            .bind(&issue_id)
+            .bind(&event.timestamp)
+            .bind(&event.level)
+            .bind(&event.title)
+            .bind(&event.environment)
+            .bind(&event.release)
+            .bind(user_key_of(event).unwrap_or_default())
+            .bind(payload)
+            .execute(&mut *tx)
+            .await?;
+        let next_stored = stored_count + 1;
+        let next_window = if next_stored >= keep_first.max(1) {
+            Some(now())
+        } else {
+            window_start
+        };
+        let mark = statement(
+            db,
+            "UPDATE issues SET stored_count = ?, sample_window_start = ? WHERE id = ?",
+        );
+        sqlx::query(&mark)
+            .bind(next_stored)
+            .bind(next_window)
+            .bind(&issue_id)
+            .execute(&mut *tx)
+            .await?;
+    }
     tx.commit().await?;
-    Ok(event.event_id.clone())
+    Ok(Ingested {
+        id: event.event_id.clone(),
+        quota_exceeded: false,
+        retry_after_secs: 0,
+    })
 }
 
 fn project_from_row(row: &sqlx::any::AnyRow) -> Result<Project, AppError> {
@@ -462,7 +542,25 @@ fn project_from_row(row: &sqlx::any::AnyRow) -> Result<Project, AppError> {
         public_key: row.try_get("public_key")?,
         platform: row.try_get("platform")?,
         created_at: row.try_get("created_at")?,
+        daily_quota: row.try_get("daily_quota")?,
     })
+}
+
+pub async fn set_daily_quota(
+    db: &Database,
+    id: &str,
+    quota: Option<i64>,
+) -> Result<Project, AppError> {
+    let sql = statement(db, "UPDATE projects SET daily_quota = ? WHERE id = ?");
+    let result = sqlx::query(&sql)
+        .bind(quota)
+        .bind(id)
+        .execute(db.pool())
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    get_project(db, id).await
 }
 
 fn issue_from_row(row: &sqlx::any::AnyRow) -> Result<IssueRow, AppError> {

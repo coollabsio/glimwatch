@@ -27,6 +27,11 @@ pub struct ProjectView {
     pub public_key: String,
     pub dsn: String,
     pub created_at: String,
+    pub daily_quota: i64,
+    pub quota_override: Option<i64>,
+    pub used_today: i64,
+    pub quota_exceeded: bool,
+    pub resets_at: String,
 }
 
 pub async fn list_projects(
@@ -35,12 +40,11 @@ pub async fn list_projects(
 ) -> Result<Json<Vec<ProjectView>>, AppError> {
     require_user(&state, &jar).await?;
     let projects = store::list_projects(&state.db).await?;
-    Ok(Json(
-        projects
-            .into_iter()
-            .map(|project| project_view(&state, project))
-            .collect(),
-    ))
+    let mut views = Vec::with_capacity(projects.len());
+    for project in projects {
+        views.push(project_view(&state, project).await?);
+    }
+    Ok(Json(views))
 }
 
 pub async fn create_project(
@@ -50,7 +54,7 @@ pub async fn create_project(
 ) -> Result<Json<ProjectView>, AppError> {
     require_user(&state, &jar).await?;
     let project = store::create_project(&state.db, &body.name, &body.platform).await?;
-    Ok(Json(project_view(&state, project)))
+    Ok(Json(project_view(&state, project).await?))
 }
 
 pub async fn get_project(
@@ -59,10 +63,33 @@ pub async fn get_project(
     Path(id): Path<String>,
 ) -> Result<Json<ProjectView>, AppError> {
     require_user(&state, &jar).await?;
-    Ok(Json(project_view(
-        &state,
-        store::get_project(&state.db, &id).await?,
-    )))
+    Ok(Json(
+        project_view(&state, store::get_project(&state.db, &id).await?).await?,
+    ))
+}
+
+#[derive(Deserialize)]
+pub struct QuotaBody {
+    pub daily_quota: Option<i64>,
+}
+
+pub async fn set_project_quota(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Path(id): Path<String>,
+    Json(body): Json<QuotaBody>,
+) -> Result<Json<ProjectView>, AppError> {
+    require_user(&state, &jar).await?;
+    if let Some(quota) = body.daily_quota {
+        if !(1..=100_000_000).contains(&quota) {
+            return Err(AppError::field(
+                "daily_quota",
+                "Use a daily cap from 1 to 100000000, or leave it empty to inherit.",
+            ));
+        }
+    }
+    let project = store::set_daily_quota(&state.db, &id, body.daily_quota).await?;
+    Ok(Json(project_view(&state, project).await?))
 }
 
 pub async fn delete_project(
@@ -75,20 +102,28 @@ pub async fn delete_project(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-fn project_view(state: &AppState, project: Project) -> ProjectView {
-    ProjectView {
+async fn project_view(state: &AppState, project: Project) -> Result<ProjectView, AppError> {
+    let global = crate::quota::error_quota(&state.db).await?;
+    let daily_quota = crate::quota::effective(global, project.daily_quota);
+    let used_today = crate::quota::used(&state.db, crate::quota::ERROR, &project.id).await?;
+    Ok(ProjectView {
         dsn: store::build_dsn(
             &state.config.public_origin,
             &project.public_key,
             &project.id,
         ),
+        quota_exceeded: used_today >= daily_quota,
+        quota_override: project.daily_quota,
+        resets_at: crate::quota::resets_at(),
+        daily_quota,
+        used_today,
         id: project.id,
         name: project.name,
         slug: project.slug,
         platform: project.platform,
         public_key: project.public_key,
         created_at: project.created_at,
-    }
+    })
 }
 
 #[derive(Deserialize, Default)]

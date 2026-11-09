@@ -210,6 +210,12 @@ http://<public_key>@127.0.0.1:43123/<project_id>
 
 SDKs post to `/api/<project_id>/envelope/` and `/api/<project_id>/store/` (with or without the trailing slash). Auth is `X-Sentry-Auth`, `Authorization: Sentry sentry_key=...`, or `?sentry_key=`. Gzip and deflate bodies are accepted. Those routes answer CORS preflight and do not use the dashboard cookie. `/api/<project_id>/security/` is accepted and ignored. Performance items, sessions, and client reports in an envelope are ignored so the SDK still gets HTTP 200.
 
+An envelope is rejected with `413` above `OWLEE_ERROR_MAX_BODY_BYTES` (1 MiB). Stack frames, breadcrumbs, tags, and messages inside an accepted event are truncated before they are stored. The same project key and the same client IP each have a token bucket (`OWLEE_ERROR_RATE_PROJECT_*`, `OWLEE_ERROR_RATE_IP_*`). A full bucket or a full daily quota answers `429` with `Retry-After` and `X-Sentry-Rate-Limits`, which is what Sentry SDKs back off on. The client IP is the TCP peer, or the `X-Forwarded-For` entry selected by `OWLEE_PROXY_HOPS` when Owlee sits behind a proxy.
+
+Issues still group on a fingerprint. `event_count` increases for every accepted event. The full payload is kept for the first `OWLEE_ERROR_KEEP_FIRST` events (5), then one more per `OWLEE_ERROR_SAMPLE_WINDOW_SECS` (1 hour). The issue row is the aggregate the feed shows. A background pass deletes raw `events` older than `OWLEE_ERROR_RETENTION_DAYS` (30) in batches of 500. The issue, including `event_count`, stays. `events(timestamp)` is indexed for that delete and for the 24-hour trend query.
+
+Each project may accept `OWLEE_ERROR_DAILY_QUOTA` events per UTC day (100,000) until the root user sets another number under Settings → Ingest quotas, or the project sets its own cap. One error a second all day is about 86,400, so normal use does not reach 100,000. The projects list and the dashboard show when today's counter has hit that cap, and when it resets (00:00 UTC).
+
 `examples/` has PHP, Node, browser, and Rust SDK programs. Set `SENTRY_DSN` to the project DSN.
 
 Short-link hostnames only take over a request when the `Host` is a configured link domain and not Owlee's own origin, and only after `/api` and `/go` have already been routed. Sentry ingest stays on `/api/...`.
@@ -222,9 +228,17 @@ Add a site in **Sites**, then paste the snippet from **Tracker**:
 <script defer src="https://owlee.example.com/data.js" data-site="YOUR_PUBLIC_ID"></script>
 ```
 
-The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`), allows any origin via CORS, and ignores bots. `window.owleeEvent(name, data)` records a custom event.
+The script posts JSON to `POST /api/receive` on the same origin as `/data.js`. It sends no cookies (`credentials: 'omit'`). CORS still allows the browser to read the response from another origin. The body is rejected with `413` above `OWLEE_ANALYTICS_MAX_BODY_BYTES` (8 KiB). Known bot user agents are answered `202` and not stored.
 
-Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `OWLEE_PROXY_HOPS` when Owlee sits behind a reverse proxy (`1` for one proxy, `2` when Cloudflare is in front, which also enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). Point `OWLEE_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
+Events are accepted only when `Origin` (or `Referer`, if `Origin` is missing) matches the site domain or a subdomain of it, or an enabled link domain attached to that site. In development, `localhost` and `127.0.0.1` are also accepted (`OWLEE_INGEST_ALLOW_LOCALHOST`, on in development and off in production). A new site is unverified. Development still collects, and the site page says so. Production returns `403` until you add the TXT record shown on the site (`_owlee-verify.example.com` TXT `owlee-verify=<token>`) and press Verify. Owlee re-checks verified domains every `OWLEE_DOMAIN_RECHECK_SECS` (1 hour) and clears the flag when DNS answers without the token. A lookup error does not clear it. Status pages have no custom hostname, so there is nothing to verify there.
+
+The same site key and the same client IP each have a token bucket. A full bucket or a full daily quota answers `429` with `Retry-After`. The default is `OWLEE_ANALYTICS_DAILY_QUOTA` (1,000,000 per site). A million pageviews a day is a large site for this install; a site can set a lower or higher cap of its own. The counter resets at 00:00 UTC. `window.owleeEvent(name, data)` records a custom event.
+
+Raw `insight_events` rows, including link clicks, older than `OWLEE_ANALYTICS_RETENTION_DAYS` (90) are deleted in batches. Daily rollups (`insight_daily`, `insight_link_daily`, and the dimension tables) stay, and those are what the overview reads. `insight_events(timestamp)` is indexed for the delete.
+
+Visitor ids rotate monthly. A visit ends after 30 minutes of idle time. Set `OWLEE_PROXY_HOPS` when Owlee sits behind a reverse proxy (`1` for Traefik or Coolify, which is the default in `deploy/compose.yaml`; `2` when Cloudflare is also in front, which enables `cf-ipcountry` / `cf-region` / `cf-ipcity`). `0` ignores `X-Forwarded-For` and treats the proxy as the client, so every visitor shares one rate-limit bucket. Point `OWLEE_GEOIP_PATH` at a MaxMind or DB-IP city `.mmdb` if you want country, region, and city without Cloudflare. DB-IP Lite data is published by [DB-IP](https://db-ip.com).
+
+Login attempts are limited per IP and per account (`OWLEE_LOGIN_RATE_IP_*`, `OWLEE_LOGIN_RATE_ACCOUNT_*`). The limit is checked before the password hash. A full bucket answers `429` with `Retry-After`.
 
 Short links redirect with `307` or `308` and `Cache-Control: no-store`. On Owlee's own hostname use `/go/{slug}`. On any other hostname that you added under **Links**, the path is the slug. `HEAD` requests and known bots follow the redirect and are not counted.
 

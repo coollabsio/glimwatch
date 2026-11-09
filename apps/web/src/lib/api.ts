@@ -195,6 +195,8 @@ export type InstanceSettings = {
   initialized: boolean;
   version: string;
   database: string;
+  error_daily_quota: number;
+  analytics_daily_quota: number;
 };
 
 export type AdminUser = {
@@ -260,6 +262,15 @@ export type DashboardSite = {
   pageviews: number;
 };
 
+export type QuotaHit = {
+  kind: "error" | "analytics";
+  id: string;
+  name: string;
+  used: number;
+  quota: number;
+  resets_at: string;
+};
+
 export type Dashboard = {
   monitors: {
     up: number;
@@ -292,6 +303,7 @@ export type Dashboard = {
     previous_clicks: number;
     top_sites: DashboardSite[];
   };
+  quota_hits: QuotaHit[];
 };
 
 export type PublicComponent = {
@@ -334,6 +346,16 @@ export type InsightSite = {
   public_threshold: number;
   public_sections: string[];
   created_at: number;
+  verified: boolean;
+  verified_at: number | null;
+  verify_name: string;
+  verify_value: string;
+  ingest_open: boolean;
+  daily_quota: number;
+  quota_override: number | null;
+  used_today: number;
+  quota_exceeded: boolean;
+  resets_at: string;
 };
 
 export type InsightPoint = {
@@ -414,6 +436,11 @@ export type Project = {
   publicKey: string;
   dsn: string;
   createdAt: string;
+  dailyQuota: number;
+  quotaOverride: number | null;
+  usedToday: number;
+  quotaExceeded: boolean;
+  resetsAt: string;
 };
 
 export type Issue = {

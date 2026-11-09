@@ -8,6 +8,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use thiserror::Error;
 
 use crate::connectivity::Connectivity;
+use crate::dns::{SystemResolver, TxtResolver};
+use crate::limit::TokenBucket;
 use crate::migrations;
 
 #[derive(Clone)]
@@ -20,8 +22,14 @@ pub struct AppState {
     pub inflight: Inflight,
     pub connectivity: Connectivity,
     pub insights_secret: String,
-    pub collector_limit: Arc<crate::insights::RateLimiter>,
     pub public_limit: Arc<crate::insights::RateLimiter>,
+    pub error_project_limit: Arc<TokenBucket>,
+    pub error_ip_limit: Arc<TokenBucket>,
+    pub analytics_site_limit: Arc<TokenBucket>,
+    pub analytics_ip_limit: Arc<TokenBucket>,
+    pub login_ip_limit: Arc<TokenBucket>,
+    pub login_account_limit: Arc<TokenBucket>,
+    pub dns: Arc<dyn TxtResolver>,
     pub geo: Option<Arc<maxminddb::Reader<Vec<u8>>>>,
 }
 
@@ -93,6 +101,10 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
     let insights = crate::insights::prepare(&database, &config)
         .await
         .map_err(|error| BootError::Config(error.to_string()))?;
+    crate::instance_settings::apply_quota_env(&database, &config.ingest)
+        .await
+        .map_err(|error| BootError::Config(error.to_string()))?;
+    let ingest = &config.ingest;
     Ok(AppState {
         db: database,
         http: HttpClients::new()?,
@@ -101,8 +113,32 @@ pub async fn boot(config: Config) -> Result<AppState, BootError> {
         connectivity: Connectivity::new(config.connectivity_targets.clone()),
         passwords,
         insights_secret: insights.secret,
-        collector_limit: insights.collector_limit,
         public_limit: insights.public_limit,
+        error_project_limit: Arc::new(TokenBucket::per_minute(
+            ingest.error_rate_project_per_min,
+            ingest.error_rate_project_burst,
+        )),
+        error_ip_limit: Arc::new(TokenBucket::per_minute(
+            ingest.error_rate_ip_per_min,
+            ingest.error_rate_ip_burst,
+        )),
+        analytics_site_limit: Arc::new(TokenBucket::per_minute(
+            ingest.analytics_rate_site_per_min,
+            ingest.analytics_rate_site_burst,
+        )),
+        analytics_ip_limit: Arc::new(TokenBucket::per_minute(
+            ingest.analytics_rate_ip_per_min,
+            ingest.analytics_rate_ip_burst,
+        )),
+        login_ip_limit: Arc::new(TokenBucket::per_minute(
+            ingest.login_rate_ip_per_min,
+            ingest.login_rate_ip_burst,
+        )),
+        login_account_limit: Arc::new(TokenBucket::per_minute(
+            ingest.login_rate_account_per_min,
+            ingest.login_rate_account_burst,
+        )),
+        dns: Arc::new(SystemResolver::from_system()),
         geo: insights.geo,
         config: Arc::new(config),
     })
@@ -146,6 +182,7 @@ pub fn testing_config(path: PathBuf) -> Config {
         connectivity_targets: Vec::new(),
         proxy_hops: 0,
         geoip_path: None,
+        ingest: owlee_platform::IngestConfig::default(),
     }
 }
 

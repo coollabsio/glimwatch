@@ -8,7 +8,7 @@
 
 use std::ops::DerefMut;
 
-use owlee_platform::{Database, Id, ParseIdError, SmtpConfig, TimestampMillis};
+use owlee_platform::{Database, Id, IngestConfig, ParseIdError, SmtpConfig, TimestampMillis};
 use sqlx::{Any, Row, Transaction};
 use thiserror::Error;
 
@@ -55,6 +55,8 @@ pub struct InstanceView {
     pub smtp: Option<SmtpSettings>,
     pub initialized: bool,
     pub root_user: Option<RootUser>,
+    pub error_daily_quota: i64,
+    pub analytics_daily_quota: i64,
 }
 
 impl InstanceView {
@@ -82,12 +84,15 @@ pub enum InstanceError {
 pub async fn load(db: &Database) -> Result<InstanceView, sqlx::Error> {
     ensure_row(db).await?;
     let row = sqlx::query(
-        "SELECT registration_open, smtp_host, smtp_port, smtp_username, smtp_password, smtp_from \
+        "SELECT registration_open, smtp_host, smtp_port, smtp_username, smtp_password, smtp_from, \
+         error_daily_quota, analytics_daily_quota \
          FROM instance_settings WHERE id = 1",
     )
     .fetch_one(db.pool())
     .await?;
     let registration_open: i64 = row.try_get("registration_open")?;
+    let error_daily_quota: i64 = row.try_get("error_daily_quota")?;
+    let analytics_daily_quota: i64 = row.try_get("analytics_daily_quota")?;
     let smtp = smtp_from_row(
         row.try_get("smtp_host")?,
         row.try_get("smtp_port")?,
@@ -127,7 +132,57 @@ pub async fn load(db: &Database) -> Result<InstanceView, sqlx::Error> {
         smtp,
         initialized,
         root_user,
+        error_daily_quota,
+        analytics_daily_quota,
     })
+}
+
+/// Copies `OWLEE_*_DAILY_QUOTA` into the row until the root user saves quotas.
+pub async fn apply_quota_env(db: &Database, ingest: &IngestConfig) -> Result<(), sqlx::Error> {
+    if ingest.error_daily_quota.is_none() && ingest.analytics_daily_quota.is_none() {
+        return Ok(());
+    }
+    let current = load(db).await?;
+    let row = sqlx::query("SELECT quotas_updated_at FROM instance_settings WHERE id = 1")
+        .fetch_one(db.pool())
+        .await?;
+    let saved: Option<i64> = row.try_get("quotas_updated_at")?;
+    if saved.is_some() {
+        return Ok(());
+    }
+    let error = ingest.error_daily_quota.unwrap_or(current.error_daily_quota);
+    let analytics = ingest
+        .analytics_daily_quota
+        .unwrap_or(current.analytics_daily_quota);
+    sqlx::query(
+        "UPDATE instance_settings SET error_daily_quota = $1, analytics_daily_quota = $2 WHERE id = 1 AND quotas_updated_at IS NULL",
+    )
+    .bind(error)
+    .bind(analytics)
+    .execute(db.pool())
+    .await?;
+    Ok(())
+}
+
+pub async fn set_quotas(
+    db: &Database,
+    error_daily: i64,
+    analytics_daily: i64,
+    now: TimestampMillis,
+) -> Result<(), sqlx::Error> {
+    let mut tx = db.begin_immediate().await?;
+    ensure_row_tx(&mut tx).await?;
+    sqlx::query(
+        "UPDATE instance_settings SET error_daily_quota = $1, analytics_daily_quota = $2, \
+         quotas_updated_at = $3, updated_at = $3 WHERE id = 1",
+    )
+    .bind(error_daily)
+    .bind(analytics_daily)
+    .bind(now.as_millis())
+    .execute(tx.deref_mut())
+    .await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 pub async fn root_user_id(db: &Database) -> Result<Option<Id>, sqlx::Error> {
@@ -313,6 +368,8 @@ mod tests {
             }),
             initialized: true,
             root_user: None,
+            error_daily_quota: 100_000,
+            analytics_daily_quota: 1_000_000,
         }
     }
 

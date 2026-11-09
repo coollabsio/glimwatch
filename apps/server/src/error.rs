@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use axum::Json;
+use axum::http::header::{self, HeaderValue};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use owlee_platform::Problem;
@@ -21,7 +22,7 @@ pub enum AppError {
     EmailNotConfigured,
     BadRequest(String),
     Validation(BTreeMap<String, String>),
-    TooManyRequests,
+    TooManyRequests { retry_after_secs: u64 },
     Internal,
 }
 
@@ -30,6 +31,12 @@ impl AppError {
         let mut fields = BTreeMap::new();
         fields.insert(name.to_owned(), message.into());
         Self::Validation(fields)
+    }
+
+    pub fn limited(retry_after_secs: u64) -> Self {
+        Self::TooManyRequests {
+            retry_after_secs: retry_after_secs.max(1),
+        }
     }
 }
 
@@ -51,7 +58,7 @@ impl std::fmt::Display for AppError {
             Self::EmailNotConfigured => formatter.write_str("email not configured"),
             Self::BadRequest(detail) => write!(formatter, "bad request: {detail}"),
             Self::Validation(_) => formatter.write_str("validation failed"),
-            Self::TooManyRequests => formatter.write_str("too many requests"),
+            Self::TooManyRequests { .. } => formatter.write_str("too many requests"),
             Self::Internal => formatter.write_str("internal error"),
         }
     }
@@ -66,6 +73,10 @@ impl From<sqlx::Error> for AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        let retry_after = match &self {
+            Self::TooManyRequests { retry_after_secs } => Some(*retry_after_secs),
+            _ => None,
+        };
         let problem = match self {
             Self::Unauthorized => Problem::unauthorized(),
             Self::InvalidLogin => Problem {
@@ -85,7 +96,7 @@ impl IntoResponse for AppError {
                 fields: None,
             },
             Self::NotFound => Problem::not_found(),
-            Self::TooManyRequests => Problem {
+            Self::TooManyRequests { .. } => Problem {
                 type_uri: "https://owlee.io/problems/too-many-requests".to_owned(),
                 title: "Too many requests".to_owned(),
                 status: 429,
@@ -148,6 +159,12 @@ impl IntoResponse for AppError {
         };
         let status =
             StatusCode::from_u16(problem.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-        (status, Json(problem)).into_response()
+        let mut response = (status, Json(problem)).into_response();
+        if let Some(secs) = retry_after {
+            if let Ok(value) = HeaderValue::from_str(&secs.to_string()) {
+                response.headers_mut().insert(header::RETRY_AFTER, value);
+            }
+        }
+        response
     }
 }
