@@ -52,7 +52,7 @@ export OWLEE_DATABASE_URL=postgres://owlee:owlee@127.0.0.1:5432/owlee
 cargo run -p owlee-server -- serve --listen 127.0.0.1:43123
 ```
 
-The URL must start with `postgres://` or `postgresql://`. Integer columns are `BIGINT` so one SQL file decodes as `i64` on both engines. A migration is applied once, inside a transaction, and its SHA-256 is stored in `schema_migrations`. A later binary with different SQL for that version refuses to start.
+The URL must start with `postgres://` or `postgresql://`. Integer columns are `BIGINT` so one SQL file decodes as `i64` on both engines. A migration is applied once, inside a transaction, and its SHA-256 is stored in `schema_migrations`. A later binary with different SQL for that version refuses to start. Make a new migration with `just new-migration <name>`. It makes `apps/server/migrations/<UTC timestamp>_<name>.sql`, so parallel branches do not collide. `apps/server/build.rs` finds the files and refuses a version that is not a timestamp or a duplicate version. Do not edit a migration after it is merged.
 
 Copy `.env.example` to `.env.local` if you want the variables written down. The process reads the environment directly. `just dev` sources `.env.local` when that file exists.
 

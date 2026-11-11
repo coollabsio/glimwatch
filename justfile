@@ -32,3 +32,12 @@ build:
 # Demo account, monitors, status page, analytics site, short links, and error events.
 seed:
     cargo run -p owlee-server -- seed
+
+# Make a migration file with a UTC timestamp version, e.g. `just new-migration add_tags`.
+new-migration name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [[ "{{name}}" =~ ^[a-z0-9_]+$ ]] || { echo "use lowercase letters, digits and _ in the name"; exit 1; }
+    file="apps/server/migrations/$(date -u +%Y%m%d%H%M%S)_{{name}}.sql"
+    echo "-- One SQL file for SQLite and Postgres." > "$file"
+    echo "$file"
